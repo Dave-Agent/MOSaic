@@ -34,6 +34,25 @@ for d in ('ghidra', 'analysis', 'extracted'):
 if os.path.isdir(os.path.join(root, 'reference')) and not (os.path.exists(os.path.join(root, 'reference.sha256')) or any(f.endswith('.sha256') for f in tracked)): warn.append('no reference.sha256 tracked (a checksum proves a supplied image is the right one)')
 rd = open(os.path.join(root, 'README.md')).read().lower() if os.path.exists(os.path.join(root, 'README.md')) else ''
 if not re.search(r'sha256|checksum|supply|provide|you need', rd): warn.append('README.md does not explain how to supply the original data')
+# the supplied media must be read-only and match the checksums recorded when it was first gathered (an emulator once rewrote a G64 attached writable)
+import hashlib
+for d in ('originals', 'original'):
+    dd = os.path.join(root, d)
+    if not os.path.isdir(dd): continue
+    sums = {}
+    for sf in (os.path.join(root, d + '.sha256'), os.path.join(root, 'SHA256SUMS')):
+        if os.path.exists(sf):
+            for l in open(sf):
+                m = re.match(r'([0-9a-fA-F]{64})\s+\*?(.+)$', l.strip())
+                if m: sums[os.path.basename(m.group(2))] = m.group(1).lower()
+    for f in sorted(os.listdir(dd)):
+        p = os.path.join(dd, f)
+        if not os.path.isfile(p): continue
+        if os.access(p, os.W_OK): warn.append(f'{d}/{f} is writable: chmod a-w it, and never give it to an emulator directly (run on a copy)')
+        if f in sums:
+            h = hashlib.sha256(open(p, 'rb').read()).hexdigest()
+            if h != sums[f]: fail.append(f'{d}/{f} DOES NOT MATCH its recorded SHA-256: the original has been changed; restore it from the source')
+        else: warn.append(f'{d}/{f} has no recorded SHA-256 (put it in {d}.sha256 when the media is gathered)')
 print('layout check:', root)
 for l in fail + warn: print('  prefer', l)
 if not fail and not warn: print('  ok')

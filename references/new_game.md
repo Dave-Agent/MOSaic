@@ -13,7 +13,7 @@ The aim of this stage: a **reference image of the game only** (no crack, no load
 
 ## 1. Gather the media
 1. Prefer a **non-cracked** release. If only a cracked one exists, find a **second release** (a different cracker): the bytes they do not share are the crack, which is how IK+ undid edits the first cracker had made (`docs/version_diff.md` there).
-2. Put media in `originals/` (not committed). Record file names, sizes and hashes in the README (how to supply them).
+2. Put media in `originals/` (not committed) and **protect it before anything touches it**: record the SHA-256 of every file in `originals.sha256` (committed), then `chmod a-w`. **Never give an original to an emulator**: VICE attaches a disk image writable and writes it back (a copy-protected G64 lost its directory track that way on the first run; the scripts here run VICE on a scratch copy, and `check_layout.py` flags a writable original or a hash that no longer matches). Record file names, sizes and the hashes in the README too (how to supply them). Extract the files you need with `c1541 -attach IMG -read NAME out` (read-only) into scratch.
 3. Note the platform facts that change timing and boot: PAL or NTSC, true-drive needs, fast loaders.
 
 ## 2. Find the hand-off

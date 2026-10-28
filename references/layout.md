@@ -15,7 +15,7 @@ tools/                project scripts; tools/migrations/ holds one-off rewrites 
 docs/                 analysis notes, the porting guide, generated lists
 launcher/             hand-written, NOT game: whatever is needed to run the game in an emulator
 
-originals/            media as downloaded                       NOT COMMITTED
+originals/            media as downloaded: read-only, SHA-256 in originals.sha256 (committed), never attached to an emulator directly    NOT COMMITTED
 dumps/                emulator RAM dumps                         NOT COMMITTED
 reference/            the cleaned reference image (diff target)  NOT COMMITTED; reference.sha256 IS committed
 build/ ghidra/ analysis/ extracted/   derived, regenerable      NOT COMMITTED

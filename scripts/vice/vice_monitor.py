@@ -55,12 +55,26 @@ class Monitor:
     def pc(s):
         s.k.sendall(b'\n'); m = re.search(r'\(C:\$([0-9a-f]{4})\)', s.read(1.0)); return int(m.group(1), 16) if m else None
 
+DISK_MEDIA = ('.d64', '.d71', '.d81', '.g64', '.g71', '.x64', '.t64', '.tap', '.crt')
+
+def scratch_copy(media):
+    """VICE attaches a disk image WRITABLE by default and writes it back (a copy-protected G64 changed under us once). So the media is NEVER given to VICE directly:
+    a disk/tape/cartridge image is copied to a temporary directory and the copy is attached. The caller removes the directory (Popen.scratch_dir) when done."""
+    import shutil, tempfile
+    d = tempfile.mkdtemp(prefix='vice_media_'); dst = os.path.join(d, os.path.basename(media)); shutil.copy2(media, dst); os.chmod(dst, 0o444)   # also read-only
+    return dst, d
+
 def start_vice(vice_bin, media, port=6510, warp=True, limit_cycles=None, extra=()):
-    """Start VICE with the remote text monitor open and the media autostarted; returns the Popen (kill it when done)."""
+    """Start VICE with the remote text monitor open and the media autostarted from a scratch COPY (see scratch_copy); returns the Popen (kill it when done, and rmtree proc.scratch_dir)."""
+    scratch = None
+    if media.lower().endswith(DISK_MEDIA): media, scratch = scratch_copy(media)
     a = [vice_bin] + (['-warp'] if warp else []) + ['+confirmonexit', '-drive8truedrive', '-drive8type', '1541', '-jamaction', '2', '-remotemonitor',
         '-remotemonitoraddress', 'ip4://127.0.0.1:%d' % port] + (['-limitcycles', str(limit_cycles)] if limit_cycles else []) + list(extra) + ['-autostart', media]
     assert '-default' not in a
-    return subprocess.Popen(a, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    proc = subprocess.Popen(a, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); proc.scratch_dir = scratch
+    import atexit, shutil
+    if scratch: atexit.register(shutil.rmtree, scratch, True)
+    return proc
 
 def main():
     import argparse
