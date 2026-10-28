@@ -23,7 +23,7 @@ The three projects (Monty on the Run `Reversing/Monty_On_The_Run`, Thing on a Sp
 | 2 | Split into files and namespaces; game logic separated from the hardware behind a platform interface: the setup for a port (`references/phase2_port.md`) | `just check` |
 | 3 | A port, kept out of phases 1 and 2 | project-specific |
 
-**Phase 1 complete (the user's definition):** no direct memory references (raw address operands, address pairs built from immediates, address words in data that should be labels), no Ghidra placeholders (`DAT_`, `LAB_`, `SUB_`, `FUN_`, `PTR_`... in code **or comments**), and no provisional names left (no `unk` names, no `TODO(name)` markers, no `STATUS:  unknown` banners). `scripts/p1_complete.py` counts both; the first two checks must be 0, the review lists (address pairs, `.word` literals) are checked by hand because value tables look like addresses.
+**Phase 1 complete (the user's definition):** no direct memory references (raw address operands, address pairs built from immediates, address words in data that should be labels), no Ghidra placeholders (`DAT_`, `LAB_`, `SUB_`, `FUN_`, `PTR_`... in code or in prose comments; the XREF and `[ADDR:bytes]` trace comments that exist to trace back to the original may keep them), and no provisional names or blockers left (no `unk` names, no `TODO(name)` or `TODO(block)` markers, no `STATUS:  unknown` banners). `scripts/p1_complete.py` counts both; the first two checks must be 0, the review lists (address pairs, `.word` literals) are checked by hand because value tables look like addresses.
 
 "Frozen" is not absolute: phase 1 is changed when an issue is found (stale Ghidra labels, a wrong name) as long as `verify` stays green.
 
@@ -32,7 +32,7 @@ The three projects (Monty on the Run `Reversing/Monty_On_The_Run`, Thing on a Sp
 This skill is the folder `/home/dave/C64Projects/c64-decomp`, a git repository (every change is a commit; several agents edit it, so commit your own and never discard others' work). `~/.claude/skills/c64-decomp` is a symlink to it, which is how Claude Code loads it in every project.
 
 
-`phase1/src` (monolith) and `phase2/src` (split); `symbols.asm` is the index and imports `zero_page.asm`, `variables.asm`, `constants.asm`; `framework/` generic tooling (never edited in a project, never holds a project value; specifics go in `project.config`); `tools/` project scripts; `tools/migrations/` one-off, already-applied rewrites (copy one as a template for a new bulk change); `reference/`, `original/`, `dumps/` are supplied data, immutable and not committed (`references/layout.md`).
+`phase1/src` (monolith) and `phase2/src` (split); `symbols.asm` is the index and imports `zero_page.asm`, `variables.asm`, `constants.asm`; `framework/` generic tooling: **the master is this skill's `framework/`**; a project holds a copy, never edits it in place (change it in the skill, then `scripts/framework_sync.py --write`), and it never holds a project value (specifics go in `project.config`); `tools/` project scripts; `tools/migrations/` one-off, already-applied rewrites (copy one as a template for a new bulk change); `reference/`, `original/`, `dumps/` are supplied data, immutable and not committed (`references/layout.md`).
 
 ## Doing a bulk change safely (the pattern that worked)
 
@@ -42,7 +42,7 @@ Write a one-off script in `tools/migrations/YYYY-MM-name.py` that (a) parses, (b
 
 - `libs/`: canonical `vic.asm`, `sid.asm`, `cia.asm`, `cpu.asm`; a project's `libs/` is a copy.
 - `scripts/`: generic tools (`--root`, `--phase 1|2` or `--main FILE`, read `project.config`; nothing changes without `--write`):
-  bulk rewrites `symbols_tidy.py`, `zp_namespace.py`, `hi_byte_names.py`; analysis `scan_offsets.py`, `raw_refs.py`, `smc_list.py`, `addr_immediates.py`, `platform_deps.py`; edits `add_label.py`, `align_comments.py`; `build_compare.sh` (baseline PRG compare); `check_layout.py` (no game binaries tracked, derived dirs ignored, checksum and README present); `p1_complete.py` (phase 1 completeness). Run them from the project root.
+  bulk rewrites `symbols_tidy.py`, `zp_namespace.py`, `hi_byte_names.py`; analysis `scan_offsets.py`, `raw_refs.py`, `smc_list.py`, `addr_immediates.py`, `platform_deps.py`; edits `add_label.py`, `align_comments.py`; `build_compare.sh` (baseline PRG compare); `framework_sync.py` (project `framework/` vs the master); `check_layout.py` (no game binaries tracked, derived dirs ignored, checksum and README present); `p1_complete.py` (phase 1 completeness). Run them from the project root.
 - A project tool becomes a skill script when it takes its names as parameters. Test a new one against the project it came from and diff the output.
 
 ## Rules and decisions

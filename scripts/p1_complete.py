@@ -7,7 +7,7 @@ Checks (1, 2 and 2b must be 0; the other two list candidates that are reviewed, 
   1. raw operands          hex addresses used as code operands (raw_refs.py); immediates excluded
   2. Ghidra placeholders   DAT_/LAB_/SUB_/FUN_/PTR_/UNK_/EXT_/BYTE_/WORD_/switchD_/caseD_ ... names, anywhere in the source files INCLUDING COMMENTS (a stale
                            `LAB_1728` in a comment still points at nothing)
-  2b. provisional names    `unk` identifiers, `TODO(name)` markers, `STATUS:  unknown` banners
+  2b. provisional names    `unk` identifiers, `TODO(name)` and `TODO(block)` markers, `STATUS:  unknown` banners
   3. address pairs         `lda #lo`/`lda #hi` built addresses in the image (addr_immediates.py): candidates for `#<label` / `#>label`
   4. address words         `.word $xxxx` literals whose value lies in the image
 Exit status 0 only when checks 1, 2 and 2b are clean."""
@@ -24,15 +24,21 @@ def run(script, *extra):
     return r.stdout
 raw = int(re.match(r'(\d+)', run('raw_refs.py')).group(1))
 ph = r'\b(?:DAT|LAB|SUB|FUN|PTR|UNK|EXT|OFF|CODE|BYTE|WORD|DWORD|QWORD|ADDR|JT|thunk_FUN|switchD|caseD)_[0-9a-fA-F]{3,8}\b' + (('|' + args.extra) if args.extra else '')
-pat = re.compile(ph); found = []
+pat = re.compile(ph); found = []; ignored = [0]
+# Original-code trace comments may keep Ghidra names (decided with the user 2026-10-29: they exist to trace back to the original): an `XREF[...]` comment, its continuation
+# lines, and the exporter's `[ADDR:bytes MNEMONIC]` end-of-line comment. Placeholders anywhere else (code, prose comments) still count.
+XREF_HEAD = re.compile(r'//\s*XREF\b'); XREF_CONT = re.compile(r'^\s+//\s+[\w.:]+\([RWcjpd]\)'); TRACE_ADDR = re.compile(r'//\s*\[[0-9A-Fa-f]{4}[:\]]')
 files = reachable(main) + [os.path.join(os.path.dirname(main), f) for f in os.listdir(os.path.dirname(main)) if f.endswith('.asm') and os.path.join(os.path.dirname(main), f) not in reachable(main)]
 libs = os.path.join(os.path.dirname(main), 'libs')
 if os.path.isdir(libs): files += [os.path.join(libs, f) for f in os.listdir(libs) if f.endswith('.asm')]
 for f in sorted(set(files)):
     for n, l in enumerate(open(f), 1):
-        for m in pat.finditer(l): found.append((os.path.relpath(f, args.root), n, m.group(0), 'comment' if '//' in l and l.index('//') < m.start() else 'code', l.strip()[:90]))
+        for m in pat.finditer(l):
+            c = l.find('//')
+            if XREF_CONT.match(l) or (0 <= c < m.start() and (XREF_HEAD.search(l[c:]) or TRACE_ADDR.search(l[c:]))): ignored[0] += 1; continue
+            found.append((os.path.relpath(f, args.root), n, m.group(0), 'comment' if '//' in l and l.index('//') < m.start() else 'code', l.strip()[:90]))
 prov = []                                                    # provisional names: `unk` identifiers, TODO(name) markers, STATUS:  unknown banners
-PROV = re.compile(r'\bunk[A-Z_]\w*|TODO\(name\)|STATUS:\s+unknown\b')
+PROV = re.compile(r'\bunk[A-Z_]\w*|TODO\((?:name|block)\)|STATUS:\s+unknown\b')
 for f in sorted(set(files)):
     for n, l in enumerate(open(f), 1):
         for m in PROV.finditer(l): prov.append((os.path.relpath(f, args.root), n, m.group(0), l.strip()[:90]))
@@ -45,8 +51,8 @@ for f in sorted(set(files)):
             if any(args.lo <= int(m.group(1), 16) <= args.hi for m in re.finditer(r'(?<![\w#])\$([0-9a-fA-F]{4})\b', code)): words.append((os.path.relpath(f, args.root), n, l.strip()[:90]))   # one entry per line
 print('phase', args.phase, 'source', os.path.relpath(main, args.root))
 print(f'  1. raw operands            {raw:5d}   (must be 0)')
-print(f'  2. Ghidra placeholders     {len(found):5d}   (must be 0)'); [print(f'       {f}:{n}  {name} ({kind})  {t}') for f, n, name, kind, t in found[:15]]
-print(f'  2b. provisional names      {len(prov):5d}   (must be 0: unk names, TODO(name) markers, STATUS:  unknown)'); [print(f'       {f}:{n}  {name}  {t}') for f, n, name, t in prov[:10]]
+print(f'  2. Ghidra placeholders     {len(found):5d}   (must be 0; {ignored[0]} more in XREF / [ADDR:...] trace comments are allowed)'); [print(f'       {f}:{n}  {name} ({kind})  {t}') for f, n, name, kind, t in found[:15]]
+print(f'  2b. provisional names      {len(prov):5d}   (must be 0: unk names, TODO(name) / TODO(block) markers, STATUS:  unknown)'); [print(f'       {f}:{n}  {name}  {t}') for f, n, name, t in prov[:10]]
 print(f'  3. address pairs (review)  {imm:5d}   (python3 addr_immediates.py for the list)')
 print(f'  4. .word $addr lines       {len(words):5d}   (review: value tables such as note frequencies are data, not addresses)'); [print(f'       {f}:{n}  {t}') for f, n, t in words[:8]]
 ok = raw == 0 and not found and not prov

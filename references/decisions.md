@@ -11,9 +11,12 @@ One line per decision: **date: what** (who decided) Why. Rule: where it lives. N
 - 2026-10-29: **Phase 2 zero page is `zp.name`** in a `zp` namespace (user: "do step 2"). Phase 2 declares storage in a `virtual` segment, as Monty and TOAS do (user: "follow TOAS and MOTR"). Tool: `scripts/zp_namespace.py`. Rule: `rules.md`, Relocatability; `naming.md`.
 - 2026-10-29: **Pointer high bytes get `_hi` names; constant-index reads of a small array get neutral element names** (`rank_order_1`) when the meaning of the index is not confirmed (user: "sort the 71"). Tool: `scripts/hi_byte_names.py`. Rule: `naming.md`.
 - 2026-10-29: **No `label+n` for a block of consecutive slots** (user): `zp_sprite_x+5` breaks if the zero-page variables are edited. `+N` is allowed in a definition only; `label+n,x` into a table stays. Rule: `rules.md`, Relocatability.
+- 2026-10-29: **`TODO(block)` marks a phase 1 blocker** (user agreed): TOAS's plain `TODO:` becomes `TODO(block)`; `p1_complete.py` counts it with `TODO(name)`.
+- 2026-10-29: **The skill masters `framework/`** (user: "sure"): the master is the skill's copy, taken from TOAS (the evolved one: config-driven `SRC_MAIN`, snapshot launch, entry-point importer) with its two project strings made generic; projects copy it, `scripts/framework_sync.py` compares and updates.
+- 2026-10-29: **The relaxed anonymous-label rule is the general one** (user: it reads better); Monty and IK+ convert where it qualifies.
 - 2026-10-29: **TODO markers are `TODO(tag):`** (my call, justified): tags carry a category (`just todo sound`), `TODO(` greps cleanly, `p2_todo` is just the `phase2` tag, migration is mechanical. TOAS's `p2_todo:` becomes `TODO(phase2):`. Rule: `rules.md`, Structure and comments. (Blocking meaning of a plain `TODO:` is open, below.)
 - 2026-10-29: **The skill carries generic tools and the hardware libs**; anything parameterised via `project.config` and arguments belongs in it (user). Rule: `SKILL.md`.
-- 2026-10-29: **XREF comments are kept** with their labels (user, via the review of `symbols_tidy.py`); `--drop-xref` is the opt-out. Open conflict with the placeholder rule, below.
+- 2026-10-29: **XREF comments are kept** with their labels (user, via the review of `symbols_tidy.py`); `--drop-xref` is the opt-out. **Placeholders inside XREF and `[ADDR:bytes]` trace comments are allowed** (user): the exporter's end-of-line comments exist to trace back to the original code. Everywhere else the no-placeholder rule holds. `p1_complete.py` ignores trace comments and reports how many it ignored.
 - 2026-10-29: **`symbols_tidy.py` puts an alias after its primary** (Kick sizes a forward-referenced zero-page alias as absolute). Rule: `kick.md`.
 - 2026-10-29: **Phase 1 is complete when no direct memory references, no Ghidra-style placeholders and no provisional names remain** (user). Tool: `scripts/p1_complete.py`. Rule: `SKILL.md`, Phases.
 - 2026-10-29: **Naming is defined in one place** (user's answers): `_tbl`, `_index`, phase 1 zero page `zp_`-prefixed; a located-but-not-understood item gets a descriptive name plus `TODO(name)`, never `unk` or an address (my proposal, user agreed). Rule: `naming.md`.
@@ -24,14 +27,11 @@ One line per decision: **date: what** (who decided) Why. Rule: where it lives. N
 - 2026-10-29: **The skill's `platform_deps.py` is canonical** over the project copies: it tracks open scopes with a stack, so a namespace closed without a `// Name` comment (`} // .namespace Data`, or a bare `}`) no longer corrupts the names of later routines (found by the TOAS agent; IK+'s own tool has the old bug and reports 5 routines with wrong paths). `check_layout.py` is advisory: findings are warnings, `--strict` exits 2.
 
 ## Open questions (waiting for the user)
-- XREF comments hold Ghidra names or old labels after a rename, which conflicts with the no-placeholder rule; nothing regenerates them. Choose: regenerate from a fresh Ghidra export, strip names from XREF lines, or allow them.
-- A plain `TODO:` blocks phase 1 in TOAS; `TODO(code)` does not block `p1_complete.py`. Which tag blocks?
-- Does a leftover generated `<mnemonic>_op_<addr>` SMC operand name block phase 1 completeness?
-- Should `framework/` (copied from Monty) be mastered in this skill?
-- Anonymous-label regime: is TOAS's relaxed rule to become the general one, or stay TOAS phase 1 only?
+- Does a leftover generated `<mnemonic>_op_<addr>` SMC operand name block phase 1 completeness? My view: yes (it is the same kind of placeholder as `LAB_xxxx` and says nothing about what the operand holds); the information for a real name is usually in the `// SMC: ... patched by` comment next to it. Not yet in the gate.
 
 ## Per-project application (for each project's agent, not decided here)
 - **IK+:** `tools/platform_deps.py` has the namespace-closing bug (use the skill's); zero-page names to `zp_` prefix in phase 1; slot members for the sprite blocks; phase 2 zero page to a virtual segment; two placeholder names in comments, address pairs and `.word` rows to review (`p1_complete.py`); dumps and reference files are tracked (`check_layout.py`); recipe names to the standard set; ~315 `label+n` table offsets unreviewed; generic scratch names (`tmp_a..d`, `ptr_a..d`, `scratch_b`) need names from the user.
+- **Monty and IK+:** `framework/` is the older copy (run `scripts/framework_sync.py`); convert anonymous labels where they qualify.
 - **Monty:** reference `.bin` tracked and `/reference/` not ignored; recipe names; its `CLAUDE.md` repeats rules now in this skill.
-- **TOAS:** TODO syntax (`p2_todo:` and `TODO:` to `TODO(tag):`); no `CLAUDE.md`.
+- **TOAS:** TODO syntax (`p2_todo:` to `TODO(phase2):`, plain `TODO:` to `TODO(block)`); no `CLAUDE.md`; its `framework/` differs from the master in `launch.sh` and `apply_entry_points.py` (two project strings made generic).
 - **All:** trim each project `CLAUDE.md` to what is specific to the game.

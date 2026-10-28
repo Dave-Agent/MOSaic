@@ -11,14 +11,14 @@ Applies to: every project. The no-raw-address rule gates phase 1; phase 2 keeps 
 
 
 ## Local labels
-Applies to: every project; **which regime**: Monty and IK+ use this rule in both phases. TOAS phase 1 uses the relaxed anonymous-label regime in the next section, because its source is a flat monolith (its phase 2 follows this rule).
+Applies to: every project, both phases (decided with the user 2026-10-29: the relaxed anonymous-label rule below is the general one, because it reads better).
 - **Local labels:** scope the routine (`Name: { ... }`), name the label for what it means (`done`, `row_loop`, `go_behind`); anonymous `!:` only for a trivial skip or tiny loop that is the only local, never mixed with named ones; a label used from another routine is global with a proper name. More than ~3 non-trivial locals suggests splitting the routine.
 
 ## Structure and comments
 Applies to: every project, except where a bullet says otherwise.
-- **Label files.** Symbols live in label files by kind (`zero_page.asm`, `variables.asm`, `constants.asm`, `symbols.asm` as the index). **Keep the Ghidra XREF comments** with their labels. OPEN (the user is taking this up with the skill's author): an XREF line can hold a Ghidra name or an old label after a rename, which conflicts with the no-placeholder rule, and nothing regenerates them yet.
+- **Label files.** Symbols live in label files by kind (`zero_page.asm`, `variables.asm`, `constants.asm`, `symbols.asm` as the index). **Keep the Ghidra XREF comments** with their labels, and the exporter's `[ADDR:bytes MNEMONIC]` end-of-line comments: they exist to trace back to the original code (decided with the user). Ghidra placeholder names inside these trace comments are allowed (they record what the original export called a thing); everywhere else the no-placeholder rule holds, in code and in prose comments. When a label is renamed its XREF lines are not rewritten. `p1_complete.py` ignores trace comments and counts the rest.
 - Section banners (Monty and IK+ only; TOAS does not use them, so `STATUS:  unknown` banners do not exist there) (`SECTION:` / `RANGE:` / `STATUS: unknown|partial|understood` / `SUMMARY:`, optional `P1_ROUTINE_NAME:` in phase 2) are landmarks; add or refine one when a region is understood. `just sections`, `just todo`.
-- **TODO markers are `// TODO(tag): headline`** (one tag per marker: `sound` needs listening, `user` needs the user's knowledge, `code` is plain work, `phase2` is a change for phase 2); detail follows on `//   ` lines; delete the marker when answered. Decided 2026-10-29 (see decisions.md): TOAS's `p2_todo:` is `TODO(phase2):` and a plain `TODO:` is `TODO(code):`. **OPEN (put to the user):** in TOAS a plain `TODO:` blocks phase 1, but `TODO(code)` is ordinary work that does not block `p1_complete.py`; a blocking tag is needed.
+- **TODO markers are `// TODO(tag): headline`** (one tag per marker: `sound` needs listening, `user` needs the user's knowledge, `code` is plain work, `phase2` is a change for phase 2); detail follows on `//   ` lines; delete the marker when answered. Decided 2026-10-29 (see decisions.md): TOAS's `p2_todo:` is `TODO(phase2):`  **`TODO(block)` is a phase 1 blocker** (decided with the user): TOAS's plain `TODO:` becomes `TODO(block)` (not `TODO(code)`, which is ordinary work), and `p1_complete.py` counts it. `TODO(name)` (a provisional name) blocks too.
 - Do not read the monolith whole: grep a label in `symbols.asm`, read around it, follow cross-references.
 - Strings: the game's own text encoding via macros (`FontText`, `HudText`), documented per project.
 
@@ -37,9 +37,9 @@ Enforced by `tools/comment_check.py` (`just comment-check`, part of `just verify
 - **Migration:** reflow in mechanical passes (clean split of long label comments, paragraph-aware wrapping that treats a `TODO(phase2)` headline specially), hand-write the rest, and check byte identity after each pass. Never reflow without a checkpoint to return to.
 
 
-## Anonymous labels (TOAS phase 1 regime)
-Applies to: TOAS phase 1. Other projects follow the stricter Local labels rule above unless they decide to adopt this one.
-A local branch target may be anonymous only when all of these hold (this relaxes the general local-label rule):
+## Anonymous labels (the general regime)
+Applies to: every project (it came from TOAS phase 1 and was adopted for all; Monty and IK+ source written under the older "trivial skip only" rule can be converted with `anon_labels.py` where it qualifies).
+A local branch target may be anonymous only when all of these hold:
 1. the label and every branch or jump to it are in the same routine (between two named labels);
 2. nothing else refers to it: no other routine, jump table, data row or self-modifying code;
 3. each reference is at most two anonymous labels away (`!+`, `!-`, `!++`, `!--`; never `!+++` / `!---`), counting the target, in the final layout;

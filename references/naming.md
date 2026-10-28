@@ -17,7 +17,7 @@ Names are the index of the source: grep must find things, and the case of a name
 - A specific verb phrase that tells siblings apart: `UpdateScore`, `FindContact`, `LoadRoom`. Not `DoUpdate`, `Process`, `Check`.
 - Predicates start `Is`/`Has`/`Can` (`IsRoundOver`), setters `Set` (`SetColours`).
 - **No namespace echo:** the namespace is the domain, so `Music.Init`, not `Music.MusicInit`. Namespace = domain noun (`HUD`, `Music`, `Move`), not `Helpers`/`Misc`/`Stuff`. Max 3 levels; a sub-domain earns a level with its own data and 3+ routines. State and tables go in a `.Data` child namespace.
-- **Local labels:** snake_case, named for what they mean (`done`, `idle`, `row_loop`, `go_behind`); the routine is a scope (`Name: { ... }`). Anonymous `!:` only under the project's anonymous-label regime (rules.md, Local labels).
+- **Local labels:** snake_case, named for what they mean (`done`, `idle`, `row_loop`, `go_behind`); the routine is a scope (`Name: { ... }`). Anonymous `!:` only under the anonymous-label rules in rules.md.
 
 ## Data: suffix vocabulary (the dominant practice in all three projects)
 | Suffix | Meaning |
@@ -37,7 +37,7 @@ Names are the index of the source: grep must find things, and the case of a name
 ## Names that are not (yet) confirmed
 - A name is **provisional** until it is confirmed against dynamic analysis or by the user. A human-made label from earlier work counts as provisional.
 - Give a provisional item a **descriptive name from what is known** (`data_after_belt_table`, `routine_before_hud_draw`), never an address and never an `unk` prefix, and mark it: `// TODO(name): provisional; known: <facts>`. Tags: `name` = a provisional name awaiting confirmation, `user` = a question only the user can answer (what a sprite, sound or mode is: ask, do not guess), `sound` = needs listening.
-- **Phase 1 is not complete while any of these remain:** a Ghidra placeholder (`DAT_`, `LAB_`, `SUB_`, `FUN_`...) in code or comments; an `unk` name; a `TODO(name)` marker; a `STATUS:  unknown` banner. `scripts/p1_complete.py` counts them.
+- **Phase 1 is not complete while any of these remain:** a Ghidra placeholder (`DAT_`, `LAB_`, `SUB_`, `FUN_`...) in code or comments; an `unk` name; a `TODO(name)` or `TODO(block)` marker; a `STATUS:  unknown` banner. Placeholder names inside XREF and `[ADDR:...]` trace comments do not count (rules.md, Structure and comments). `scripts/p1_complete.py` counts them.
 
 ## Generated operand names (open)
 SMC operand labels are generated as `<mnemonic>_op_<addr>` (`sta_op_09fe`) until the operand's meaning is known; then rename them to what the operand holds (`irq_d018_value`, `sample_ptr`). Open question for the user: does a leftover `_op_<addr>` name count as a placeholder that blocks phase 1? (IK+ phase 1 has 72 such lines.)

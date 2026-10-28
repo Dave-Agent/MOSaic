@@ -10,7 +10,7 @@ CLAUDE.md             what is specific to this game; everything shared lives in 
 phase1/src/           the byte-identical monolith + label files (symbols, zero_page, variables, constants) + libs/
 phase2/src/           the split source: game/ platform/ data/ + label files + libs/ (a main file that imports the rest)
 libs/                 a copy of the skill's hardware libs (inside each phase's src/)
-framework/            generic build/verify/launch/Ghidra-import tooling (never edited in a project; no project values inside)
+framework/            a copy of the skill's `framework/` master: generic build/verify/launch/Ghidra-import tooling (never edited in a project; no project values inside; `scripts/framework_sync.py` keeps it current)
 tools/                project scripts; tools/migrations/ holds one-off rewrites that were applied (templates, not to re-run)
 docs/                 analysis notes, the porting guide, generated lists
 launcher/             hand-written, NOT game: whatever is needed to run the game in an emulator
