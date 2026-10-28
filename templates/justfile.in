@@ -63,6 +63,15 @@ seeds:
     done
     python3 {{skill}}/scripts/ghidra/make_seeds.py --root . --reference "$REFERENCE_PRG" --base "${LOAD_ADDRESS#0x}" --out tools/ghidra/seeds.txt --entry "$HANDOFF_PC:hand-off" --vectors dumps/handoff.bin --edges build/trace/cov.edges --executed build/trace/cov.flags
 
+# First conversion step after the first byte-identical build: name the hardware registers with the libs (names only; the gate must stay green).
+libs:
+    python3 {{skill}}/scripts/apply_libs.py --root . --phase 1
+    @echo "dry run above: apply with  just libs-apply  (it re-runs verify)"
+
+libs-apply:
+    python3 {{skill}}/scripts/apply_libs.py --root . --phase 1 --write
+    just verify
+
 # Stage 5b: import the reference into Ghidra, seed it, export Kick Assembler source into ghidra/ (the landing zone: never phase1/src).
 ghidra:
     bash {{skill}}/scripts/ghidra/run.sh .
