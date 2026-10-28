@@ -30,7 +30,7 @@ One line per decision: **date: what** (who decided) Why. Rule: where it lives. N
 - 2026-10-29: **The skill's `platform_deps.py` is canonical** over the project copies: it tracks open scopes with a stack, so a namespace closed without a `// Name` comment (`} // .namespace Data`, or a bare `}`) no longer corrupts the names of later routines (found by the TOAS agent; IK+'s own tool has the old bug and reports 5 routines with wrong paths). `check_layout.py` is advisory: findings are warnings, `--strict` exits 2.
 
 ## Open questions (waiting for the user)
-None at the moment.
+- Add `TODO(port)` to the TODO tag set? IK+ marks each place a hardware-ism is left on purpose with it (phase 2 step 4).
 
 ## Per-project application (for each project's agent, not decided here)
 - **IK+:** `tools/platform_deps.py` has the namespace-closing bug (use the skill's); zero-page names to `zp_` prefix in phase 1; slot members for the sprite blocks; phase 2 zero page to a virtual segment; 72 generated SMC operand names (`sta_op_09fe`...) to rename, two placeholder names in comments, address pairs and `.word` rows to review (`p1_complete.py`); dumps and reference files are tracked (`check_layout.py`); recipe names to the standard set; ~315 `label+n` table offsets unreviewed; generic scratch names (`tmp_a..d`, `ptr_a..d`, `scratch_b`) need names from the user.
