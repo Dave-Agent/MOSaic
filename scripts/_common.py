@@ -91,3 +91,105 @@ def rewrite_code(files, fn, skip_label_lines=True):
         new = '\n'.join(out)
         if new != old: changed[f] = new
     return changed, n
+
+# ---- helpers for the refactor/ tools and add_label.py ----------------------------------------------------------------------------------------------------
+
+WRAP = 124                  # comment text is wrapped here (rules.md: wrap at 128, nothing past 150; 124 leaves room for the indent)
+
+def read_tsv(path):
+    """Rows of a TSV map: blank lines and lines starting with '#' skipped, cells stripped of the trailing newline only."""
+    return [l.rstrip('\n').split('\t') for l in open(path) if l.strip() and not l.lstrip().startswith('#')]
+
+def wrap_comment(text, indent='', width=WRAP):
+    """Wrap text into `//` comment lines. Paragraphs are separated by a real newline or a literal backslash-n; a paragraph that starts with `TODO(tag):` gets its
+    continuation lines indented by three spaces after the `//` (the TODO marker form of rules.md). `indent` goes before every `//`."""
+    out = []
+    for para in re.split(r'\\n|\n', text):
+        words = para.split()
+        if not words: continue
+        cont = '//   ' if re.match(r'TODO\(\w+\):', words[0]) else '// '
+        cur = indent + '// '
+        for w in words:
+            if len(cur) + len(w) + 1 > width and cur.strip() != '//': out.append(cur.rstrip()); cur = indent + cont + w + ' '
+            else: cur += w + ' '
+        out.append(cur.rstrip())
+    return out
+
+def code_files(main):
+    """Every .asm file of the main file's source directory (recursive, without libs/): the code files and the label files."""
+    return src_files(os.path.dirname(main))
+
+def split_comment(line):
+    """(code, comment) of a source line; the comment starts at the first `//` outside a string and keeps its slashes."""
+    q = None
+    for i, c in enumerate(line):
+        if q:
+            if c == q: q = None
+        elif c == '"': q = c
+        elif line.startswith('//', i): return line[:i], line[i:]
+    return line, ''
+
+XREF_LINE = re.compile(r'^\s*//\s*(?:Ghidra\s+)?XREF\b|^\s+//\s+[\w.:]+\([RWcjpd]\)|^\s+//\s+(?:[0-9a-fA-F]{4}|[\w ]+)\([RWcjpd]\)')
+
+def label_defs(text_lines, name):
+    """Line indexes where `name` is defined (`.label name =` or an in-stream `name:`)."""
+    pat = re.compile(r'^\s*(?:\.label\s+%s\s*=|%s\s*:(?!\S))' % (re.escape(name), re.escape(name)))
+    return [i for i, l in enumerate(text_lines) if pat.match(l)]
+
+ROW = re.compile(r'^(\s*)\.byte ((?:\$[0-9a-fA-F]{2},?)+)\s*// \[([0-9a-fA-F]{4})\] ?(.*)$')
+INS = re.compile(r'^\s+(?!\.)(\w+)\s?.*?// \[([0-9A-Fa-f]{4}):((?:[0-9a-fA-F]{2} ?)+)')
+
+def find_cover(addr, files, texts=None):
+    """Where does the original address `addr` live: (file, line index, kind, offset) with kind 'ins' (an instruction starts there, offset 0, or the address is inside it, offset > 0)
+    or 'row' (a `.byte` row covers it), from the [ADDR:bytes] / [ADDR] trace comments. None when nothing covers it. `texts` ({path: list of lines}) is used instead of the disk when given."""
+    for p in files:
+        L = texts[p] if texts is not None else open(p).read().split('\n')
+        for i, l in enumerate(L):
+            m = INS.match(l)
+            if m:
+                ad = int(m.group(2), 16); n = len(m.group(3).split())
+                if ad <= addr < ad + n: return p, i, 'ins', addr - ad
+                continue
+            m = ROW.match(l)
+            if m:
+                ad = int(m.group(3), 16); n = len(m.group(2).replace(',', '')) // 3
+                if ad <= addr < ad + n: return p, i, 'row', addr - ad
+    return None
+
+def insert_label_lines(L, i, kind, off, name, pre):
+    """In the line list L: put `pre` (comment lines) and `name:` before the instruction at line i (kind 'ins', offset 0) or split the .byte row at line i (kind 'row') at offset off."""
+    if pre and i > 0 and L[i - 1].strip(): pre = [''] + list(pre)         # a blank line before the comment block
+    if kind == 'ins':
+        if off: raise SystemExit('address is inside the instruction at line %d (offset %d): %s' % (i + 1, off, L[i].strip()[:60]))
+        L[i:i] = list(pre) + [name + ':']
+    else:
+        m = ROW.match(L[i]); ind = m.group(1); ad = int(m.group(3), 16); bs = [int(x[1:], 16) for x in m.group(2).replace(',', ' ').split()]
+        mk = lambda a, b: ind + '.byte ' + ','.join('$%02x' % x for x in b) + ' // [%04x] ' % a + ''.join(chr(x) if 32 <= x < 127 else '.' for x in b)
+        L[i:i + 1] = ([mk(ad, bs[:off])] if off else []) + list(pre) + [name + ':', mk(ad + off, bs[off:])]
+
+def add_label_at(files, addr, name, pre=(), write=False, indent='  '):
+    """Put the in-stream label `name:` at original address `addr`: before the instruction starting there, or by splitting the `.byte` row that covers it. `pre` is a list
+    of comment lines placed above the label. Refuses an address inside an instruction. Returns (file, description of what was done)."""
+    hit = find_cover(addr, files)
+    if not hit: raise SystemExit('no instruction or .byte row covers $%04X' % addr)
+    p, i, kind, off = hit
+    L = open(p).read().split('\n')
+    if kind == 'ins' and off: raise SystemExit('$%04X is inside the instruction at $%04X: %s' % (addr, addr - off, L[i].strip()[:60]))
+    insert_label_lines(L, i, kind, off, name, pre)
+    if write: open(p, 'w').write('\n'.join(L))
+    return p, ('line %d of %s' % (i + 1, os.path.basename(p)))
+
+def block_flags(lines):
+    """For each line, True when it is inside (or opens) a /* ... */ block comment: such lines are left alone by the rewriters."""
+    out = []; inblock = False
+    for l in lines:
+        if inblock: out.append(True); inblock = '*/' not in l; continue
+        code = split_comment(l)[0]
+        if '/*' in code and '*/' not in code: out.append(True); inblock = True; continue
+        out.append(False)
+    return out
+
+def write_changed(changed, write):
+    """changed = {path: new text}; writes them when `write`."""
+    if write:
+        for p, t in changed.items(): open(p, 'w').write(t)

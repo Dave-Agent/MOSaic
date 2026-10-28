@@ -20,6 +20,10 @@ lines = open(args.input or os.path.join(D, 'symbols.asm')).read().split('\n')
 XR0 = re.compile(r'\s*//\s*XREF.*$')
 XR = XR0 if args.drop_xref else re.compile(r'(?!)')       # what to strip from the end of a line (nothing when XREFs are kept)
 entries = []; pend = []; i = 0; known = {}
+PLACEHOLDER = re.compile(r'(?:DAT|LAB|SUB|FUN|PTR|UNK|EXT|OFF|CODE|BYTE|WORD|DWORD|QWORD|ADDR|JT|thunk_FUN|switchD|caseD)_[0-9a-fA-F]+(?:_\d+)?')
+def is_constant_name(name):
+    """A constant is an UPPER_SNAKE value name. Never a Ghidra placeholder (`DAT_0002`, `LAB_0d93_1`): str.isupper() is true for a name with no lowercase letter, so the all-digit-hex ones would wrongly pass."""
+    return (name.isupper() and not PLACEHOLDER.fullmatch(name)) or name.startswith('OPC_')
 def addr_of(rhs):
     rhs = rhs.strip(); m = re.fullmatch(r'\$([0-9A-Fa-f]+)', rhs)
     if m: return int(m.group(1), 16)
@@ -52,7 +56,7 @@ while i < len(lines):
         aa = addr_of(rhs)
         if aa is not None: known[name] = aa
         entries.append(dict(kind='label', name=name, rhs=rhs.strip(), addr=aa, pre=pend, text=l.rstrip() if keep_line else '.label %s = %s' % (name, rhs.strip()) + (('   ' + tail.strip()) if tail.strip() else ''),
-                            const=aa is None or name.isupper() or name.startswith('OPC_'))); pend = []; continue
+                            const=aa is None or is_constant_name(name))); pend = []; continue
     entries.append(dict(kind='other', addr=-1, text=XR.sub('', l).rstrip(), pre=pend)); pend = []
 def region(e):
     if e['kind'] == 'other' or (e.get('block') and e['addr'] < 0): return 'index'
@@ -79,11 +83,13 @@ def emit(es, hdr):
     for e in es: out += e['pre']; out.append(e['text']); out += e.get('cont', [])
     return '\n'.join(out) + '\n'
 files = {
- 'zero_page.asm': emit(groups['zp'], ['#importonce', '// zero_page.asm - the zero-page variables, one label per byte (or first byte) in address order; the gaps are bytes the game does not name.', '// Comments say what a variable holds and who writes it; the Ghidra XREF comments travel with their label.', '//  %d zero-page names' % len(groups['zp']), '']),
+ 'zero_page.asm': emit(groups['zp'], ['#importonce', '// zero_page.asm - the zero-page variables, one label per byte (or first byte) in address order; the gaps are bytes not named.', '// Comments say what a variable holds and who writes it; the Ghidra XREF comments travel with their label.', '//  %d zero-page names' % len(groups['zp']), '']),
  'variables.asm': emit(groups['var'], ['#importonce', '// variables.asm - the RAM variables outside zero page ($0100 and up), in address order.', '']),
  'constants.asm': emit(groups['const'], ['#importonce', '// constants.asm - named values, not addresses: ids, modes, colours, opcodes.', '']),
 }
-files['symbols.asm'] = '\n'.join(['// symbols.asm - the spine/index of the source: vectors, screen buffers, and the imports of every label file (search here first).', '#importonce', '#import "zero_page.asm"', '#import "variables.asm"', '#import "constants.asm"', '']) + emit(groups['index'], [''])
+files['symbols.asm'] = '\n'.join(['// symbols.asm - the spine/index of the source: vectors, screen buffers and the imports of every label file (search here first).', '#importonce', '#import "zero_page.asm"', '#import "variables.asm"', '#import "constants.asm"', '']) + emit(groups['index'], [''])
+bad = [e['name'] for e in groups['const'] if e['kind'] == 'label' and e['addr'] is not None and e['addr'] < 0x10000 and PLACEHOLDER.fullmatch(e['name'])]
+if bad: sys.exit('internal check failed: placeholder-named address labels landed in constants.asm: ' + ', '.join(bad[:8]))
 for f, t in files.items(): print(args.src, f, t.count('\n'), 'lines')
 if args.write:
     for f, t in files.items(): open(os.path.join(D, f), 'w').write(t)

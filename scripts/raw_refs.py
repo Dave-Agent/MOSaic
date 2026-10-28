@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 """Count raw hex addresses used as operands in code lines (phase 1 wants labels, not numbers). Immediates (#$xx) are excluded.
-  raw_refs.py [--phase 1|2 | --main FILE] [-v] [--first N --last N]     -v lists them, grouped by target address
+  raw_refs.py [--phase 1|2 | --main FILE] [-v] [--first N --last N] [--range LO-HI]     -v lists them, grouped by target address
 Must report 0 after every change in a project that has the no-raw-address rule."""
 import re, os, sys, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser, main_file, expanded_lines
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('-v', action='store_true'); a.add_argument('--first', type=int, default=1); a.add_argument('--last', type=int, default=10**9)
+a.add_argument('--range', help='LO-HI (hex): count only the instructions whose [ADDR:bytes] trace address lies in the range (a slice of the source)')
 args = a.parse_args(); L = expanded_lines(main_file(args))
+RANGE = tuple(int(x, 16) for x in args.range.split('-')) if args.range else None
+def in_range(l):
+    if not RANGE: return True
+    m = re.search(r'// \[([0-9A-Fa-f]{4})[:\]]', l)
+    return bool(m) and RANGE[0] <= int(m.group(1), 16) <= RANGE[1]
 cnt = collections.Counter(); where = collections.defaultdict(list)
 for i, l in enumerate(L[args.first - 1:args.last], args.first):
+    if not in_range(l): continue
     code = l.split('//')[0]
     code = re.sub(r'^\s*(?:[A-Za-z_][\w.]*|!+):\s*', '', code)       # a label in front of the instruction or directive (`Name: .byte ...`, `!: lda ...`)
     if not code.strip() or code.lstrip().startswith(('.', '#')): continue
