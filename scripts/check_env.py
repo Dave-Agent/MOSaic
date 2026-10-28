@@ -29,7 +29,7 @@ def ghidra():
     return shutil.which('analyzeHeadless') or ''
 def mesen():
     cands = [shutil.which('mesen'), shutil.which('Mesen')] + glob.glob(home + '/tools/Mesen*/**/Mesen*', recursive=True) + glob.glob(home + '/tools/Mesen*/Mesen*')
-    return next((c for c in cands if c and os.path.isfile(c) and os.access(c, os.X_OK) and not c.endswith(('.sln', '.cs', '.csproj', '.md', '.txt'))), '')
+    return next((c for c in cands if c and os.path.isfile(c) and os.access(c, os.X_OK) and not c.endswith(('.sln', '.cs', '.csproj', '.md', '.txt', '.so', '.dll', '.dylib', '.a'))), '')
 # (name, found path, version, needed-for, role, install hint, minimum version tuple or None)
 j = find_cmd(('java', 'JAVA')); jv = ver([j, '-version']) if j else ''
 rows = [

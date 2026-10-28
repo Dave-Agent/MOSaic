@@ -46,7 +46,7 @@ Write a one-off script in `tools/migrations/YYYY-MM-name.py` that (a) parses, (b
 
 - `libs/`: canonical `vic.asm`, `sid.asm`, `cia.asm`, `cpu.asm`; a project's `libs/` is a copy.
 - `scripts/`: generic tools (`--root`, `--phase 1|2` or `--main FILE`, read `project.config`; nothing changes without `--write`):
-  bulk rewrites `symbols_tidy.py`, `zp_namespace.py`, `hi_byte_names.py`; analysis `scan_offsets.py`, `raw_refs.py`, `smc_list.py`, `addr_immediates.py`, `platform_deps.py`; edits `add_label.py`, `align_comments.py`; `build_compare.sh` (baseline PRG compare); `check_env.py` (tool check, run first); `framework_sync.py` (project `framework/` vs the master); `check_layout.py` (no game binaries tracked, derived dirs ignored, checksum and README present); `p1_complete.py` (phase 1 completeness). Run them from the project root.
+  bulk rewrites `symbols_tidy.py`, `zp_namespace.py`, `hi_byte_names.py`; analysis `scan_offsets.py`, `raw_refs.py`, `smc_list.py`, `addr_immediates.py`, `platform_deps.py`; edits `add_label.py`, `align_comments.py`; `build_compare.sh` (baseline PRG compare); `check_env.py` (tool check, run first); `split_section.py` (move a SECTION into its own file); `reloc_scan.py` and `layout_fuzz.py` (relocation hazards and the padding stress test); `framework_sync.py` (project `framework/` vs the master); `check_layout.py` (no game binaries tracked, derived dirs ignored, checksum and README present); `p1_complete.py` (phase 1 completeness). Run them from the project root.
 - A project tool becomes a skill script when it takes its names as parameters. Test a new one against the project it came from and diff the output.
 
 ## Rules and decisions
@@ -56,6 +56,7 @@ Write a one-off script in `tools/migrations/YYYY-MM-name.py` that (a) parses, (b
 - `references/layout.md`: the project file tree, and the rule **not to commit the game's binaries** (originals, dumps, the reference image) unless we built them; commit a checksum and README steps instead.
 - `references/naming.md`: every naming rule in one place (shapes, suffixes, provisional names).
 - `references/rules.md`: SMC, no raw addresses, local and anonymous labels, comments, relocatability, hygiene (each section says which projects it applies to).
+- `references/phase2_split.md`: **the phase 2 procedure**, step by step (safety net, dependency catalogue, split, interface, relocatability, byte-changing removals).
 - `references/phase2_port.md`: phase 2 as the setup for a port (generic). `references/kick.md`: Kick Assembler gotchas.
 - `references/decisions.md`: dated log of choices and their reasons. **Check it before proposing a convention; append to it when one is made.**
 - `references/workflow.md`: the acquisition toolchain and the editor/Claude working setup.
