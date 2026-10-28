@@ -51,6 +51,7 @@ Write a one-off script in `tools/migrations/YYYY-MM-name.py` that (a) parses, (b
 
 ## Rules and decisions
 
+- `references/hand_off_tools.md`: the tools for stages 2-4 of the playbook: unattended VICE hand-off dump (`scripts/vice/`), reference builder and dump diff (`scripts/reference/`), screenshot judge, symbol converter.
 - `references/new_game.md`: **starting a new game**: media, hand-off, the clean reference, launcher, Ghidra, the first byte-identical build (draft, with questions for the user).
 - `references/just.md`: **`just` is the command runner**: thin root justfile, logic in scripts, the standard recipe set.
 - `references/layout.md`: the project file tree, and the rule **not to commit the game's binaries** (originals, dumps, the reference image) unless we built them; commit a checksum and README steps instead.
