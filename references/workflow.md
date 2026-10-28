@@ -1,4 +1,5 @@
 # Acquisition and working setup (the user's toolchain)
+The full stage-by-stage playbook is `new_game.md`; this page keeps the user's own summary.
 
 From the user, when asked how the projects are done:
 

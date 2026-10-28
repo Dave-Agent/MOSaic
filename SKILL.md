@@ -18,7 +18,7 @@ The three projects (Monty on the Run `Reversing/Monty_On_The_Run`, Thing on a Sp
 
 | Phase | Goal | Gate |
 |---|---|---|
-| Acquire | An uncracked game, RAM exported after any decompression, imported to Ghidra, exported to Kick Assembler (`references/workflow.md`) | assembles and matches the RAM image |
+| Acquire | An uncracked game, RAM exported after any decompression, imported to Ghidra, exported to Kick Assembler (`references/new_game.md`) | the first byte-identical build |
 | 1 | One commented monolith, every function understood, byte-identical. **Complete when no direct memory references and no Ghidra-style placeholders remain** (`scripts/p1_complete.py`) | `just verify`, `p1_complete.py` clean |
 | 2 | Split into files and namespaces; game logic separated from the hardware behind a platform interface: the setup for a port (`references/phase2_port.md`) | `just check` |
 | 3 | A port, kept out of phases 1 and 2 | project-specific |
@@ -47,6 +47,7 @@ Write a one-off script in `tools/migrations/YYYY-MM-name.py` that (a) parses, (b
 
 ## Rules and decisions
 
+- `references/new_game.md`: **starting a new game**: media, hand-off, the clean reference, launcher, Ghidra, the first byte-identical build (draft, with questions for the user).
 - `references/just.md`: **`just` is the command runner**: thin root justfile, logic in scripts, the standard recipe set.
 - `references/layout.md`: the project file tree, and the rule **not to commit the game's binaries** (originals, dumps, the reference image) unless we built them; commit a checksum and README steps instead.
 - `references/naming.md`: every naming rule in one place (shapes, suffixes, provisional names).
