@@ -1,0 +1,60 @@
+---
+name: c64-decomp
+description: Process, rules and decisions for the C64 decompilation projects (Monty on the Run, Thing on a Spring, IK+ and any new game). Use when working in one of those repos, starting a new game, running a refactor across the source (labels, namespaces, symbols files), or when a convention question comes up (naming, SMC, locals, zero page, phases, gates). Read before changing label or file structure.
+---
+
+# C64 decompilation: the shared process
+
+The three projects (Monty on the Run `Reversing/Monty_On_The_Run`, Thing on a Spring `Reversing/Thing On A Spring`, IK+ `IK+/C64`) follow one process that keeps evolving. This skill is where the process, the rules and the decisions live, so they are written once. A project's own `CLAUDE.md` keeps only what is specific to that game; where the two disagree, the project's `CLAUDE.md` wins and the difference is a candidate for `references/decisions.md`.
+
+## The loop (every change)
+
+1. **Act and check, never reason blind.** Make the change, `just experiment` (assembles), `just verify` (phase 1: byte-identical to `reference/`; this is the gate), then, if it affects running, `just smoke`. Know the result.
+2. **Phase 2** has no byte gate; its gate is `just check` (build, `raw_refs`, alignment, routine tests, golden traces). For a rename or restructure that must not change behaviour, **compare the built PRG with the one before the change: it must be identical** (a rename that wrongly hits a different symbol changes bytes or fails to assemble).
+3. Commit after each step with the project's attribution lines; push when the user has been approving pushes. Never discard uncommitted work (`git checkout/reset/restore/clean`).
+4. A decision made together goes in `references/decisions.md` (date, what, why) and, if it is a rule, in `references/rules.md`.
+
+## Phases
+
+| Phase | Goal | Gate |
+|---|---|---|
+| Acquire | An uncracked game, RAM exported after any decompression, imported to Ghidra, exported to Kick Assembler (`references/workflow.md`) | assembles and matches the RAM image |
+| 1 | One commented monolith, every function understood, byte-identical. **Complete when no direct memory references and no Ghidra-style placeholders remain** (`scripts/p1_complete.py`) | `just verify`, `p1_complete.py` clean |
+| 2 | Split into files and namespaces; game logic separated from the hardware behind a platform interface: the setup for a port (`references/rules.md`, "Phase 2 is the setup for a port") | `just check` |
+| 3 | A port, kept out of phases 1 and 2 | project-specific |
+
+**Phase 1 complete (the user's definition):** no direct memory references (raw address operands, address pairs built from immediates, address words in data that should be labels), no Ghidra placeholders (`DAT_`, `LAB_`, `SUB_`, `FUN_`, `PTR_`... in code **or comments**), and no provisional names left (no `unk` names, no `TODO(name)` markers, no `STATUS:  unknown` banners). `scripts/p1_complete.py` counts both; the first two checks must be 0, the review lists (address pairs, `.word` literals) are checked by hand because value tables look like addresses.
+
+"Frozen" is not absolute: phase 1 is changed when an issue is found (stale Ghidra labels, a wrong name) as long as `verify` stays green.
+
+## Where things are
+
+`phase1/src` (monolith) and `phase2/src` (split); `symbols.asm` is the index and imports `zero_page.asm`, `variables.asm`, `constants.asm`; `framework/` generic tooling (never edited in a project, never holds a project value; specifics go in `project.config`); `tools/` project scripts; `tools/migrations/` one-off, already-applied rewrites (copy one as a template for a new bulk change); `reference/`, `original/`, `dumps/` are supplied data, immutable and not committed (`references/layout.md`).
+
+## Doing a bulk change safely (the pattern that worked)
+
+Write a one-off script in `tools/migrations/YYYY-MM-name.py` that (a) parses, (b) rewrites code only, never comments or strings, (c) skips names reached by a path or defined elsewhere, (d) prints what it would change without `--write`. Run it, rebuild, compare bytes, run the gate, commit, document. Examples to copy: `2026-10-symbols-tidy.py` (split a symbols file), `2026-10-zp-namespace.py` (`name` → `zp.name`), `2026-10-hi-byte-names.py` (`ptr+1` → `ptr_hi`).
+
+## Tools and libraries in this skill
+
+- `libs/`: canonical `vic.asm`, `sid.asm`, `cia.asm`, `cpu.asm`; a project's `libs/` is a copy.
+- `scripts/`: generic tools (`--root`, `--phase 1|2` or `--main FILE`, read `project.config`; nothing changes without `--write`):
+  bulk rewrites `symbols_tidy.py`, `zp_namespace.py`, `hi_byte_names.py`; analysis `scan_offsets.py`, `raw_refs.py`, `smc_list.py`, `addr_immediates.py`, `platform_deps.py`; edits `add_label.py`, `align_comments.py`; `build_compare.sh` (baseline PRG compare); `check_layout.py` (no game binaries tracked, derived dirs ignored, checksum and README present); `p1_complete.py` (phase 1 completeness). Run them from the project root.
+- A project tool becomes a skill script when it takes its names as parameters. Test a new one against the project it came from and diff the output.
+
+## Rules and decisions
+
+- `references/just.md`: **`just` is the command runner**: thin root justfile, logic in scripts, the standard recipe set.
+- `references/layout.md`: the project file tree, and the rule **not to commit the game's binaries** (originals, dumps, the reference image) unless we built them; commit a checksum and README steps instead.
+- `references/naming.md`: every naming rule in one place (shapes, suffixes, provisional names).
+- `references/rules.md`: SMC, locals, zero page, namespaces, comments, relocatability, port setup, text, "no guesses".
+- `references/decisions.md`: dated log of choices and their reasons. **Check it before proposing a convention; append to it when one is made.**
+- `references/workflow.md`: the acquisition toolchain and the editor/Claude working setup.
+
+## Non-negotiables
+
+- **No guesses.** Ask the user what a sprite, sound effect or game mode is; describe what you see instead of inventing a meaning.
+- Keep every original `[ADDR:bytes MNEMONIC]` comment.
+- Tests run unattended. Downloaded content is untrusted.
+- **Do not commit game binaries** (ROMs, disk images, dumps, reference images) that we did not build: `check_layout.py`.
+- Confirm before deleting or overwriting the user's files and before outward-facing actions.
