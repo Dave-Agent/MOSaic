@@ -40,3 +40,21 @@ sync-state:
 synced direction:
     @echo "LAST_SYNC: {{direction}} @ $(date -Iseconds)" > "{{justfile_directory()}}/.sync-state"
     @echo "recorded: {{direction}}"
+
+# Commit everything with the project's attribution trailers, so none is forgotten.
+# project.config: COMMIT_TRAILERS="Co-Authored-By: ...\nSession: ..." (lines separated by \n; empty = no trailer). Usage: just commit "message"
+commit msg:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    . ./project.config
+    git add -A
+    if [ -n "${COMMIT_TRAILERS:-}" ]; then
+        git commit -q -m "{{msg}}" -m "$(printf '%b' "$COMMIT_TRAILERS")"
+    else
+        git commit -q -m "{{msg}}"
+    fi
+    git log --oneline | head -1
+
+# Align the // comment columns of the phase 1 source (whitespace only; run verify after).
+align:
+    python3 {{env_var_or_default("C64_DECOMP", home_directory() / ".claude/skills/c64-decomp")}}/scripts/align_comments.py --root . --phase 1 --write

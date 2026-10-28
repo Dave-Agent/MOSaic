@@ -46,3 +46,6 @@ SEED_JOY1="ff"                 # joystick 1 value held during the coverage run (
 SEED_JOY2="ff"
 SEED_FRAMES="6000"
 SEED_RUNS="6"
+
+# --- Commits ---
+COMMIT_TRAILERS=""             # attribution lines appended by `just commit "msg"`, separated by \n (decided per project and author)
