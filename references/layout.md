@@ -15,16 +15,16 @@ tools/                project scripts; tools/migrations/ holds one-off rewrites 
 docs/                 analysis notes, the porting guide, generated lists
 launcher/             hand-written, NOT game: whatever is needed to run the game in an emulator
 
-original/             media as downloaded                       NOT COMMITTED
+originals/            media as downloaded                       NOT COMMITTED
 dumps/                emulator RAM dumps                         NOT COMMITTED
 reference/            the cleaned reference image (diff target)  NOT COMMITTED; reference.sha256 IS committed
 build/ ghidra/ analysis/ extracted/   derived, regenerable      NOT COMMITTED
 ```
 
 ## Prefer not committing the game's binaries
-**Prefer not committing any ROM, disk image, tape, cartridge, memory dump or image that is the original program's bytes, or a byte-for-byte derivation of it, unless we built it ourselves from our own source.** That covers `original/`, `dumps/`, `reference/`, an unpacked or cleaned image, and tables generated from them. We do not own that data, and a public repository must not redistribute it.
+**Prefer not committing any ROM, disk image, tape, cartridge, memory dump or image that is the original program's bytes, or a byte-for-byte derivation of it, unless we built it ourselves from our own source.** That covers `originals/`, `dumps/`, `reference/`, an unpacked or cleaned image, and tables generated from them. We do not own that data, and a public repository must not redistribute it.
 - **Commit instead:** the source, the tools that derive the reference from the original (`make_reference.py` or equivalent), a **checksum file** (`reference.sha256`) that proves a supplied image is the right one, and the README steps to supply it (which release, where it came from, which file name, which hash).
-- **`.gitignore` lists** `/original/`, `/dumps/`, `/reference/`, `/build/`, `/ghidra/`, `/analysis/`, `/extracted/`, any stray `/*.prg`, `__pycache__/`, `.claude/settings.local.json`, tool state (`progress.db`, `.sync-state`), editor noise, and Kick's working copies next to the source.
+- **`.gitignore` lists** `/originals/`, `/dumps/`, `/reference/`, `/build/`, `/ghidra/`, `/analysis/`, `/extracted/`, any stray `/*.prg`, `__pycache__/`, `.claude/settings.local.json`, tool state (`progress.db`, `.sync-state`), editor noise, and Kick's working copies next to the source.
 - **Our own built output is also not committed** (`build/`): it is derived from the source. The exception is a small binary we wrote by hand (for example a launcher stub) when it cannot be rebuilt from text.
 - **A missing original fails clearly.** `just verify` and every test that needs the reference say which file is missing, the expected checksum and where the README explains it; they do not silently skip. Tests that need no original data run without it.
 - **History:** a binary that is already in git history stays there until the history is rewritten, which is an outward-facing change (forks, clones, a public mirror). Do not rewrite it without the user's explicit decision per project; stop committing it going forward first.

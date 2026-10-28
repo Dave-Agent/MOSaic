@@ -27,7 +27,7 @@ if bad:
     if len(bad) > 25: fail.append(f'    ... and {len(bad) - 25} more')
 gi = open(os.path.join(root, '.gitignore')).read() if os.path.exists(os.path.join(root, '.gitignore')) else ''
 def ignored(d): return bool(re.search(r'^/?%s/?\*?\s*$' % re.escape(d), gi, re.M))
-for d in ('original', 'dumps', 'reference', 'build'):
+for d in ('originals', 'original', 'dumps', 'reference', 'build'):          # `original` is the older spelling some projects still use
     if os.path.isdir(os.path.join(root, d)) and not ignored(d): fail.append(f'.gitignore does not ignore /{d}/ (the directory exists)')
 for d in ('ghidra', 'analysis', 'extracted'):
     if os.path.isdir(os.path.join(root, d)) and not ignored(d) and not re.search(r'^/?%s/\*' % d, gi, re.M): warn.append(f'.gitignore does not ignore /{d}/')

@@ -36,7 +36,7 @@ Run `scripts/check_env.py` from the project root (add `--role run|disk|trace|ghi
 This skill is the folder `/home/dave/C64Projects/c64-decomp`, a git repository (every change is a commit; several agents edit it, so commit your own and never discard others' work). `~/.claude/skills/c64-decomp` is a symlink to it, which is how Claude Code loads it in every project.
 
 
-`phase1/src` (monolith) and `phase2/src` (split); `symbols.asm` is the index and imports `zero_page.asm`, `variables.asm`, `constants.asm`; `framework/` generic tooling: **the master is this skill's `framework/`**; a project holds a copy, never edits it in place (change it in the skill, then `scripts/framework_sync.py --write`), and it never holds a project value (specifics go in `project.config`); `tools/` project scripts; `tools/migrations/` one-off, already-applied rewrites (copy one as a template for a new bulk change); `reference/`, `original/`, `dumps/` are supplied data, immutable and not committed (`references/layout.md`).
+`phase1/src` (monolith) and `phase2/src` (split); `symbols.asm` is the index and imports `zero_page.asm`, `variables.asm`, `constants.asm`; `framework/` generic tooling: **the master is this skill's `framework/`**; a project holds a copy, never edits it in place (change it in the skill, then `scripts/framework_sync.py --write`), and it never holds a project value (specifics go in `project.config`); `tools/` project scripts; `tools/migrations/` one-off, already-applied rewrites (copy one as a template for a new bulk change); `reference/`, `originals/`, `dumps/` are supplied data, immutable and not committed (`references/layout.md`).
 
 ## Doing a bulk change safely (the pattern that worked)
 

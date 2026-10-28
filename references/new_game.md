@@ -13,7 +13,7 @@ The aim of this stage: a **reference image of the game only** (no crack, no load
 
 ## 1. Gather the media
 1. Prefer a **non-cracked** release. If only a cracked one exists, find a **second release** (a different cracker): the bytes they do not share are the crack, which is how IK+ undid edits the first cracker had made (`docs/version_diff.md` there).
-2. Put media in `original/` (not committed). Record file names, sizes and hashes in the README (how to supply them).
+2. Put media in `originals/` (not committed). Record file names, sizes and hashes in the README (how to supply them).
 3. Note the platform facts that change timing and boot: PAL or NTSC, true-drive needs, fast loaders.
 
 ## 2. Find the hand-off

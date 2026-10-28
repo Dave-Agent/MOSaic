@@ -8,7 +8,7 @@
 - **Project specifics come from `project.config`** (sourced by the scripts), never hard-coded in a recipe. `PROJECT_ROOT` is exported so scripts work from any directory.
 - **Every recipe has a comment line above it**: that is what `just --list` shows. Say what it does and how long it takes if it is slow.
 - **Recipes run unattended** (no prompts, no GUI waits); anything that needs an emulator window is a separate, clearly named recipe (`launch`, `debug-*`).
-- **Machine-local recipes go in `local.just`** (not tracked): ones that need supplied data (`original/`, `reference/`) or tools not everyone has.
+- **Machine-local recipes go in `local.just`** (not tracked): ones that need supplied data (`originals/`, `reference/`) or tools not everyone has.
 - **Arguments with `$`** are expanded by the shell: do not pass hex through a recipe argument; use a script argument file instead.
 - **A recipe prints its result and exits non-zero on failure**, so `just check && git commit` works.
 

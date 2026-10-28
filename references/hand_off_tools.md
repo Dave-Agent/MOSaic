@@ -18,7 +18,7 @@ Generic scripts, all in `scripts/`, all taking `--root` (the project root, defau
 1. Work out the boot chain interactively first (breakpoints at each stage: BASIC `SYS`, depacker, intro, final jump). The tool does not find the hand-off; it repeats a path you already know.
 2. Write the path as `--step` options, in order. Each `--step 'ADDR=CMD;CMD'` runs to ADDR, deletes the breakpoint and sends monitor commands: that is how a key wait is made to fall through (a patched `lda`/`bne`, two NOPs). Then `--handoff HANDOFF` is the final breakpoint. A prompt that wants a key (a hi-score name, "press space") is answered with `--feed '> 0277 4e;> c6 01'` (pokes the keyboard buffer and its length, re-sent at every poll).
 3. Run:
-   `scripts/vice/vice_handoff.py --media original/MEDIA --handoff HANDOFF --out dumps/NAME_handoff.bin --step 'ADDR=> ADDR EA EA' --feed '...' --io`
+   `scripts/vice/vice_handoff.py --media originals/MEDIA --handoff HANDOFF --out dumps/NAME_handoff.bin --step 'ADDR=> ADDR EA EA' --feed '...' --io`
    The dump is 65536 bytes of true RAM, taken one instruction after the break (see gotchas). `--io` adds `NAME.io.txt` (VIC, SID, CIA, colour RAM, CPU registers): the input to stage 4.
 4. A run takes about a minute in warp. Commit the command line (a `just` recipe or the README), not the dump.
 

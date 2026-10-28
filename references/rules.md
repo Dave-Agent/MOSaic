@@ -76,5 +76,5 @@ Applies to: every project.
 - Anything the hardware reads at a fixed address (bitmap, charset) must stay anchored in phase 2; check with a screenshot, not only traces.
 - State that holds an address is not behaviour: keep it out of golden-trace state.
 - `framework/` is generic; no project value inside it (`project.config` carries them).
-- Never edit `reference/`, `original/` or a mirror directly; one-way flows only.
+- Never edit `reference/`, `originals/` or a mirror directly; one-way flows only.
 - Emulator tests must run unattended (judge by screenshot, not by a PC sample).
