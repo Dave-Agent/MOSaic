@@ -14,7 +14,7 @@ Run `scripts/check_env.py` from the project root (add `--role run|disk|trace|ghi
 ## The loop (every change)
 
 1. **Act and check, never reason blind.** Make the change, assemble it, run the gate, then, if it affects running, the smoke test. Know the result. Use the project's recipes by role (`references/just.md`: assemble, gate, tests, smoke, and what to do when a project lacks a recipe); phase 1's gate is `verify` (byte-identical to `reference/`).
-2. **Phase 2** has no byte gate; its gate is the project's `check` (build, raw-address check, alignment, routine tests, golden traces). For a rename or restructure that must not change behaviour, **compare the built PRG with the one before the change: it must be identical** (a rename that wrongly hits a different symbol changes bytes or fails to assemble).
+2. **Phase 2** has no byte gate; its gate is the project's `check` (build, raw-address check, alignment, `scripts/sim/run_tests.py`, `scripts/golden/golden.py check-t`); phase 1 runs the same tests with `--phase 1` and the exact `golden.py check`. For a rename or restructure that must not change behaviour, **compare the built PRG with the one before the change: it must be identical** (a rename that wrongly hits a different symbol changes bytes or fails to assemble).
 3. Commit after each step with the project's attribution lines. **Push only when the user says to.** Never discard uncommitted work (`git checkout/reset/restore/clean`).
 4. A decision made together goes in `references/decisions.md` (date, what, why) and, if it is a rule, in `references/rules.md`.
 
@@ -46,11 +46,12 @@ Write a one-off script in `tools/migrations/YYYY-MM-name.py` that (a) parses, (b
 
 - `libs/`: canonical `vic.asm`, `sid.asm`, `cia.asm`, `cpu.asm`; a project's `libs/` is a copy.
 - `scripts/`: generic tools (`--root`, `--phase 1|2` or `--main FILE`, read `project.config`; nothing changes without `--write`):
-  bulk rewrites `symbols_tidy.py`, `zp_namespace.py`, `hi_byte_names.py`; analysis `scan_offsets.py`, `raw_refs.py`, `smc_list.py`, `addr_immediates.py`, `platform_deps.py`; edits `add_label.py`, `align_comments.py`; `build_compare.sh` (baseline PRG compare); `check_env.py` (tool check, run first); `split_section.py` (move a SECTION into its own file); `reloc_scan.py` and `layout_fuzz.py` (relocation hazards and the padding stress test); `framework_sync.py` (project `framework/` vs the master); `check_layout.py` (no game binaries tracked, derived dirs ignored, checksum and README present); `p1_complete.py` (phase 1 completeness). Run them from the project root.
+  bulk rewrites `symbols_tidy.py`, `zp_namespace.py`, `hi_byte_names.py`; analysis `scan_offsets.py`, `raw_refs.py`, `smc_list.py`, `addr_immediates.py`, `platform_deps.py`; edits `add_label.py`, `align_comments.py`; `build_compare.sh` (baseline PRG compare); `check_env.py` (tool check, run first); `trace/` (project-neutral 6510 tracer `c64trace.c`, `selftest.py`, `entry_points.py`), `sim/` (routine-test harness `c64sim.py`, `run_tests.py`), `golden/` (golden traces, exact and timing-tolerant), `coverage/` (scenario coverage, unexecuted and raw-executed reports), `vice/` and `reference/` (hand-off dump, reference builder; `hand_off_tools.md`), with keys `TRACE_*`, `SIM_*`, `GOLDEN_*`, `COVERAGE_*`, `ENTRY_*` in `project.config`; `split_section.py` (move a SECTION into its own file); `reloc_scan.py` and `layout_fuzz.py` (relocation hazards and the padding stress test); `framework_sync.py` (project `framework/` vs the master); `check_layout.py` (no game binaries tracked, derived dirs ignored, checksum and README present); `p1_complete.py` (phase 1 completeness). Run them from the project root.
 - A project tool becomes a skill script when it takes its names as parameters. Test a new one against the project it came from and diff the output.
 
 ## Rules and decisions
 
+- `references/testing.md`: routine tests, golden traces, coverage and the tracer self-test: what each proves, its limits, and how a port is checked against the same cases.
 - `references/hand_off_tools.md`: the tools for stages 2-4 of the playbook: unattended VICE hand-off dump (`scripts/vice/`), reference builder and dump diff (`scripts/reference/`), screenshot judge, symbol converter.
 - `references/new_game.md`: **starting a new game**: media, hand-off, the clean reference, launcher, Ghidra, the first byte-identical build (draft, with questions for the user).
 - `references/just.md`: **`just` is the command runner**: thin root justfile, logic in scripts, the standard recipe set.

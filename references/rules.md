@@ -20,7 +20,7 @@ Applies to: every project, except where a bullet says otherwise.
 - Section banners (Monty and IK+ only; TOAS does not use them, so `STATUS:  unknown` banners do not exist there) (`SECTION:` / `RANGE:` / `STATUS: unknown|partial|understood` / `SUMMARY:`, optional `P1_ROUTINE_NAME:` in phase 2) are landmarks; add or refine one when a region is understood. `just sections`, `just todo`.
 - **TODO markers are `// TODO(tag): headline`** (one tag per marker: `sound` needs listening, `user` needs the user's knowledge, `code` is plain work, `phase2` is a change for phase 2); detail follows on `//   ` lines; delete the marker when answered. Decided 2026-10-29 (see decisions.md): TOAS's `p2_todo:` is `TODO(phase2):`  **`TODO(block)` is a phase 1 blocker** (decided with the user): TOAS's plain `TODO:` becomes `TODO(block)` (not `TODO(code)`, which is ordinary work), and `p1_complete.py` counts it. `TODO(name)` (a provisional name) blocks too.
 - Do not read the monolith whole: grep a label in `symbols.asm`, read around it, follow cross-references.
-- Strings: the game's own text encoding via macros (`FontText`, `HudText`), documented per project.
+- **Text as text** (decided with the user): every string the game contains is written in the source **as readable text**, through the game's own encoding (a macro such as `FontText("...")` / `HudText("...")`, or `.text` with an `.encoding`), never as rows of `.byte` values. The encoding is documented per project (`docs/text_and_encodings.md`), each string or table has a label, and where the control codes mix with the letters they have named constants. A byte row that decodes as text is a sign the text has not been recovered yet.
 
 
 ## Comment rules

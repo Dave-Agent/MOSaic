@@ -12,6 +12,17 @@
 - **Arguments with `$`** are expanded by the shell: do not pass hex through a recipe argument; use a script argument file instead.
 - **A recipe prints its result and exits non-zero on failure**, so `just check && git commit` works.
 
+## Calling the skill's scripts from a justfile
+Define the skill's location once and call its scripts through it, so the justfile works on any machine (`C64_DECOMP` overrides the default, which is the symlink Claude Code uses):
+```
+skill := env_var_or_default("C64_DECOMP", home_directory() / ".claude/skills/c64-decomp")
+test:        python3 {{skill}}/scripts/sim/run_tests.py --root .
+golden:      python3 {{skill}}/scripts/golden/golden.py check
+golden-t:    python3 {{skill}}/scripts/golden/golden.py check-t
+coverage:    python3 {{skill}}/scripts/coverage/run_scenarios.py
+check:       build-phase2 test golden-t     # plus the raw-address and align checks
+```
+
 ## Recipe contract (roles, and the fallback when a project lacks one)
 The skill and its agents refer to recipes by **role**, because the three projects do not all spell them the same (TOAS, for example, has `assemble`, `verify`, `todos`, `p2todos`). Required: `default` (lists recipes) and a phase 1 gate named `verify`. Everything else is a role with a fallback:
 | Role | Usual name | If the project has none |
