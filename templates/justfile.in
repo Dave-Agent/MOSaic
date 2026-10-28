@@ -1,0 +1,68 @@
+# justfile: thin. Generic recipes come from framework/recipes.just; the c64-decomp skill's scripts are called through `skill`.
+set allow-duplicate-recipes := true
+skill := env_var_or_default("C64_DECOMP", home_directory() / ".claude/skills/c64-decomp")
+rom_dir := env_var_or_default("VICE_ROM_DIR", home_directory() / ".local/share/vice/C64")
+import 'framework/recipes.just'
+
+default:
+    @just --list
+
+# Check the tools this project needs are installed (run first on a new machine).
+env:
+    python3 {{skill}}/scripts/check_env.py --role run --role disk --role trace --role ghidra
+
+# Check the layout rules: no game binaries tracked, originals read-only with a recorded hash.
+layout:
+    python3 {{skill}}/scripts/check_layout.py --root .
+
+# Stage 2: DUMP_COUNT RAM dumps at DUMP_PC, real speed, from a read-only scratch copy of the medium (project.config: HANDOFF_MEDIA, DUMP_PC, DUMP_COUNT).
+dumps:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    . ./project.config
+    : "${DUMP_PC:?set DUMP_PC in project.config (the address the dumps are taken at: references/new_game.md stage 2)}"
+    mkdir -p dumps
+    for i in $(seq 1 "${DUMP_COUNT:-5}"); do
+        python3 {{skill}}/scripts/vice/vice_handoff.py --root . --media "$HANDOFF_MEDIA" --handoff "$DUMP_PC" --no-warp --out dumps/at_dump_$i.bin --timeout 300
+    done
+
+# A timing-critical loader leaves single-bit noise that differs per run in VICE: keep the value most dumps agree on.
+vote:
+    python3 {{skill}}/scripts/reference/vote_dumps.py --root . --out dumps/voted.bin dumps/at_dump_*.bin || true
+
+# Run the depacker in the skill's tracer from the voted image to HANDOFF_PC and dump RAM there (dumps/handoff.bin is the 64 KB RAM; handoff_state.bin adds VIC registers, colour RAM, $DD00).
+decrunch:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    . ./project.config
+    : "${DUMP_PC:?}" "${HANDOFF_PC:?set HANDOFF_PC in project.config (the depacker's exit)}"
+    mkdir -p build/trace
+    gcc -O2 -o build/trace/c64trace {{skill}}/scripts/trace/c64trace.c
+    rm -f build/trace/h.*
+    build/trace/c64trace --ram dumps/voted.bin --rom-dir {{rom_dir}} --out build/trace/h --pc "$DUMP_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port "${DECRUNCH_PORT:-34}" --frames 400 --dump-at "$HANDOFF_PC" --dump dumps/handoff_state.bin
+    head -c 65536 dumps/handoff_state.bin > dumps/handoff.bin
+
+# Derive the reference: the RAM range REF_KEEP at the hand-off, patched by tools/reference.spec, with its SHA-256.
+reference:
+    python3 {{skill}}/scripts/reference/make_reference.py --root . --in dumps/handoff.bin --write
+
+# The whole derivation from the medium to the reference.
+derive: dumps vote decrunch reference
+
+# Stage 5a: run the game in the tracer from the hand-off with seeded fuzz (press SEED_JOY1 values) and write the Ghidra seeds from what executed.
+seeds:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    . ./project.config
+    : "${HANDOFF_PC:?}"
+    mkdir -p build/trace tools/ghidra
+    [ -x build/trace/c64trace ] || gcc -O2 -o build/trace/c64trace {{skill}}/scripts/trace/c64trace.c
+    rm -f build/trace/cov.*
+    for s in $(seq 1 "${SEED_RUNS:-6}"); do
+        build/trace/c64trace --ram dumps/handoff.bin --rom-dir {{rom_dir}} --out build/trace/cov --pc "$HANDOFF_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port 35 --frames "${SEED_FRAMES:-6000}" --seed $s --chaos 6 --joy1 "${SEED_JOY1:-ff}" --joy2 "${SEED_JOY2:-ff}" | tail -1 || true
+    done
+    python3 {{skill}}/scripts/ghidra/make_seeds.py --root . --reference "$REFERENCE_PRG" --base "${LOAD_ADDRESS#0x}" --out tools/ghidra/seeds.txt --entry "$HANDOFF_PC:hand-off" --vectors dumps/handoff.bin --edges build/trace/cov.edges --executed build/trace/cov.flags
+
+# Stage 5b: import the reference into Ghidra, seed it, export Kick Assembler source into ghidra/ (the landing zone: never phase1/src).
+ghidra:
+    bash {{skill}}/scripts/ghidra/run.sh .

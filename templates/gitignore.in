@@ -1,0 +1,18 @@
+# Build output and derived data: never committed.
+/build/
+/ghidra/
+/analysis/
+/extracted/
+__pycache__/
+# Supplied game data: never committed (see README.md for how to supply it).
+/originals/
+/dumps/
+/reference/
+/*.prg
+/.sync-state
+.DS_Store
+*.swp
+*~
+# Kick working copies next to the source
+phase1/src/build/
+phase2/src/build/

@@ -1,0 +1,20 @@
+# Boot chain (stage 2 of the c64-decomp playbook)
+Observations only; nothing here is a claim about what the game does.
+
+## What runs, in order
+1.
+
+## The game
+Entry, main loop, interrupt chain, what it does with `$01`.
+
+## Crack or loader code in the game image (and how each was shown removable)
+| range | what | removed as |
+|---|---|---|
+
+## What the game needs at entry
+Stack pointer, zero page, vectors, work RAM, the raster line it is entered on.
+
+## Verification of the hand-off
+How the hand-off address was found, and the cross-check (VICE dumps voted; tracer from the pre-depacker dump to the hand-off).
+
+## Open

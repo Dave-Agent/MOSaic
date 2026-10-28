@@ -1,0 +1,46 @@
+# project.config - the seam between the generic framework and this project. Shell-sourceable KEY="value", paths relative to the project root.
+PROJECT_NAME="@NAME@"
+
+# --- Toolchain ---
+KICKASS_JAR="@KICKASS_JAR@"
+JAVA="java"
+VICE_BIN="x64sc"
+# GHIDRA_HOME="~/ghidra/ghidra_x.y_PUBLIC"     # if not under ~/ghidra*/ghidra_*
+
+# --- Source ---
+SRC_DIR="phase1/src"
+SRC_MAIN="phase1/src/@SLUG@.asm"
+SRC_SYMBOLS="phase1/src/symbols.asm"
+PHASE2_DIR="phase2/src"
+PHASE2_MAIN="phase2/src/@SLUG@.asm"
+
+# --- Reference (the game's RAM at the hand-off; derived from the media, never committed: see README) ---
+REFERENCE_PRG="reference/@SLUG@_ref.bin"
+REFERENCE_IS_RAW="true"
+LOAD_ADDRESS="0x0800"          # first address of the reference image; set it with REF_KEEP below
+IGNORE_LOAD_ADDRESS="false"
+REF_KEEP="0800-FFFF"           # the address range of the dump that becomes the reference
+REF_SPEC="tools/reference.spec"
+REF_OUT="reference/@SLUG@_ref.bin"
+REF_SHA_FILE="reference.sha256"
+
+# --- Build ---
+BUILD_DIR="build"
+OUTPUT_PRG="build/@SLUG@_game.prg"
+VICE_SYMBOLS="build/@SLUG@.vs"
+DEBUG_FILE="build/@SLUG@.dbg"
+GHIDRA_EXPORT_DIR="ghidra"
+
+# --- Hand-off derivation (fill these in as the boot analysis finds them: references/new_game.md stages 2-3) ---
+HANDOFF_MEDIA="@MEDIA@"        # the medium the dumps are taken from (a read-only scratch copy is attached, never this file)
+DUMP_PC=""                     # stage 1: RAM is dumped when execution reaches this address (the depacker's entry, or the hand-off itself if nothing is packed)
+DUMP_COUNT="5"                 # how many dumps are voted (emulator noise from a timing-critical loader)
+DECRUNCH_SP="fc"               # tracer start state for the depacker run: SP, processor status, processor port
+DECRUNCH_P="34"
+DECRUNCH_PORT="34"
+HANDOFF_PC=""                  # the tracer stops here (the depacker's exit = the game's entry) and dumps RAM: the reference is that state
+# --- Seeds for Ghidra (the game's own behaviour, from the tracer; stage 5) ---
+SEED_JOY1="ff"                 # joystick 1 value held during the coverage run (ff = nothing pressed; ef = fire): press what the game waits for
+SEED_JOY2="ff"
+SEED_FRAMES="6000"
+SEED_RUNS="6"

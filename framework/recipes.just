@@ -16,7 +16,7 @@ experiment:
     PROJECT_ROOT="{{justfile_directory()}}" bash framework/scripts/build.sh
 
 # Experiment-build then launch emulator with symbols. target=vice|retro (default vice).
-# Optional pokes JSON patches a binary copy before launch: just launch vice pokes/room_0d.json
+# Optional pokes JSON patches a binary copy before launch: just launch vice pokes/example.json
 launch target="vice" pokes="":
     bash framework/scripts/launch.sh {{target}} {{pokes}}
 

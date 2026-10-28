@@ -1,0 +1,3 @@
+# Reference spec: patches applied to the hand-off dump before REF_KEEP is cut out (references/new_game.md stage 3).
+# One operation per line, each with its reason after `#`:  zero LO HI | bytes ADDR HH HH .. | copy LO HI NAME | expect ADDR HH HH ..
+# Start with `expect` guards: the bytes that must be at the hand-off (so the spec cannot be applied to the wrong dump).
