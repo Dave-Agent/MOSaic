@@ -58,3 +58,8 @@ Proven (on one game: a REM-cracked 1541 disk with a three-stage unpacker, one ke
 - the stage 1 and stage 2 specs reproduce both recorded SHA-256 values of the reference exactly;
 - the screenshot judge passes a smoke screenshot of the launcher build at 1.00 and fails a same-size image with the crop blanked (0.72) and a different-size image (-1).
 Not proven: NTSC media, tape media, fast-loader media that need more than a key wait, a game that loads code after the hand-off (stage 2 item 5 of the playbook), `--io` output used to build a launcher, running without a display, the `--feed` loop on a prompt other than a key press, `copy` from a second release whose hand-off state differs from the first.
+
+## Voting out emulator noise, and the Ghidra step
+- `scripts/reference/vote_dumps.py --out VOTED.bin DUMP DUMP DUMP ...`: majority vote per byte over several dumps taken at the same moment (`vice_handoff.py --no-warp` for real speed). Reports positions without a majority inside the game range (take more dumps, or check whether a later step overwrites them).
+- `scripts/ghidra/make_seeds.py`, `run.sh`, `setup.py`: seeds from evidence, then headless import, seeding and Kick Assembler export; see `new_game.md` stage 5.
+- `c64trace --selftest DUMP_BEFORE DUMP_AT_HANDOFF --selftest-pc ... --selftest-done HANDOFF` cross-checks a depacker (stage 2).

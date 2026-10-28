@@ -37,7 +37,7 @@ def main():
     a.add_argument('--run-seconds', type=float, default=0, help='how long the machine runs after the dump / --after before the screenshot (wall seconds, warp)')
     a.add_argument('--screenshot', help='PNG to write after --run-seconds')
     a.add_argument('--expect', metavar='LO-HI:HEXBYTES', help='after running, this byte sequence must occur in RAM LO..HI (e.g. 0400-0460:04050d0f, screen codes of a word)')
-    a.add_argument('--timeout', type=float); a.add_argument('--port', type=int); a.add_argument('--vice'); a.add_argument('--limit-cycles', type=int)
+    a.add_argument('--timeout', type=float); a.add_argument('--port', type=int); a.add_argument('--vice'); a.add_argument('--limit-cycles', type=int); a.add_argument('--no-warp', action='store_true', help='run VICE at real speed: a timing-critical fast loader can corrupt bits in warp mode')
     args = a.parse_args(); cfg = config(args.root); R = lambda p: p if os.path.isabs(p) else os.path.join(args.root, p)
     media = args.media or cfg.get('HANDOFF_MEDIA'); hand = args.handoff or cfg.get('HANDOFF_BREAK'); out = args.out or cfg.get('HANDOFF_DUMP')
     if not (media and hand and out): sys.exit('need --media, --handoff and --out (or HANDOFF_MEDIA / HANDOFF_BREAK / HANDOFF_DUMP in project.config)')
@@ -45,7 +45,7 @@ def main():
     tmo = args.timeout or float(cfg.get('HANDOFF_TIMEOUT', 300)); port = args.port or int(cfg.get('VICE_MONITOR_PORT', 6510))
     vice = args.vice or cfg.get('VICE_BIN') or 'x64sc'
     if not os.path.exists(media): sys.exit('media not found: ' + media)
-    proc = start_vice(vice, media, port, limit_cycles=args.limit_cycles); ok = True
+    proc = start_vice(vice, media, port, warp=not args.no_warp, limit_cycles=args.limit_cycles); ok = True
     try:
         m = Monitor(port); m.read(1)
         for st in args.step:
