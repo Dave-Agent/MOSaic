@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""
-1. Align // [addr:...] EOL code-reference comments to column 39 (1-indexed).
-2. Ensure a blank line before each top-level label (or its leading comment block).
-   If the label is immediately preceded (no blank gap) by // comment line(s),
-   the blank is inserted before the first such comment.
-3. Remove blank lines immediately before anonymous labels (!:).
-"""
-import re, sys
+"""Align the `// [addr:...]` comments of the source files and tidy label spacing. Reports by default; changes nothing without --write.
+
+  align_comments.py [--root DIR] [--phase 1|2 | --main FILE] [FILE ...] [--write | --check]
+
+Files: the FILE arguments (relative to --root), else every file reachable from the main file (label files and libs excluded).
+  1. Align // [addr:...] EOL code-reference comments to column 39 (1-indexed).
+  2. Ensure a blank line before each top-level label (or its leading comment block).
+     If the label is immediately preceded (no blank gap) by // comment line(s), the blank is inserted before the first such comment.
+  3. Remove blank lines immediately before anonymous labels (!:).
+--write applies the change; --check exits 1 if any file is not aligned (nothing is written). With neither, the files that would change are listed."""
+import os, re, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _common import parser, main_file, reachable
 
 TARGET  = 38   # chars before //  (// lands at position 39, 1-indexed)
 MIN_GAP = 1    # minimum spaces before //
@@ -70,24 +75,34 @@ def remove_anon_blanks(lines):
     return out
 
 
-check = '--check' in sys.argv
-path = [a for a in sys.argv[1:] if not a.startswith('--')][0]
-with open(path) as f:
-    lines = f.readlines()
+def aligned(lines):
+    """(result lines, EOL comments realigned, blank lines added, blank lines removed)."""
+    spaced = add_label_blanks(lines)
+    cleaned = remove_anon_blanks(spaced)
+    result = [align_eol(l) for l in cleaned]
+    return result, sum(1 for a, b in zip(cleaned, result) if a != b), len(spaced) - len(lines), len(spaced) - len(cleaned)
 
-spaced  = add_label_blanks(lines)
-cleaned = remove_anon_blanks(spaced)
-result  = [align_eol(l) for l in cleaned]
 
-blanks_added   = len(spaced)   - len(lines)
-blanks_removed = len(spaced)   - len(cleaned)
-eol_realigned  = sum(1 for a, b in zip(cleaned, result) if a != b)
-
-if result != lines:
-    if check:
-        print(f"{path}: not aligned ({eol_realigned} EOL comments, +{blanks_added}/-{blanks_removed} blank lines)")
-        sys.exit(1)
-    with open(path, 'w') as f:
-        f.writelines(result)
-    print(f"Changed {eol_realigned} EOL comments, "
-          f"+{blanks_added}/-{blanks_removed} blank lines in {path}")
+a = parser('Align // [addr:...] comments and label spacing', write=True, phase=True)
+a.add_argument('files', nargs='*', help='files relative to --root (default: every source file reachable from the main file)')
+a.add_argument('--check', action='store_true', help='exit 1 if a file is not aligned; write nothing')
+args = a.parse_args()
+paths = [os.path.join(args.root, f) for f in args.files] if args.files else reachable(main_file(args))
+status = 0
+for path in paths:
+    with open(path) as f:
+        lines = f.readlines()
+    result, eol, added, removed = aligned(lines)
+    if result == lines:
+        continue
+    rel = os.path.relpath(path, args.root)
+    note = f"{eol} EOL comments, +{added}/-{removed} blank lines"
+    if args.check:
+        print(f"{rel}: not aligned ({note})"); status = 1
+    elif args.write:
+        with open(path, 'w') as f:
+            f.writelines(result)
+        print(f"Changed {note} in {rel}")
+    else:
+        print(f"{rel}: would change {note} (use --write)")
+sys.exit(status)

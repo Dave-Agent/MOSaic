@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Check the project layout against references/layout.md: no game binaries tracked, derived/supplied dirs ignored, checksum present, README explains supplying data.
 
-  check_layout.py [--root DIR]
+  check_layout.py [--root DIR] [--strict]
 
 Tracked files with a ROM/disk/tape/cartridge/dump extension are listed unless they are named in COMMIT_BINARIES (space-separated paths, project.config).
-Exit status 1 when a tracked binary is found or .gitignore misses a required directory (the other findings are warnings)."""
+The layout rules are a PREFERENCE (layout.md: "prefer not committing"), so every finding is a warning and the exit status is 0.
+With --strict any finding makes the exit status 2 (a distinct "preference not met"); status 1 is reserved for a real error (not a git repository)."""
 import os, re, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser, config
-a = parser(__doc__.split('\n')[0], write=False); args = a.parse_args(); root = os.path.abspath(args.root); cfg = config(root)
+a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--strict', action='store_true', help='exit 2 when any preference is not met (default: always 0)'); args = a.parse_args(); root = os.path.abspath(args.root); cfg = config(root)
 EXT = ('.d64', '.d71', '.d81', '.g64', '.prg', '.bin', '.crt', '.t64', '.tap', '.sid', '.nes', '.gb', '.gbc', '.rom', '.sna', '.vsf', '.zip', '.7z', '.p00')
 allow = set(cfg.get('COMMIT_BINARIES', '').split())
 def git(*x): return subprocess.run(['git', '-C', root] + list(x), capture_output=True, text=True)
@@ -34,7 +35,6 @@ if os.path.isdir(os.path.join(root, 'reference')) and not (os.path.exists(os.pat
 rd = open(os.path.join(root, 'README.md')).read().lower() if os.path.exists(os.path.join(root, 'README.md')) else ''
 if not re.search(r'sha256|checksum|supply|provide|you need', rd): warn.append('README.md does not explain how to supply the original data')
 print('layout check:', root)
-for l in fail: print('  FAIL', l)
-for l in warn: print('  warn', l)
+for l in fail + warn: print('  prefer', l)
 if not fail and not warn: print('  ok')
-sys.exit(1 if fail else 0)
+sys.exit(2 if (fail or warn) and args.strict else 0)
