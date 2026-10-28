@@ -5,3 +5,17 @@ Applies to: every project (Kick Assembler 5.x).
 - A named label may be followed directly by an anonymous `!:` at the same address (see the anonymous-label rules in rules.md).
 - Text with a `$` passed through a `just` recipe argument is expanded by the shell: rename first, then add a comment containing `$` with a script.
 
+
+## A custom text encoding (text as text)
+When a game's character codes are not PETSCII or screen codes (a space is 0, letters are screen codes 1-26, digits keep `$30-$39`), do not leave the strings as `.byte`. Pick the closest built-in encoding, map the differences in a macro, and use only the macro:
+```
+.encoding "screencode_upper"
+.macro Text(s) {                                  // the string, then the game's terminator byte
+    .for (var i = 0; i < s.size(); i++) {
+        .if (s.charAt(i) == " ") { .byte $00 } else { .text s.charAt(i) }
+    }
+    .byte $FF
+}
+```
+- **`.encoding` is global from the point of the directive to the end of the assembly** (or the next `.encoding`), so it also changes every later `.text`. Keep it in one file (`text.asm`), imported once, and write strings only through the macros; add a raw variant (no terminator) for strings that continue with a control code.
+- The encoding is **inferred** from the decoded words: write what you know in the header comment and a `TODO(user)` that the glyphs really are those letters (the character set itself may not have been read yet). Check by assembling and comparing the bytes: the gate does this for free.
