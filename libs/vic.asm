@@ -3,14 +3,15 @@
 VIC: {
 
     // -------------------------------------------------------------------------
-    // DYNAMIC CONFIGURATION
-    // 1. Check if SCREEN_RAM is already defined (from main file).
-    // 2. If not, default to $0400.
+    // Hardware registers and fixed hardware addresses ONLY.
+    // Screen memory and the sprite pointers are NOT here: where they live is a per-game
+    // decision (VIC bank $DD00 bits 0-1, screen base $D018), so a name for them would be
+    // silently wrong for most games, and a conditional default depended on import order.
+    // Define SCREEN_RAM, the sprite pointer addresses (SCREEN_RAM+$3F8..$3FF) and the
+    // character set / bitmap bases as constants in the PROJECT (constants.asm).
+    // COLOR_RAM ($D800) is fixed by the hardware and stays below.
     // -------------------------------------------------------------------------
-    #if !SCREEN_RAM 
-        .label SCREEN_RAM = $0400
-    #endif 
-    
+
     SPRITE: {
         // SPRITE OBJECTS
         // Usage: sta VIC.SPRITE.S0.X
@@ -34,14 +35,14 @@ VIC: {
 
         // --- Individual Sprite Attributes ---
         // Includes calculated RAM Pointers relative to SCREEN_BASE
-        S0: { .label X=$D000; .label Y=$D001; .label COLOR=$D027; .label POINTER=SCREEN_RAM+$3F8 }
-        S1: { .label X=$D002; .label Y=$D003; .label COLOR=$D028; .label POINTER=SCREEN_RAM+$3F9 }
-        S2: { .label X=$D004; .label Y=$D005; .label COLOR=$D029; .label POINTER=SCREEN_RAM+$3FA }
-        S3: { .label X=$D006; .label Y=$D007; .label COLOR=$D02A; .label POINTER=SCREEN_RAM+$3FB }
-        S4: { .label X=$D008; .label Y=$D009; .label COLOR=$D02B; .label POINTER=SCREEN_RAM+$3FC }
-        S5: { .label X=$D00A; .label Y=$D00B; .label COLOR=$D02C; .label POINTER=SCREEN_RAM+$3FD }
-        S6: { .label X=$D00C; .label Y=$D00D; .label COLOR=$D02D; .label POINTER=SCREEN_RAM+$3FE }
-        S7: { .label X=$D00E; .label Y=$D00F; .label COLOR=$D02E; .label POINTER=SCREEN_RAM+$3FF }
+        S0: { .label X=$D000; .label Y=$D001; .label COLOR=$D027 }
+        S1: { .label X=$D002; .label Y=$D003; .label COLOR=$D028 }
+        S2: { .label X=$D004; .label Y=$D005; .label COLOR=$D029 }
+        S3: { .label X=$D006; .label Y=$D007; .label COLOR=$D02A }
+        S4: { .label X=$D008; .label Y=$D009; .label COLOR=$D02B }
+        S5: { .label X=$D00A; .label Y=$D00B; .label COLOR=$D02C }
+        S6: { .label X=$D00C; .label Y=$D00D; .label COLOR=$D02D }
+        S7: { .label X=$D00E; .label Y=$D00F; .label COLOR=$D02E }
     }
 
     //
