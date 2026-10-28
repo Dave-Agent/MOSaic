@@ -1,0 +1,57 @@
+# Testing and tracing (generic)
+
+Four instruments, all built on one small 6510 simulator (`scripts/trace/c64trace.c`). Each answers a different question; none of them replaces the others. Project specifics (which routines, which scenarios, which state) live in the project, never here.
+
+| Instrument | Script | Question it answers |
+|---|---|---|
+| Tracer self-test | `scripts/trace/selftest.py` | Is the simulator itself right? |
+| Routine tests | `scripts/sim/run_tests.py` (+ `c64sim.py`) | Does this routine still do what its model says? |
+| Golden traces | `scripts/golden/golden.py` | Does the whole program still behave the same, frame by frame? |
+| Coverage | `scripts/coverage/run_scenarios.py` (+ `unexecuted.py`, `raw_executed.py`), `scripts/trace/entry_points.py` | What has never run, and what ran but is still undisassembled? |
+
+All of them read `project.config` and take `--root DIR` and `--phase 1|2`; nothing writes outside the project's build, golden and analysis directories. Keys are documented at the top of each script; `scripts/trace/c64env.py` holds the shared ones (`TRACE_RAM`, `TRACE_ROM_DIR`, `TRACE_ENTRY`, `TRACE_A/X/Y/SP/P/PORT`, `TRACE_INIT`, `TRACE_PRG`, `TRACE_SYM`, `TRACE_PRG_P1`, `TRACE_SYM_P1`, `TRACE_BIN`).
+
+## The simulator and its self-test
+`c64trace` is a complete documented-opcode 6510 (plus the common undocumented ones) with just enough hardware for a program's main loop and interrupts to run: PAL line timing (63 cycles per line, 312 lines), the VIC raster interrupt, both CIAs (timers, IRQ and NMI), a keyboard matrix and two joysticks, SID and colour RAM as plain storage. Joystick and key input is a **seeded fuzzer** (or fixed with `--joy1/--joy2/--keymat`); `--chaos N` makes the sprite-collision registers return random bits one read in N. Everything is deterministic for a given image, seed and argument list. The machine setup is all arguments: start PC, SP, registers, processor port, ROM directory, I/O writes to apply first (`--init`), steering pokes (`--poke FRAME[+PERIOD]:ADDR=VAL`).
+
+**Self-test (`selftest.py`).** Step 1 runs a built-in program with known answers (every addressing-mode family, decimal mode, stack, flags, the `JMP (ind)` page quirk; needs no ROMs). Step 2, if the project defines `TRACE_SELFTEST_*`, runs a real program of the project that transforms a known image (a depacker, an unscrambler) and requires the result to equal a known reference byte for byte. A program of millions of instructions reproducing a reference exactly is the strongest evidence the core is right. Tools that depend on the tracer refuse to run when it fails.
+
+**What it proves:** the instruction semantics and the flags are right for the code that ran. **What it does not:** cycle-exact timing (no bad-line or sprite-DMA stealing, so a timing-critical raster routine is not validated), anything the VIC draws (sprites, collisions, bitmap), anything the SID plays, real keyboard behaviour. Treat hardware-dependent behaviour as covered only by an emulator run (the project's smoke test) and, for what the eye or ear sees, by looking and listening.
+
+## Routine tests (`scripts/sim`)
+A test calls **one routine by its symbol name** with chosen RAM and registers, then compares the RAM and A/X afterwards with a **Python model written from the routine's contract, not from its code**. API (module `c64sim`, documented at its top): `symbol(name)`, `run(target, pokes, a, x, y, joy1, joy2, store_a, store_x, keymat, init, memlog)`, `rom_byte(addr)`. Symbols come from Kick's `.sym` (namespace paths, locals included) or `.vs` file (flat names); the build is laid over the project's base RAM image, so the test runs the source as it is now, wherever the routine moved. `scripts/sim/example_test.py` is a complete, project-free example; `run_tests.py` runs every `tools/tests/test_*.py` against the current build and exits non-zero if any fails.
+
+Practice that has paid off: random cases with a fixed seed plus the exhaustive corner cases; one test finds a *finding* (a model that disagrees with the code usually means the model, or the routine, is not what the comment said: record the finding in the test's docstring); write the model before looking at the code; inject input through `joy1/joy2/keymat` instead of poking the registers the routine reads; address RAM by symbol, so the test survives a relocation.
+**Proves:** the routine's input/output behaviour on the cases sampled. **Limits:** a routine that depends on interrupts, raster position or other routines' timing is only tested in the deterministic setup (interrupts masked, noise read from the raster is whatever the simulator returns: derive it from the first call). Large routines that call many others are better covered by golden traces than by a model. A routine test says nothing about how the routine is *used*.
+
+## Golden traces (`scripts/golden`)
+A **scenario** is a tracer run from the program's start state with a fixed seed and steering pokes. Once per video frame the tracer samples a **state list** (ranges of RAM: the program's own variables) and the traces are recorded: a CRC per frame (exact mode) or the full sampled bytes compressed (timing-tolerant mode). Later builds are compared against the recording. `record` / `check` is the exact form; `record-t` / `check-t` the timing-tolerant one.
+
+* **State list.** Choose the variables that are behaviour (modes, positions, timers, scores, per-object state), not scratch bytes or the stack. Ends may be symbol names (the list survives a relocation) and `!LO HI` lines **exclude** ranges. **State that holds an address (a pointer into code or data, a scratch pair that builds one) is not behaviour: exclude it**, otherwise every layout change breaks the traces.
+* **Exact mode** is valid for the build it was recorded on. It proves that a change did not alter any sampled byte on any frame of any scenario, so it is the gate of a refactoring that must be byte-identical (the cycle timing is identical too).
+* **Timing-tolerant mode** is for a refactoring that changes bytes and therefore cycle timing. The program's noise is the problem: code that adds the raster line to a random value makes the whole run depend on timing. With `--raster-entropy` the tracer answers those reads from a private PRNG keyed per *site* (the reading instruction, or the call to an entropy routine), and `site_map` keys each site by the enclosing label's path plus the offset into it, so the same routine gets the same noise after the code moved. The comparison then tolerates *transient* differences (a cell different for fewer than `GOLDEN_PERSIST` frames: the tracer samples at a fixed raster line while the program updates a variable mid-frame) and requires the first *persistent* difference to come after `GOLDEN_MIN_CLEAN` frames (a long clean prefix, then a late drift as the changed interrupt/main-loop interleaving diverges, is accepted; a break early is not).
+**Proves (tolerant):** the program behaves identically for the first stretch of every scenario, in every sampled variable, under a noise sequence independent of the layout: a real behaviour change shows up within the first ~100 frames. **Limits:** it is blind to what is not sampled and to anything beyond the horizon; a late drift is *assumed* to be timing, not proven to be; it cannot see what only the video chip sees (a bitmap that moved passes every trace): keep an emulator smoke test and a screenshot check next to it. Re-record (`record-t`) only after a deliberate behaviour change, from a build you trust, and say so in the commit.
+
+## Coverage (`scripts/coverage`, `scripts/trace/entry_points.py`)
+`run_scenarios.py` runs a set of scenarios (a list of `name: arguments`; the steering pokes force modes, levels, player counts the fuzzer would not reach) and accumulates, per scenario, which bytes were executed as opcode or operand, read, written, and the edges (JSR/JMP/branch/IRQ/RTS-trick targets). Two reports, read from the source's `[ADDR:bytes]` trace comments (so against the **original-address** source, phase 1):
+* `unexecuted.py`: code no scenario executed, per routine, in runs of at least `--min` bytes. Candidates for a new scenario, or dead code.
+* `raw_executed.py`: bytes that ran but are still raw data rows in the source: code nobody has disassembled yet (or a deliberate trick: an `rts` reached with a stacked address).
+`entry_points.py` goes the other way for a new game: it runs many seeds from the start state and writes entry points, code ranges, data ranges and self-modifying bytes for the disassembler, each marked `executed` or `static` (by flow from executed code).
+**Proves:** that the listed code did run, and under which scenario. **Limits:** "never executed" only means "not reached by these scenarios"; an unexecuted byte may be dead, rare-path (game over, high-score entry: needs better input) or reachable only with hardware the tracer does not model. Coverage does not say the executed code is right.
+
+## Checking a port against the same cases
+The cases are the specification; the C64 build is the first implementation.
+1. **Routine tests** become the port's unit tests: the Python model and the inputs/outputs are platform-neutral; only `run(...)` is replaced by a call into the port's implementation of the same routine (or of the platform interface the routine uses). A routine whose model was written from its contract is exactly what a port needs.
+2. **Golden traces** become the port's integration test: the scenarios (seed, steering) and the state list, resolved *by name* in the port, define the expected per-frame state. Run the port headless with the same scenario, dump the same variables each frame, and compare with the C64's recording using the **tolerant criterion** above, because a port cannot match cycle timing: identical for the first stretch, drift tolerated afterwards. The noise must be injectable (a seeded source in place of the raster read) and keyed by call site, as in `--raster-entropy`, or the traces diverge at the first random number.
+3. **Coverage** tells which scenarios still have to exist before the port can claim the whole game: run the same scenario set against the port with its own coverage tool and compare the sets of executed routines.
+What a port cannot take from these: anything hardware-only (picture, sound, timing-critical raster effects, input devices): those are checked by looking, listening and playing.
+
+## Which script when
+| You changed | Run |
+|---|---|
+| a name, a comment, the layout (bytes identical) | the project's build comparison (`framework/scripts/build.sh` / `build_compare.sh`); exact golden `check` |
+| code, bytes change, behaviour must not | routine tests, `check-t`, then the emulator smoke test |
+| code that adds bytes or moves a table | the above plus the project's relocation checks and a screenshot |
+| a new routine or a fix | add or extend its routine test first, then the rest |
+| a deliberate behaviour change | change the model and the test, then `record-t` / `record`, in the same commit |
+| the tracer itself | `selftest.py`, then compare a golden `check` and a coverage run with the previous tracer: the `.flags` files must be identical |
