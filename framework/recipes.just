@@ -41,8 +41,7 @@ synced direction:
     @echo "LAST_SYNC: {{direction}} @ $(date -Iseconds)" > "{{justfile_directory()}}/.sync-state"
     @echo "recorded: {{direction}}"
 
-# Commit everything with the project's attribution trailers, so none is forgotten.
-# project.config: COMMIT_TRAILERS="Co-Authored-By: ...\nSession: ..." (lines separated by \n; empty = no trailer). Usage: just commit "message"
+# Commit everything with the project's trailers (COMMIT_TRAILERS in project.config, lines separated by \n). Usage: just commit "message"
 commit msg:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -53,7 +52,7 @@ commit msg:
     else
         git commit -q -m "{{msg}}"
     fi
-    git log --oneline | head -1
+    git log -1 --oneline
 
 # Align the // comment columns of the phase 1 source (whitespace only; run verify after).
 align:
