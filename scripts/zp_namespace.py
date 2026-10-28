@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Phase 2: the zero-page variables become `zp.name` (as in Monty's zero_page.asm).
+"""Phase 2: the zero-page variables become `zp.name` (one `zero_page.asm` declaring them in a `zp` namespace).
 
 zero_page.asm wraps its top-level `.label`s in `.namespace zp { }`; every use in the source is rewritten (code only: not comments, strings, `name:` operand
-labels, or names reached by a path such as `Balls.Data.index`). A name that is also defined elsewhere is reported and left alone. One-line `.namespace X { ...}`
+labels, or names reached by a path such as `Group.Data.index`). A name that is also defined elsewhere is reported and left alone. One-line `.namespace X { ...}`
 entries stay outside zp. The `zp_` prefix is dropped where the stripped name is free.
 
   zp_namespace.py --src phase2/src [--zp-file zero_page.asm] [--extra FILE ...] [--keep-prefix] [--write]

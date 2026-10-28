@@ -7,7 +7,7 @@ to `bank ram` and `save "file" 0 0000 ffff` writes the true RAM.
 Use as a module (the other scripts in this folder do):
     from vice_monitor import Monitor, start_vice
     proc = start_vice(vice_bin, media, port=6510); m = Monitor(port); m.read(1)   # swallow the first prompt
-    m.cmd('break 2d00'); m.cmd('x', 0.2); m.wait_stop(120)
+    m.cmd('break ADDR'); m.cmd('x', 0.2); m.wait_stop(120)
 or from the shell, to send commands to a VICE that is already listening:
     vice_monitor.py [--port 6510] [--wait 0.6] CMD [CMD ...]     (prints each reply)
 

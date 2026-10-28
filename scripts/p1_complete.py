@@ -15,7 +15,7 @@ import re, os, sys, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser, main_file, reachable, config
 here = os.path.dirname(os.path.abspath(__file__))
-a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--extra', help='an extra regex for placeholder names'); a.add_argument('--lo', type=lambda x: int(x, 0), default=0x0800); a.add_argument('--hi', type=lambda x: int(x, 0), default=0xFEFF)
+a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--extra', help='an extra regex for placeholder names'); a.add_argument('--lo', type=lambda x: int(x, 0), default=0x0800); a.add_argument('--hi', type=lambda x: int(x, 0), default=0xFFFF)
 args = a.parse_args(); main = main_file(args)
 base = [sys.executable]; common = ['--root', args.root] + (['--main', args.main] if args.main else ['--phase', str(args.phase)])
 def run(script, *extra):

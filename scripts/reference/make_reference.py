@@ -16,7 +16,7 @@ SPEC, one operation per line, `#` starts the reason that is printed with it (wri
 For each operation the number of bytes that actually change is printed (0 = the spec and the input already agree: check it is not a typo).
 Chain stages by running it again with --in = the previous --out and --in-base = its first address; archive each intermediate image, and keep their SHA-256 in the README.
 
-project.config keys (each overridden by its option): REF_DUMP (--in), REF_SPEC (--spec), REF_KEEP (--keep, `0800-FEFF`), REF_OUT (--out, the reference image),
+project.config keys (each overridden by its option): REF_DUMP (--in), REF_SPEC (--spec), REF_KEEP (--keep, `0800-FFFF`), REF_OUT (--out, the reference image),
 REF_SHA_FILE (--sha-file). Paths relative to --root. Exit 1 when --expect-sha256 or an `expect` line fails."""
 import hashlib, os, re, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))

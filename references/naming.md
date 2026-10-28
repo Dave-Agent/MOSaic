@@ -5,9 +5,9 @@ Names are the index of the source: grep must find things, and the case of a name
 ## What a name's shape says
 | Thing | Form | Examples |
 |---|---|---|
-| Routine, code label, macro, `.function`, namespace | PascalCase | `Move.Start`, `RoundFlow`, `FontText`, `SpritePtr` |
+| Routine, code label, macro, `.function`, namespace | PascalCase | `Audio.Init`, `RoundFlow`, `DrawText`, `SpritePtr` |
 | Data, variable, table, local label | snake_case | `frame_counter`, `reaction_tbl`, `row_loop` |
-| Constant (a value, not an address) | UPPER_SNAKE with a family prefix | `MOVE_JUMP_UP`, `BUBBLE_ID_MATCH_OVER`, `OPC_RTS` |
+| Constant (a value, not an address) | UPPER_SNAKE with a family prefix | `STATE_JUMP`, `MSG_ID_GAME_OVER`, `OPC_RTS` |
 | Hardware register | the canonical lib name | `VIC.BORDER_COLOR`, `SID.V1_CTRL`, `CIA.DATA_PORT_A_1` |
 | Zero-page variable, phase 1 | `zp_` prefix, snake_case | `zp_ptr_a`, `zp_tmp_a` |
 | Zero-page variable, phase 2 | `zp.` namespace, no prefix | `zp.ptr_a`, `zp.tmp_a` |
@@ -31,8 +31,8 @@ Names are the index of the source: grep must find things, and the case of a name
 | `_chr` / `_music` etc. | only when the data type helps reasoning and no richer name exists |
 
 - **A block of consecutive slots** that code addresses one by one is a `.namespace` with `base` and members named for what the code proves (`slot5`, or the hardware number), never `name+5` at the use site (rules.md, Relocatability; `+N` is allowed in the definition only).
-- **Per-slot aliases** of one variable (per fighter, per player) are `<name>_<slot>` defined from the primary slot (`.label x_red = x+1`: a `+N` in a definition is allowed), after it.
-- **Constants:** a family shares a prefix (`MOVE_*`, `BUBBLE_ID_*`, `GAME_MODE_*`, `OPC_*`); a stride, count or range the code spells as a number gets one (`ENEMY_SLOT_SIZE`, `ENEMY_SLOTS`).
+- **Per-slot aliases** of one variable (per actor, per player) are `<name>_<slot>` defined from the primary slot (`.label x_red = x+1`: a `+N` in a definition is allowed), after it.
+- **Constants:** a family shares a prefix (`STATE_*`, `MSG_ID_*`, `MODE_*`, `OPC_*`); a stride, count or range the code spells as a number gets one (`ACTOR_SLOT_SIZE`, `ACTOR_SLOTS`).
 
 ## Names that are not (yet) confirmed
 - A name is **provisional** until it is confirmed against dynamic analysis or by the user. A human-made label from earlier work counts as provisional.

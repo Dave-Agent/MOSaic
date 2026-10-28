@@ -36,7 +36,7 @@ def reachable(main, skip=('libs',)):
     walk(os.path.normpath(main)); return seen
 
 def expanded_lines(main, skip=('libs',)):
-    """main with every local `#import \"file\"` expanded in place (line numbers refer to the expanded text, as in the IK+ srcfiles.py)."""
+    """main with every local `#import \"file\"` expanded in place (line numbers refer to the expanded text)."""
     out = []
     for l in open(main).read().split('\n'):
         m = re.match(r'\s*#import\s+"([^"]+\.asm)"', l)

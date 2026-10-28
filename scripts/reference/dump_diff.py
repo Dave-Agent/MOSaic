@@ -7,7 +7,7 @@ The second-release comparison of references/new_game.md stage 1/3: the bytes the
 64 KB dumps (base 0) or images at --a-base / --b-base. Differences closer than --gap bytes merge into one region (default 8). --range limits the comparison (default: the part
 both cover); --ignore skips ranges known to differ (a hole the build fills, screen RAM). -v hex-dumps regions of 32 bytes or less. --symbols is a Kick symbol file (-symbolfile)
 or a source-derived one; the nearest label at or below the region start (within 1 KB) is shown as `label+offset`.
-project.config keys: DIFF_RANGE (--range, e.g. `0800-FEFF`), SYMBOL_FILE (--symbols). Exit status 0 when the dumps are equal over the range, 1 when they differ."""
+project.config keys: DIFF_RANGE (--range, e.g. `0800-FFFF`), SYMBOL_FILE (--symbols). Exit status 0 when the dumps are equal over the range, 1 when they differ."""
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')); sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'vice'))
 from _common import parser, config

@@ -203,4 +203,4 @@ if ARGS.section in (None, '9'):
         m = re.match(r'^\s*\.word\s+((?:\$[0-9a-fA-F]{4}\s*,?\s*)+)$', c)
         if m:
             vals = [int(x, 16) for x in re.findall(r'\$([0-9a-fA-F]{4})', m.group(1))]
-            if any(0x0800 <= v <= 0xFEFF for v in vals): print(f'   line {i+1} ({cur}): {c.strip()[:90]}')
+            if any(0x0800 <= v <= 0xFFFF for v in vals): print(f'   line {i+1} ({cur}): {c.strip()[:90]}')

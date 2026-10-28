@@ -24,18 +24,18 @@ check:       build-phase2 test golden-t     # plus the raw-address and align che
 ```
 
 ## Recipe contract (roles, and the fallback when a project lacks one)
-The skill and its agents refer to recipes by **role**, because the three projects do not all spell them the same (TOAS, for example, has `assemble`, `verify`, `todos`, `p2todos`). Required: `default` (lists recipes) and a phase 1 gate named `verify`. Everything else is a role with a fallback:
+The skill and its agents refer to recipes by **role**, because projects do not all spell them the same (one has `assemble`, `verify`, `todos`, `p2todos`). Required: `default` (lists recipes) and a phase 1 gate named `verify`. Everything else is a role with a fallback:
 | Role | Usual name | If the project has none |
 |---|---|---|
-| assemble, no diff | `experiment` (TOAS: `assemble`) | run `framework/scripts/build.sh` |
+| assemble, no diff | `experiment` (or `assemble`) | run `framework/scripts/build.sh` |
 | phase 2 gate | `check` | run its parts: build phase 2, `scripts/raw_refs.py`, align check, the tests, the golden traces |
 | tests | `test` | run the project's test runner directly |
-| list TODO markers | `todo [tag]` (TOAS: `todos`, `p2todos`) | `grep -rn 'TODO(' phase*/src` |
+| list TODO markers | `todo [tag]` (or `todos`, `p2todos`) | `grep -rn 'TODO(' phase*/src` |
 | list sections | `sections` | `grep -rn 'SECTION:' phase*/src` |
 | align comments | `align`, `align-check` | `scripts/align_comments.py` |
 | run / smoke test | `launch`, `smoke` | start the emulator by hand with the symbol file |
 | Ghidra sync state | `sync-state`, `synced` | skip, but never edit Ghidra and the source in both directions |
-Optional roles seen in TOAS (add where useful): `comment-check` (comment rules), `anon-check` (anonymous-label limits), `rawops` (the raw-address check; the skill's `raw_refs.py` does the same), `progress` (how much is classified). Docs-site recipes stay out of the skill.
+Optional roles seen in practice (add where useful): `comment-check` (comment rules), `anon-check` (anonymous-label limits), `rawops` (the raw-address check; the skill's `raw_refs.py` does the same), `progress` (how much is classified). Docs-site recipes stay out of the skill.
 A project that lacks a role-recipe the loop needs should add it (named as above) rather than rely on the fallback.
 
 ## The standard recipe set

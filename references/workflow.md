@@ -11,4 +11,4 @@ From the user, when asked how the projects are done:
 
 Afterwards: source and Ghidra are never edited in both directions at once (`just sync-state`, `just synced <direction>`); `framework/ghidra/import_symbols.py` is the source → Ghidra bridge.
 
-Gaps to fill when a new game starts (not yet written down by the user): how crack code is told from game code (IK+ needed `docs/boot_and_crack_analysis.md`), how the reference image is cleaned, and how the first byte-identical build is reached.
+See `new_game.md` for how crack code is told from game code, how the reference image is cleaned and how the first byte-identical build is reached.

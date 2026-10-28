@@ -3,7 +3,7 @@
 
   raw_executed.py [--root DIR] [--phase 1|2 | --main FILE] PREFIX...        (or --dir DIR: every *.flags in DIR; default COVERAGE_DIR)
 Flags are OR-merged over the prefixes. Needs the exporter's `// [ADDR]` row comments, so run it on the phase 1 source (the default) with traces of the original image.
-Range scanned: $0800-$FEFF (--lo/--hi to change). Output: the number of runs and bytes, then each run as `START-END (size)`.
+Range scanned: $0800-$FFFF (--lo/--hi to change). Output: the number of runs and bytes, then each run as `START-END (size)`.
 """
 import os, re, struct, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, os.path.dirname(HERE))

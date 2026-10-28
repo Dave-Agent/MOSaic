@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """VICE monitor commands from Kick Assembler's namespaced symbol file.
 
-Kick's -vicesymbols file drops the namespace prefix (every `Random` looks alike). This reads the full symbol file (-symbolfile: `.namespace X {` / `.label n=$addr` /
-`.label n=$addr {` for a routine scope) and writes a monitor command file with the complete paths (`Ai.Decide`, local labels as `Move.Start.set_id`), plus optional breakpoints
+Kick's -vicesymbols file drops the namespace prefix (every routine named `Init` looks alike). This reads the full symbol file (-symbolfile: `.namespace X {` / `.label n=$addr` /
+`.label n=$addr {` for a routine scope) and writes a monitor command file with the complete paths (`Module.Routine`, local labels as `Module.Routine.local_label`), plus optional breakpoints
 and watches:
 
   vice_symbols.py SYMFILE OUT.mon [--break NAME ...] [--watch NAME ...] [--bank C]
@@ -43,7 +43,7 @@ def main():
     def addr(n):
         if n.startswith('$'): return int(n[1:], 16)
         if n in labels: return labels[n]
-        raise SystemExit('no label %s in %s (labels look like Ai.Decide, Move.Start.set_id)' % (n, sym))
+        raise SystemExit('no label %s in %s (labels look like Module.Routine, Module.Routine.local_label)' % (n, sym))
     with open(out, 'w') as f:
         for n, v in sorted(labels.items(), key=lambda x: x[1]): f.write('al %s:%04x .%s\n' % (bank, v, n))
         for n in breaks: f.write('break $%04x\n' % addr(n))

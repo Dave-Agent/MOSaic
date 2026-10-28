@@ -70,7 +70,7 @@ case "$TARGET" in
         exit 1
     fi
     echo ">> launching RetroDebugger with symbols${POKES_FILE:+ (poked PRG)}"
-    "$RETRODEBUGGER_BIN" -c64 "$LAUNCH_PRG" -debuginfo "$DEBUG_FILE" -symbols "$VICE_SYMBOLS" -wait 3000 -jmp x0810 -unpause
+    "$RETRODEBUGGER_BIN" -c64 "$LAUNCH_PRG" -debuginfo "$DEBUG_FILE" -symbols "$VICE_SYMBOLS" -wait 3000 -jmp "${LAUNCH_JMP:-x0810}" -unpause
     ;;
   *)
     echo "!! unknown launch target '$TARGET' (use: vice | retro)" >&2

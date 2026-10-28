@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Find pointers built from two immediates: `lda #lo; sta P` ... `lda #hi; sta P+1` (either order, within 3 instructions) where the combined value lies in the image.
 Candidates for `#<label` / `#>label`. Reads the [ADDR:bytes] comments of the source lines.
-  addr_immediates.py [--phase 1|2 | --main FILE] [--lo 0x0800] [--hi 0xFEFF]"""
+  addr_immediates.py [--phase 1|2 | --main FILE] [--lo 0x0800] [--hi 0xFFFF]"""
 import re, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser, main_file, expanded_lines
-a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--lo', type=lambda x: int(x, 0), default=0x0800); a.add_argument('--hi', type=lambda x: int(x, 0), default=0xFEFF)
+a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--lo', type=lambda x: int(x, 0), default=0x0800); a.add_argument('--hi', type=lambda x: int(x, 0), default=0xFFFF)
 args = a.parse_args(); L = expanded_lines(main_file(args)); I = []
 for i, l in enumerate(L):
     m = re.match(r'^  (?!\.)(\w+)\s.*?// \[([0-9A-F]{4}):((?:[0-9a-f]{2} ?)+)', l)

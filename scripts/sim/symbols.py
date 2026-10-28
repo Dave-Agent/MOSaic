@@ -1,7 +1,7 @@
 """Symbol lookup from a Kick Assembler symbol file, by name.
 
-  load(path)        -> {name: address}   `.sym` (-symbolfile): every label with its scope path ('Hit.MeasurePair', 'Music.Sfx.Data.state_tbl'),
-                                         locals included ('UpdateHud.fill_loop'); `.vs` (-vicesymbols, `al C:ADDR .name`): flat names, the namespace
+  load(path)        -> {name: address}   `.sym` (-symbolfile): every label with its scope path ('Module.Routine', 'Module.Sub.Data.table'),
+                                         locals included ('Routine.fill_loop'); `.vs` (-vicesymbols, `al C:ADDR .name`): flat names, the namespace
                                          prefix is dropped by Kick, so a name that exists in several namespaces keeps the last one.
   routines(path)    -> {name: address}   only the labels reachable from outside a routine (no labels inside a routine's own scope)
   lookup(table, name)                    the address, or a clear error naming the closest matches

@@ -1,4 +1,4 @@
-# Project file layout (decided with the user 2026-10-29; TOAS is the model)
+# Project file layout (decided with the user 2026-10-29)
 
 ## The tree
 ```

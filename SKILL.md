@@ -1,11 +1,11 @@
 ---
 name: c64-decomp
-description: Process, rules and decisions for the C64 decompilation projects (Monty on the Run, Thing on a Spring, IK+ and any new game). Use when working in one of those repos, starting a new game, running a refactor across the source (labels, namespaces, symbols files), or when a convention question comes up (naming, SMC, locals, zero page, phases, gates). Read before changing label or file structure.
+description: Process, rules and decisions for Commodore 64 decompilation projects (turning a game's disk image into byte-identical, commented, relocatable Kick Assembler source). Use when working in such a repo, starting a new game from its original media, running a refactor across the source (labels, namespaces, symbols files), or when a convention question comes up (naming, SMC, locals, zero page, phases, gates). Read before changing label or file structure.
 ---
 
 # C64 decompilation: the shared process
 
-The three projects (Monty on the Run `Reversing/Monty_On_The_Run`, Thing on a Spring `Reversing/Thing On A Spring`, IK+ `IK+/C64`) follow one process that keeps evolving. This skill is where the process, the rules and the decisions live, so they are written once. A project's own `CLAUDE.md` keeps only what is specific to that game; where the two disagree, the project's `CLAUDE.md` wins and the difference is a candidate for `references/decisions.md`.
+Every project follows one process that keeps evolving. This skill is where the process, the rules, the tools and the decisions live, so they are written once. It holds **no game- or project-specific information**: a project's own notes live in the project. A project's own `CLAUDE.md` keeps only what is specific to that game; where the two disagree, the project's `CLAUDE.md` wins and the difference is a candidate for `references/decisions.md`.
 
 ## Before you start
 
@@ -33,7 +33,7 @@ Run `scripts/check_env.py` from the project root (add `--role run|disk|trace|ghi
 
 ## Where things are
 
-This skill is the folder `/home/dave/C64Projects/c64-decomp`, a git repository (every change is a commit; several agents edit it, so commit your own and never discard others' work). `~/.claude/skills/c64-decomp` is a symlink to it, which is how Claude Code loads it in every project.
+This skill is a folder that is a git repository (every change is a commit; several agents may edit it, so commit your own and never discard others' work). It is loaded by Claude Code through `~/.claude/skills/c64-decomp` (a symlink to the folder); scripts refer to it as `<skill>`, and recipes find it through the `C64_DECOMP` variable.
 
 
 `phase1/src` (monolith) and `phase2/src` (split); `symbols.asm` is the index and imports `zero_page.asm`, `variables.asm`, `constants.asm`; `framework/` generic tooling: **the master is this skill's `framework/`**; a project holds a copy, never edits it in place (change it in the skill, then `scripts/framework_sync.py --write`), and it never holds a project value (specifics go in `project.config`); `tools/` project scripts; `tools/migrations/` one-off, already-applied rewrites (copy one as a template for a new bulk change); `reference/`, `originals/`, `dumps/` are supplied data, immutable and not committed (`references/layout.md`).

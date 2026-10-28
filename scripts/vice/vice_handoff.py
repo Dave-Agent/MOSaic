@@ -5,10 +5,10 @@
 
 How it runs (stage 2 of references/new_game.md): start VICE (warp, true drive, remote TEXT monitor, see vice_monitor.py), then
   1. for each --step 'ADDR=CMD;CMD;...' in order: set a breakpoint at ADDR, run to it, delete the breakpoint, run the monitor commands. This is how the key waits of a
-     cracker's intro or menu are patched so a headless run gets through (`2d00=> 2e20 ea ea`, `0852=> 0852 a9 7f ea`: `>` writes bytes, `f LO HI VAL` fills);
+     cracker's intro or menu are patched so a headless run gets through (`ADDR=> ADDR a9 7f ea`: `>` writes bytes at an address, `f LO HI VAL` fills);
   2. set the final breakpoint at --handoff and run to it. --feed 'CMD;CMD' is re-sent every poll while waiting (for a prompt that wants a key: poke the keyboard buffer,
-     `> 0277 4e;> c6 01`); every poll interrupts the machine briefly, so a feed is only used when needed;
-  3. step the instruction at the break (`z`; --no-step skips it) so edits made afterwards cannot destroy the jump that was about to execute (a test round of IK+ was
+     `> 0277 20;> c6 01`); every poll interrupts the machine briefly, so a feed is only used when needed;
+  3. step the instruction at the break (`z`; --no-step skips it) so edits made afterwards cannot destroy the jump that was about to execute (a test round was once
      invalid for this reason), switch to `bank ram` and `save` the TRUE RAM to --out (exactly 65536 bytes, no load address);
   4. with --after 'CMD;CMD' apply those commands to the live machine (a removal to test), delete breakpoints, continue for --run-seconds, then take --screenshot and
      print the PC, whether the machine jammed, and (--expect) whether a byte sequence is on screen. Judge success by screenshot (judge_screenshot.py), not by a PC sample.
