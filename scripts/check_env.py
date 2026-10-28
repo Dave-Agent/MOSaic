@@ -5,7 +5,7 @@
 
 Reads project.config (KICKASS_JAR, JAVA, VICE_BIN, EXOMIZER, RETRODEBUGGER_BIN, GHIDRA_HOME) when present, else looks in the usual places. Prints what is found, the version
 where it is cheap to get, what each tool is for, and an install hint (apt / brew). Required tools missing -> exit 1; optional ones only warn.
-Roles limit what is required: build (default: python3, java, Kick Assembler, git, just), run (+VICE), disk (+c1541), trace (+C compiler), ghidra (+Ghidra headless), headless (+xvfb-run), nes (+Mesen)."""
+Roles limit what is required: build (default: python3, java, Kick Assembler, git, just), run (+VICE), disk (+c1541), trace (+C compiler), ghidra (+Ghidra headless), headless (+xvfb-run), research (+pdftoppm), nes (+Mesen)."""
 import os, re, shutil, subprocess, sys, glob
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser, config
@@ -40,6 +40,7 @@ rows = [
  ('just', shutil.which('just') or '', ver(['just', '--version']), 'the command runner (just.md)', 'build', 'cargo install just | brew install just | apt install just', None),
  ('VICE (x64sc)', find_cmd(('x64sc', 'VICE_BIN'), ('x64',)), '', 'running the game, RAM dumps, smoke tests (x64sc is cycle-exact; x64 is the fallback)', 'run', 'apt install vice | brew install vice', None),
  ('xvfb-run', shutil.which('xvfb-run') or '', '', 'running VICE on a virtual display so nobody can type into it (unattended runs)', 'headless', 'apt install xvfb', None),
+ ('pdftoppm', shutil.which('pdftoppm') or '', '', 'rendering scanned manuals (PDF) to images to read them (poppler)', 'research', 'apt install poppler-utils | brew install poppler', None),
  ('c1541', shutil.which('c1541') or '', '', 'reading and building .d64 disk images (ships with VICE)', 'disk', 'comes with VICE', None),
  ('exomizer', find_cmd(('exomizer', 'EXOMIZER')), '', 'packing a disk build (optional)', 'disk', 'https://bitbucket.org/magli143/exomizer', None),
  ('C compiler (cc/gcc)', shutil.which('cc') or shutil.which('gcc') or '', '', 'building the c64trace tracer', 'trace', 'apt install build-essential | xcode-select --install', None),
