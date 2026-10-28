@@ -32,9 +32,11 @@ DEBUG_FILE="build/@SLUG@.dbg"
 GHIDRA_EXPORT_DIR="ghidra"
 
 # --- Hand-off derivation (fill these in as the boot analysis finds them: references/new_game.md stages 2-3) ---
-HANDOFF_MEDIA="@MEDIA@"        # the medium the dumps are taken from (a read-only scratch copy is attached, never this file)
+HANDOFF_MEDIA="@MEDIA@"        # the medium the dumps are taken from: CHECK IT is the unprotected one (a read-only scratch copy is attached, never this file)
 DUMP_PC=""                     # stage 1: RAM is dumped when execution reaches this address (the depacker's entry, or the hand-off itself if nothing is packed)
 DUMP_COUNT="5"                 # how many dumps are voted (emulator noise from a timing-critical loader)
+DUMP_STEPS=""                  # patches to pass a title/menu that waits for a key or fire: "ADDR=> ADDR EA EA;;ADDR=CMD;CMD" (`;;` separates steps, run in order; references/hand_off_tools.md)
+DUMP_FEED=""                   # monitor commands re-sent while waiting, e.g. to poke a key into the keyboard buffer
 DECRUNCH_SP="fc"               # tracer start state for the depacker run: SP, processor status, processor port
 DECRUNCH_P="34"
 DECRUNCH_PORT="34"

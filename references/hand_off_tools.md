@@ -63,3 +63,9 @@ Not proven: NTSC media, tape media, fast-loader media that need more than a key 
 - `scripts/reference/vote_dumps.py --out VOTED.bin DUMP DUMP DUMP ...`: majority vote per byte over several dumps taken at the same moment (`vice_handoff.py --no-warp` for real speed). Reports positions without a majority inside the game range (take more dumps, or check whether a later step overwrites them).
 - `scripts/ghidra/make_seeds.py`, `run.sh`, `setup.py`: seeds from evidence, then headless import, seeding and Kick Assembler export; see `new_game.md` stage 5.
 - `c64trace --selftest DUMP_BEFORE DUMP_AT_HANDOFF --selftest-pc ... --selftest-done HANDOFF` cross-checks a depacker (stage 2).
+
+## Added after the clean-room run
+- `scripts/disk/extract_files.py IMAGE --out DIR`: every file of a disk image (read-only) with a manifest of load addresses and lengths.
+- `scripts/reference/file_coverage.py --dump DUMP FILES...`: which program files are in a dump and where; the hand-off validity check (`new_game.md` stage 2, 5b).
+- `vice_handoff.py` keeps the reply of the monitor's `x` command, so a breakpoint hit within the first 0.2 s after resuming is no longer lost (consecutive `--step`s a few frames apart).
+- In `just dumps`, `DUMP_STEPS` and `DUMP_FEED` (project.config) pass the title's key or fire waits.

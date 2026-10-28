@@ -50,12 +50,13 @@ def main():
         m = Monitor(port); m.read(1)
         for st in args.step:
             at, _, cs = st.partition('='); at = '%04x' % hexa(at)
-            m.cmd('break ' + at); m.cmd('x', 0.2)
-            if not m.wait_stop(tmo, at): sys.exit('step %s: breakpoint not reached within %ds' % (at, tmo))
+            m.cmd('break ' + at); seen = m.cmd('x', 0.2)            # keep the reply of `x`: a breakpoint hit within 0.2 s is reported in it
+            if not m.wait_stop(tmo, at, seen): sys.exit('step %s: breakpoint not reached within %ds' % (at, tmo))
             m.cmd('delete')
             for c in split_cmds(cs): m.cmd(c, 0.3)
-        m.cmd('break ' + hand); m.cmd('x', 0.2); feed = split_cmds(args.feed); hit = False; t0 = time.time()
-        if not feed: hit = m.wait_stop(tmo, hand)
+        m.cmd('break ' + hand); seen = m.cmd('x', 0.2); feed = split_cmds(args.feed); hit = False; t0 = time.time()
+        if not feed: hit = m.wait_stop(tmo, hand, seen)
+        elif 'Stop on' in seen and hand in seen.lower(): hit = True
         while feed and time.time() - t0 < tmo and not hit:
             m.k.sendall(b'\n'); txt = m.read(0.8)
             if 'Stop on' in txt and hand in txt.lower(): hit = True; break

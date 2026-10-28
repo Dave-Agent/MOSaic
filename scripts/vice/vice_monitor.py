@@ -38,10 +38,11 @@ class Monitor:
         return out.decode('latin1')
     def cmd(s, c, t=0.6):
         s.k.sendall((c + '\n').encode()); return s.read(t)
-    def wait_stop(s, timeout, at=None):
+    def wait_stop(s, timeout, at=None, seen=''):
         """True when VICE reports 'Stop on' (a breakpoint was hit), within timeout seconds; at = hex address text that must appear in the report (else any stop counts)."""
-        o = ''; t = time.time()
+        o = seen; t = time.time()                      # `seen`: what the `x` (go) command already printed: a breakpoint hit within the first moments is reported THERE
         while time.time() - t < timeout:
+            if 'Stop on' in o and (at is None or at.lower() in o.lower()): return True
             o += s.read(1)
             if 'Stop on' in o and (at is None or at.lower() in o.lower()): return True
         return False

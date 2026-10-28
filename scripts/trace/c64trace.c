@@ -15,7 +15,7 @@
  *
  * Build:  gcc -O2 -o c64trace c64trace.c
  *
- * Run:    c64trace --ram IMAGE [--rom-dir DIR] --out PREFIX --pc HEX [--a HEX --x HEX --y HEX --sp HEX --p HEX] [--port HEX]
+ * Run:    c64trace --ram IMAGE [--rom-dir DIR] --out PREFIX --pc HEX [--a HEX --x HEX --y HEX --sp HEX --p HEX] [--port HEX (the processor port, $01: pass it when the dump's $01 is not the value you want, a dump taken mid-load may hold junk)]
  *                  [--init FILE] [--frames N] [--seed S] [--chaos N] [--poke F[+P]:ADDR=VAL ...] [--joy1 HEX] [--joy2 HEX]
  *                  [--keymat B0,..,B7] [--skew CYCLES]
  *           IMAGE: 64K RAM (a 65538-byte file with a 2-byte load address is accepted); without --rom-dir the ROM areas read $02 (KIL: executing one stops the run); DIR holds kernal-901227-03.bin,
@@ -23,7 +23,7 @@
  *           FILE of --init: lines "ADDR VALUE" (hex), I/O writes applied before the run (data-direction registers, VIC setup ...).
  * Noise: --raster-entropy [--site-map FILE] [--entropy-pool-read]   answer reads of $D012 that the program uses as noise from a private PRNG
  *           (timing-independent, for traces that must survive a change of cycle timing); see the comments at io_read.
- * Output: --out PREFIX (.flags .hits .edges .writer, accumulated over runs), --iolog FILE, --memlog FILE ADDR_LO ADDR_HI [PC_LO PC_HI],
+ * Output: --out PREFIX (.flags .hits .edges .writer, accumulated over runs), --iolog FILE, --memlog FILE ADDR_LO ADDR_HI [PC_LO PC_HI] (ONE range per run: a second --memlog replaces the first),
  *           --dump FILE [--dump-at HEX] (the RAM image, then VIC registers, colour RAM and $DD00),
  *           --sample FILE LO HI | --sample-set FILE RANGES (RAM bytes appended once per video frame; RANGES: one "LO HI" hex per line)
  * Self-test: c64trace --selftest IMAGE REFERENCE --selftest-pc HEX --selftest-sp HEX --selftest-done HEX [--selftest-base HEX]

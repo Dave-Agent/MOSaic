@@ -40,7 +40,7 @@ for line in open(SEEDS):
     a = A(int(f[0].lstrip('$'), 16))
     if mem.contains(a) and getInstructionAt(a) is None:
         disassemble(a); n += 1
-print('seeded %d disassembly start points' % n)
+print('seeds: %d new disassembly start(s); seeds already inside a disassembled instruction are skipped' % n)
 
 if os.path.exists(LABELS):
     for line in open(LABELS):

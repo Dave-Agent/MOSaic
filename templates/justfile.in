@@ -15,15 +15,22 @@ env:
 layout:
     python3 {{skill}}/scripts/check_layout.py --root .
 
-# Stage 2: DUMP_COUNT RAM dumps at DUMP_PC, real speed, from a read-only scratch copy of the medium (project.config: HANDOFF_MEDIA, DUMP_PC, DUMP_COUNT).
+# Stage 2: DUMP_COUNT RAM dumps at DUMP_PC, real speed, from a read-only scratch copy of the medium. Each takes about a minute (five: ~6 minutes): run it in the background.
+# project.config: HANDOFF_MEDIA, DUMP_PC, DUMP_COUNT, and for a title/menu that waits for a key or fire: DUMP_STEPS ("ADDR=> ADDR EA EA;;ADDR=CMD" patches run in order at each address, `;;` between steps) and DUMP_FEED.
 dumps:
     #!/usr/bin/env bash
     set -euo pipefail
     . ./project.config
-    : "${DUMP_PC:?set DUMP_PC in project.config (the address the dumps are taken at: references/new_game.md stage 2)}"
+    : "${DUMP_PC:?set DUMP_PC in project.config: the address the dumps are taken at (references/new_game.md stage 2)}"
     mkdir -p dumps
+    args=()
+    if [ -n "${DUMP_STEPS:-}" ]; then
+        IFS=$'\n' read -r -d '' -a parts < <(printf '%s\0' "${DUMP_STEPS//;;/$'\n'}") || true
+        for p in "${parts[@]}"; do args+=(--step "$p"); done
+    fi
+    [ -n "${DUMP_FEED:-}" ] && args+=(--feed "$DUMP_FEED")
     for i in $(seq 1 "${DUMP_COUNT:-5}"); do
-        python3 {{skill}}/scripts/vice/vice_handoff.py --root . --media "$HANDOFF_MEDIA" --handoff "$DUMP_PC" --no-warp --out dumps/at_dump_$i.bin --timeout 300
+        python3 {{skill}}/scripts/vice/vice_handoff.py --root . --media "$HANDOFF_MEDIA" --handoff "$DUMP_PC" --no-warp "${args[@]}" --out dumps/at_dump_$i.bin --timeout 400
     done
 
 # A timing-critical loader leaves single-bit noise that differs per run in VICE: keep the value most dumps agree on.
@@ -31,11 +38,13 @@ vote:
     python3 {{skill}}/scripts/reference/vote_dumps.py --root . --out dumps/voted.bin dumps/at_dump_*.bin || true
 
 # Run the depacker in the skill's tracer from the voted image to HANDOFF_PC and dump RAM there (dumps/handoff.bin is the 64 KB RAM; handoff_state.bin adds VIC registers, colour RAM, $DD00).
+# If nothing needs depacking, DUMP_PC and HANDOFF_PC are the same address: this recipe then just copies the voted image.
 decrunch:
     #!/usr/bin/env bash
     set -euo pipefail
     . ./project.config
-    : "${DUMP_PC:?}" "${HANDOFF_PC:?set HANDOFF_PC in project.config (the depacker's exit)}"
+    : "${DUMP_PC:?}" "${HANDOFF_PC:?set HANDOFF_PC in project.config, the address of the depacker exit}"
+    if [ "$DUMP_PC" = "$HANDOFF_PC" ]; then cp dumps/voted.bin dumps/handoff.bin; echo "DUMP_PC = HANDOFF_PC: nothing to depack, handoff.bin is the voted dump"; exit 0; fi
     mkdir -p build/trace
     gcc -O2 -o build/trace/c64trace {{skill}}/scripts/trace/c64trace.c
     rm -f build/trace/h.*

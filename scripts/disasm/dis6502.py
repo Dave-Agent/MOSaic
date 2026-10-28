@@ -3,7 +3,8 @@
 
   dis6502.py FILE START [LENGTH] [--prg | --base ADDR] [--follow]
      FILE     a .prg (first two bytes = load address; use --prg), a raw file placed at --base (default: a 64 KB RAM dump, base 0)
-     START    hex address to start at;  LENGTH  bytes to disassemble (hex; default 40)
+     START    hex MEMORY address to start at (with --prg the file's load address is the base, so START must lie inside the file's own range; 0 means address $0000);
+              LENGTH  bytes to disassemble (hex; default 40)
      --follow also print, after the listing, the targets of JMP/JSR/branches found in the range (where to read next)
 Linear disassembly follows no flow: data inside the range prints as nonsense, and an overlapping-code trick shows only one reading. Confirm with a trace (scripts/trace)."""
 import argparse, sys
