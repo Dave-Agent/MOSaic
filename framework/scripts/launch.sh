@@ -12,9 +12,9 @@
 # Usage:
 #   launch.sh                            # VICE, no patches
 #   launch.sh vice                       # explicit
-#   launch.sh vice pokes/room_0d.json    # VICE with pokes applied
+#   launch.sh vice pokes/example.json    # VICE with pokes applied
 #   launch.sh retro                      # RetroDebugger, no patches
-#   launch.sh retro pokes/room_0d.json   # RetroDebugger with pokes applied
+#   launch.sh retro pokes/example.json   # RetroDebugger with pokes applied
 
 set -euo pipefail
 
