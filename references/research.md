@@ -7,6 +7,9 @@ Applies to: every project. Documentation turns code reading from "what is this?"
 - **Tips pages and POKE/cheat lists.** They reveal behaviours (hidden rooms, warps, what an item does) and sometimes variable addresses (lives, time, level). Treat addresses as hypotheses.
 - Credits and author names (terminology follows the original author: `rules.md`).
 
+## POKE lists: a documented patch is a pointer into the code
+A poke is a patch someone found, so its address points at an **instruction or a value that matters**. Put the pokes in a small file and run `scripts/research/check_pokes.py --pokes FILE --reference REF --main SRC`: it shows what instruction each poke patches and what it becomes. `DEC $xxxx` becoming `LDA $xxxx` points at a counter that is decremented; `SBC #$01` becoming `SBC #$00` at a per-tick step; a `BNE` becoming `RTS` at a routine to skip; an operand at a start value. A `SYS` address is a documented entry point: it can **independently confirm the hand-off address** (stage 2) and mark a second entry (for example "start with hi-score load"). Pokes are for one release: addresses from a different build (a tape version, a remake) do not apply; do not mix them. A poke proves nothing about meaning: watch the behaviour (tracer write watch, emulator) before naming a variable from it.
+
 ## Scanned manuals and PDFs
 `WebFetch` cannot read an image-only PDF (it returns raw data). Save the file, render it with `scripts/research/pdf_pages.py FILE.pdf --out DIR --dpi 70`, and **read the page images** (an image-reading tool displays them). Check small print at a higher dpi before relying on it. A manual often also describes the **boot sequence** (title screens, "press a key to load the rest"): that is a free cross-check of the hand-off you find in stage 2.
 
