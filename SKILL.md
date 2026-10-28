@@ -7,6 +7,10 @@ description: Process, rules and decisions for the C64 decompilation projects (Mo
 
 The three projects (Monty on the Run `Reversing/Monty_On_The_Run`, Thing on a Spring `Reversing/Thing On A Spring`, IK+ `IK+/C64`) follow one process that keeps evolving. This skill is where the process, the rules and the decisions live, so they are written once. A project's own `CLAUDE.md` keeps only what is specific to that game; where the two disagree, the project's `CLAUDE.md` wins and the difference is a candidate for `references/decisions.md`.
 
+## Before you start
+
+Run `scripts/check_env.py` from the project root (add `--role run|disk|trace|ghidra|nes` for what the work needs): it reports the tools that are installed (Java 17+, Kick Assembler, `just`, VICE, ...), which are missing, and how to install them. Do this when picking up a project on a new machine or handing it to someone else.
+
 ## The loop (every change)
 
 1. **Act and check, never reason blind.** Make the change, assemble it, run the gate, then, if it affects running, the smoke test. Know the result. Use the project's recipes by role (`references/just.md`: assemble, gate, tests, smoke, and what to do when a project lacks a recipe); phase 1's gate is `verify` (byte-identical to `reference/`).
@@ -42,7 +46,7 @@ Write a one-off script in `tools/migrations/YYYY-MM-name.py` that (a) parses, (b
 
 - `libs/`: canonical `vic.asm`, `sid.asm`, `cia.asm`, `cpu.asm`; a project's `libs/` is a copy.
 - `scripts/`: generic tools (`--root`, `--phase 1|2` or `--main FILE`, read `project.config`; nothing changes without `--write`):
-  bulk rewrites `symbols_tidy.py`, `zp_namespace.py`, `hi_byte_names.py`; analysis `scan_offsets.py`, `raw_refs.py`, `smc_list.py`, `addr_immediates.py`, `platform_deps.py`; edits `add_label.py`, `align_comments.py`; `build_compare.sh` (baseline PRG compare); `framework_sync.py` (project `framework/` vs the master); `check_layout.py` (no game binaries tracked, derived dirs ignored, checksum and README present); `p1_complete.py` (phase 1 completeness). Run them from the project root.
+  bulk rewrites `symbols_tidy.py`, `zp_namespace.py`, `hi_byte_names.py`; analysis `scan_offsets.py`, `raw_refs.py`, `smc_list.py`, `addr_immediates.py`, `platform_deps.py`; edits `add_label.py`, `align_comments.py`; `build_compare.sh` (baseline PRG compare); `check_env.py` (tool check, run first); `framework_sync.py` (project `framework/` vs the master); `check_layout.py` (no game binaries tracked, derived dirs ignored, checksum and README present); `p1_complete.py` (phase 1 completeness). Run them from the project root.
 - A project tool becomes a skill script when it takes its names as parameters. Test a new one against the project it came from and diff the output.
 
 ## Rules and decisions
