@@ -15,7 +15,7 @@ def main_file(args):
     cfg = config(args.root)
     m = args.main or cfg.get('SRC_MAIN' if args.phase == 1 else 'PHASE2_MAIN')
     if not m: sys.exit('no main file: pass --main, or set SRC_MAIN / PHASE2_MAIN in project.config')
-    path = os.path.join(args.root, m)
+    path = os.path.normpath(os.path.join(args.root, m))      # normalised: reachable() returns normalised paths, so a `./x` spelling would never match them
     if not os.path.exists(path):
         sys.exit('main file %s not found (phase %s): this project may not have that phase yet; use --phase 1, or --main FILE' % (m, args.phase))
     return path

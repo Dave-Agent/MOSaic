@@ -81,6 +81,7 @@ def main():
     res = bytes(img[lo:hi + 1]); h = sha(res)
     print('output $%04X-$%04X  %d bytes  sha256 %s' % (lo, hi, len(res), h))
     if args.expect_sha256 and args.expect_sha256.lower() != h: print('SHA-256 MISMATCH: expected', args.expect_sha256); bad = True
+    if bad and args.write: sys.exit('an `expect` guard (or --expect-sha256) failed: NOTHING WRITTEN. The spec does not match this dump: wrong dump, wrong stage or wrong address.')
     if args.write:
         if not out: sys.exit('--write needs --out (or REF_OUT)')
         os.makedirs(os.path.dirname(os.path.abspath(R(out))), exist_ok=True); open(R(out), 'wb').write(res); print('wrote', out)

@@ -14,7 +14,7 @@ import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser, main_file, reachable, rewrite_code
 SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('--libs'); args = a.parse_args(); MAIN = main_file(args); SRC = os.path.dirname(MAIN)
+a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('--libs'); args = a.parse_args(); MAIN = os.path.normpath(main_file(args)); SRC = os.path.dirname(MAIN)      # normalised: `reachable` returns normalised paths, so a `./x` spelling would never match
 libdir = args.libs or (os.path.join(SRC, 'libs') if os.path.isdir(os.path.join(SRC, 'libs')) else os.path.join(SKILL, 'libs'))
 
 def parse_lib(path):
