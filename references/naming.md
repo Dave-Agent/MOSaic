@@ -37,10 +37,10 @@ Names are the index of the source: grep must find things, and the case of a name
 ## Names that are not (yet) confirmed
 - A name is **provisional** until it is confirmed against dynamic analysis or by the user. A human-made label from earlier work counts as provisional.
 - Give a provisional item a **descriptive name from what is known** (`data_after_belt_table`, `routine_before_hud_draw`), never an address and never an `unk` prefix, and mark it: `// TODO(name): provisional; known: <facts>`. Tags: `name` = a provisional name awaiting confirmation, `user` = a question only the user can answer (what a sprite, sound or mode is: ask, do not guess), `sound` = needs listening.
-- **Phase 1 is not complete while any of these remain:** a Ghidra placeholder (`DAT_`, `LAB_`, `SUB_`, `FUN_`...) in code or comments; an `unk` name; a `TODO(name)` or `TODO(block)` marker; a `STATUS:  unknown` banner. Placeholder names inside XREF and `[ADDR:...]` trace comments do not count (rules.md, Structure and comments). `scripts/p1_complete.py` counts them.
+- **Phase 1 is not complete while any of these remain:** a Ghidra placeholder (`DAT_`, `LAB_`, `SUB_`, `FUN_`...) in code or comments; an `unk` name; a `TODO(name)` or `TODO(block)` marker; a `STATUS:  unknown` banner; a generated `<mnemonic>_op_<addr>` SMC operand name. Placeholder names inside XREF and `[ADDR:...]` trace comments do not count (rules.md, Structure and comments). `scripts/p1_complete.py` counts them.
 
-## Generated operand names (open)
-SMC operand labels are generated as `<mnemonic>_op_<addr>` (`sta_op_09fe`) until the operand's meaning is known; then rename them to what the operand holds (`irq_d018_value`, `sample_ptr`). Open question for the user: does a leftover `_op_<addr>` name count as a placeholder that blocks phase 1? (IK+ phase 1 has 72 such lines.)
+## Generated operand names
+SMC operand labels are generated as `<mnemonic>_op_<addr>` (`sta_op_09fe`) until the operand's meaning is known. **These are provisional names and block phase 1** (decided with the user): they are the same kind of placeholder as `LAB_xxxx` (a mnemonic and an address, nothing about what the operand holds, and the address goes stale when code moves). Rename each to what the operand holds (`irq_d018_value`, `sample_ptr`, `stage_ptr_slot2_addr`); the `// SMC: <kind> patched by <routine>` comment beside it usually has what is needed. `p1_complete.py` counts the pattern with the other provisional names.
 
 ## Checking
 `scripts/p1_complete.py` (placeholders, `unk`, provisional markers), `scan_offsets.py` (name-plus-offset uses that should be names), and a periodic grep for the wrong suffixes (`_table`, `_idx`). Audit exported names whenever a section is touched.

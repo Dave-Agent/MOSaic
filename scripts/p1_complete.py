@@ -7,7 +7,7 @@ Checks (1, 2 and 2b must be 0; the other two list candidates that are reviewed, 
   1. raw operands          hex addresses used as code operands (raw_refs.py); immediates excluded
   2. Ghidra placeholders   DAT_/LAB_/SUB_/FUN_/PTR_/UNK_/EXT_/BYTE_/WORD_/switchD_/caseD_ ... names, anywhere in the source files INCLUDING COMMENTS (a stale
                            `LAB_1728` in a comment still points at nothing)
-  2b. provisional names    `unk` identifiers, `TODO(name)` and `TODO(block)` markers, `STATUS:  unknown` banners
+  2b. provisional names    `unk` identifiers, `TODO(name)` and `TODO(block)` markers, `STATUS:  unknown` banners, generated `<mnemonic>_op_<addr>` SMC operand names
   3. address pairs         `lda #lo`/`lda #hi` built addresses in the image (addr_immediates.py): candidates for `#<label` / `#>label`
   4. address words         `.word $xxxx` literals whose value lies in the image
 Exit status 0 only when checks 1, 2 and 2b are clean."""
@@ -38,7 +38,7 @@ for f in sorted(set(files)):
             if XREF_CONT.match(l) or (0 <= c < m.start() and (XREF_HEAD.search(l[c:]) or TRACE_ADDR.search(l[c:]))): ignored[0] += 1; continue
             found.append((os.path.relpath(f, args.root), n, m.group(0), 'comment' if '//' in l and l.index('//') < m.start() else 'code', l.strip()[:90]))
 prov = []                                                    # provisional names: `unk` identifiers, TODO(name) markers, STATUS:  unknown banners
-PROV = re.compile(r'\bunk[A-Z_]\w*|TODO\((?:name|block)\)|STATUS:\s+unknown\b')
+PROV = re.compile(r'\bunk[A-Z_]\w*|TODO\((?:name|block)\)|STATUS:\s+unknown\b|\b[a-z]{2,4}_op_[0-9a-fA-F]{3,4}\b')   # the last alternative: generated SMC operand names such as sta_op_09fe
 for f in sorted(set(files)):
     for n, l in enumerate(open(f), 1):
         for m in PROV.finditer(l): prov.append((os.path.relpath(f, args.root), n, m.group(0), l.strip()[:90]))
@@ -52,7 +52,11 @@ for f in sorted(set(files)):
 print('phase', args.phase, 'source', os.path.relpath(main, args.root))
 print(f'  1. raw operands            {raw:5d}   (must be 0)')
 print(f'  2. Ghidra placeholders     {len(found):5d}   (must be 0; {ignored[0]} more in XREF / [ADDR:...] trace comments are allowed)'); [print(f'       {f}:{n}  {name} ({kind})  {t}') for f, n, name, kind, t in found[:15]]
-print(f'  2b. provisional names      {len(prov):5d}   (must be 0: unk names, TODO(name) / TODO(block) markers, STATUS:  unknown)'); [print(f'       {f}:{n}  {name}  {t}') for f, n, name, t in prov[:10]]
+print(f'  2b. provisional names      {len(prov):5d}   (must be 0: unk names, TODO(name)/TODO(block), STATUS:  unknown, <mnemonic>_op_<addr> SMC names)'); [print(f'       {f}:{n}  {name}  {t}') for f, n, name, t in prov[:10]]
+if prov:
+    kinds = {}
+    for f, n, name, t in prov: k = 'SMC operand name' if '_op_' in name else name.split('(')[0]; kinds[k] = kinds.get(k, 0) + 1
+    print('       by kind:', ', '.join(f'{k} {v}' for k, v in sorted(kinds.items())))
 print(f'  3. address pairs (review)  {imm:5d}   (python3 addr_immediates.py for the list)')
 print(f'  4. .word $addr lines       {len(words):5d}   (review: value tables such as note frequencies are data, not addresses)'); [print(f'       {f}:{n}  {t}') for f, n, t in words[:8]]
 ok = raw == 0 and not found and not prov
