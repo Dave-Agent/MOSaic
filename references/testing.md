@@ -55,3 +55,7 @@ What a port cannot take from these: anything hardware-only (picture, sound, timi
 | a new routine or a fix | add or extend its routine test first, then the rest |
 | a deliberate behaviour change | change the model and the test, then `record-t` / `record`, in the same commit |
 | the tracer itself | `selftest.py`, then compare a golden `check` and a coverage run with the previous tracer: the `.flags` files must be identical |
+
+## Holding a key in the tracer, and reading its output
+- `--keymat B0,...,B7` holds keys for the whole run and switches the key fuzzer off (as `--joy1` / `--joy2` switch off the joystick fuzzer): one hex byte per keyboard column, bit = row. The program must select the column by writing a 0 bit to `$DC00`, and reads the rows on `$DC01`. SPACE is column 7, row 4: `--keymat 0,0,0,0,0,0,0,10`. `--keymat-frames N` releases the keys after N frames. Joystick 1 is ANDed onto `$DC01`, so pass `--joy1 ff --joy2 ff` to see only keys, and `--port 35` so the I/O area is visible. `selftest.py` checks this with a tiny program that reads the key.
+- `scripts/trace/report.py PREFIX` reads the tracer's outputs (flags, hits, edges, writer) and prints the legend, the interrupt entries with the raster line each serves, the hottest loops, JSR callers, the `$DC00/$DC01` reads and the byte classes. Run it before naming anything (`phase1_method.md`).

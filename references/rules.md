@@ -15,7 +15,7 @@ Applies to: every project. The no-raw-address rule gates phase 1; phase 2 keeps 
 
 ## Local labels
 Applies to: every project, both phases (decided with the user 2026-10-29: the relaxed anonymous-label rule below is the general one, because it reads better).
-- **Local labels:** scope the routine (`Name: { ... }`), name the label for what it means (`done`, `row_loop`, `go_behind`); anonymous `!:` only for a trivial skip or tiny loop that is the only local, never mixed with named ones; a label used from another routine is global with a proper name. More than ~3 non-trivial locals suggests splitting the routine.
+- **Local labels:** scope the routine (`Name: { ... }`) and name each label for what it means (`done`, `row_loop`, `go_behind`); a label used from another routine is global with a proper name. **Anonymous labels (`!:`, `!+`, `!-`) are allowed under the limits of the next section** (the general regime), and `scripts/anon_labels.py` lists what qualifies and converts it; `--strict` is the older, narrower regime (a trivial skip or a tiny loop that is the only local), for a project that wants it. More than ~3 non-trivial locals suggests splitting the routine.
 
 ## Structure and comments
 Applies to: every project, except where a bullet says otherwise.
@@ -28,7 +28,7 @@ Applies to: every project, except where a bullet says otherwise.
 
 ## Comment rules
 Applies to: projects that adopt them (decided with the user 2026-10-29 in one project; others adopt them when they choose).
-Enforced by `tools/comment_check.py` (`just comment-check`, part of `just verify`; `--list` shows offenders; an optional `tools/comment_baseline.tsv` makes it a ratchet for a source that is not yet clean).
+Enforced by `scripts/comment_check.py` (`just comment-check`; every threshold is an option; `--list` shows offenders; an optional `tools/comment_baseline.tsv` makes it a ratchet for a source that is not yet clean, and `--write` only ever lowers the baseline).
 - **Width:** wrap comment text at 128 columns; nothing passes 150. A long note is several `//` lines. A data row is as wide as its bytes, so only its comment is limited (100 columns).
 - **Label line** (`Name:  // ...`): a one-line summary, at most 80 characters (ideally under 60). The detail is a block comment **above** the label, wrapped at 128, above the `XREF` lines if the project keeps them.
 - **Routine:** the block above the label says what it does and why; add `In:` / `Out:` / `Clobbers:` lines when they are not obvious.
@@ -47,7 +47,7 @@ A local branch target may be anonymous only when all of these hold:
 2. nothing else refers to it: no other routine, jump table, data row or self-modifying code;
 3. each reference is at most two anonymous labels away (`!+`, `!-`, `!++`, `!--`; never `!+++` / `!---`), counting the target, in the final layout;
 4. each reference is at most 40 source lines from its target.
-Anything else keeps a name: routine entries, jump-table targets, SMC operands and targets, labels used from several places. A routine whose only other reference is far away keeps the named label and adds an anonymous one directly after it for the near retry loop (`Name:` then `!:` ... `bcc !-`). Keep the `// [addr:... BNE $xxxx]` comment on the branch: it shows the real target. Adding or removing a `!:` changes the count for every reference that spans it, so run `just verify` after any change near one. `just anon-check` fails on `!+++` / `!---`.
+Anything else keeps a name: routine entries, jump-table targets, SMC operands and targets, labels used from several places. A routine whose only other reference is far away keeps the named label and adds an anonymous one directly after it for the near retry loop (`Name:` then `!:` ... `bcc !-`). Keep the `// [addr:... BNE $xxxx]` comment on the branch: it shows the real target. Adding or removing a `!:` changes the count for every reference that spans it, so run `just verify` after any change near one. `scripts/anon_labels.py --check` (recipe `anon-check`) fails on `!+++` / `!---` and on any reference over the limits; `anon_labels.py` alone lists the candidates and `--write` converts them (recounting every reference, because adding a label can push another one over the limit).
 
 
 ## Relocatability
@@ -70,7 +70,8 @@ Applies to: every project.
 - **Terminology follows the original author** when there is one (use the author's word, not a synonym: the identifiers, comments and docs all change together).
 - **Bulk rewrites of comments or names:** copy the files to a scratch directory first and make every pass repeatable from that copy. A mechanical reflow of paragraphs will produce ragged text; if a pass is wrong, re-run the fixed pass from the copy rather than patching its output. Check byte identity (`just verify`) after each pass.
 - **Dead code and write-only variables** found while naming are recorded as `TODO(phase2)` with the facts only (what is always taken, what is never read); say "probably" for intent. Do not delete them in phase 1.
-- **Tools that keep the source tidy:** `just align` (comment columns), `just anon-check`, `just comment-check`. Run `just verify` after any change.
+- **A name-only pass uses `scripts/refactor/`** (`rename`, `drop_labels`, `replace_raw`, `replace_imm`, `move_img`, `scopeify`, `set_comment`, `uses`: each takes a TSV map, prints per-name counts in a dry run, and changes code only): read the counts, `--write`, then `just verify`. Write a one-off migration script only for what these do not cover. `refactor/README.md` has the pass order.
+- **Tools that keep the source tidy:** `just align` (comment columns), `just anon-check` (`anon_labels.py --check`), `just comment-check` (`comment_check.py`), `p1_complete.py --range LO-HI --allow-marked` to call a slice clean. Run `just verify` after any change.
 
 
 ## Hygiene

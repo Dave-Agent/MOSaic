@@ -71,7 +71,7 @@ def find_image(args, cfg):
     if p:
         p = os.path.join(args.root, p) if not os.path.isabs(p) else p; d = open(p, 'rb').read()
         if len(d) in (65536, 65538): return bytearray(d[-65536:])
-        ram = bytearray(65536); base = int(args.base or cfg.get('LOAD_ADDRESS', '0'), 0)         # a shorter raw file (the reference image) sits at its load address
+        ram = bytearray(65536); base = int((args.base or cfg.get('LOAD_ADDRESS', '0')).replace('$', '0x') if (args.base or cfg.get('LOAD_ADDRESS', '0')).lower().startswith(('$', '0x')) else '0x' + (args.base or cfg.get('LOAD_ADDRESS', '0')), 16)         # a shorter raw file (the reference image) sits at its load address
         ram[base:base + len(d)] = d[:65536 - base]; return ram
     ref = cfg.get('REFERENCE_PRG')
     if ref and os.path.exists(os.path.join(args.root, ref)):
