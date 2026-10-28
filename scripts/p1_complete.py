@@ -18,7 +18,10 @@ here = os.path.dirname(os.path.abspath(__file__))
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--extra', help='an extra regex for placeholder names'); a.add_argument('--lo', type=lambda x: int(x, 0), default=0x0800); a.add_argument('--hi', type=lambda x: int(x, 0), default=0xFEFF)
 args = a.parse_args(); main = main_file(args)
 base = [sys.executable]; common = ['--root', args.root] + (['--main', args.main] if args.main else ['--phase', str(args.phase)])
-def run(script, *extra): return subprocess.run(base + [os.path.join(here, script)] + common + list(extra), capture_output=True, text=True).stdout
+def run(script, *extra):
+    r = subprocess.run(base + [os.path.join(here, script)] + common + list(extra), capture_output=True, text=True)
+    if r.returncode != 0 or not r.stdout.strip(): sys.exit('%s failed: %s' % (script, (r.stderr.strip().splitlines() or ['no output'])[-1]))
+    return r.stdout
 raw = int(re.match(r'(\d+)', run('raw_refs.py')).group(1))
 ph = r'\b(?:DAT|LAB|SUB|FUN|PTR|UNK|EXT|OFF|CODE|BYTE|WORD|DWORD|QWORD|ADDR|JT|thunk_FUN|switchD|caseD)_[0-9a-fA-F]{3,8}\b' + (('|' + args.extra) if args.extra else '')
 pat = re.compile(ph); found = []

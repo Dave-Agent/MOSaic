@@ -21,7 +21,7 @@ reference/            the cleaned reference image (diff target)  NOT COMMITTED; 
 build/ ghidra/ analysis/ extracted/   derived, regenerable      NOT COMMITTED
 ```
 
-## Do not commit the game's binaries
+## Prefer not committing the game's binaries
 **Prefer not committing any ROM, disk image, tape, cartridge, memory dump or image that is the original program's bytes, or a byte-for-byte derivation of it, unless we built it ourselves from our own source.** That covers `original/`, `dumps/`, `reference/`, an unpacked or cleaned image, and tables generated from them. We do not own that data, and a public repository must not redistribute it.
 - **Commit instead:** the source, the tools that derive the reference from the original (`make_reference.py` or equivalent), a **checksum file** (`reference.sha256`) that proves a supplied image is the right one, and the README steps to supply it (which release, where it came from, which file name, which hash).
 - **`.gitignore` lists** `/original/`, `/dumps/`, `/reference/`, `/build/`, `/ghidra/`, `/analysis/`, `/extracted/`, any stray `/*.prg`, `__pycache__/`, `.claude/settings.local.json`, tool state (`progress.db`, `.sync-state`), editor noise, and Kick's working copies next to the source.

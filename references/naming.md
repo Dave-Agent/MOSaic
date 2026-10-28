@@ -17,7 +17,7 @@ Names are the index of the source: grep must find things, and the case of a name
 - A specific verb phrase that tells siblings apart: `UpdateScore`, `FindContact`, `LoadRoom`. Not `DoUpdate`, `Process`, `Check`.
 - Predicates start `Is`/`Has`/`Can` (`IsRoundOver`), setters `Set` (`SetColours`).
 - **No namespace echo:** the namespace is the domain, so `Music.Init`, not `Music.MusicInit`. Namespace = domain noun (`HUD`, `Music`, `Move`), not `Helpers`/`Misc`/`Stuff`. Max 3 levels; a sub-domain earns a level with its own data and 3+ routines. State and tables go in a `.Data` child namespace.
-- **Local labels:** snake_case, named for what they mean (`done`, `idle`, `row_loop`, `go_behind`); the routine is a scope (`Name: { ... }`). Anonymous `!:` only under the anonymous-label rule (rules.md).
+- **Local labels:** snake_case, named for what they mean (`done`, `idle`, `row_loop`, `go_behind`); the routine is a scope (`Name: { ... }`). Anonymous `!:` only under the project's anonymous-label regime (rules.md, Local labels).
 
 ## Data: suffix vocabulary (the dominant practice in all three projects)
 | Suffix | Meaning |
@@ -30,8 +30,8 @@ Names are the index of the source: grep must find things, and the case of a name
 | `_x`, `_y` | a position component |
 | `_chr` / `_music` etc. | only when the data type helps reasoning and no richer name exists |
 
-- **A block of consecutive slots** that code addresses one by one is a `.namespace` with `base` and members named for what the code proves (`slot5`, or the hardware number), never `name+5` at the use site.
-- **Per-slot aliases** of one variable (per fighter, per player) are `<name>_<slot>` defined from the primary slot (`.label x_red = x+1`), after it.
+- **A block of consecutive slots** that code addresses one by one is a `.namespace` with `base` and members named for what the code proves (`slot5`, or the hardware number), never `name+5` at the use site (rules.md, Relocatability; `+N` is allowed in the definition only).
+- **Per-slot aliases** of one variable (per fighter, per player) are `<name>_<slot>` defined from the primary slot (`.label x_red = x+1`: a `+N` in a definition is allowed), after it.
 - **Constants:** a family shares a prefix (`MOVE_*`, `BUBBLE_ID_*`, `GAME_MODE_*`, `OPC_*`); a stride, count or range the code spells as a number gets one (`ENEMY_SLOT_SIZE`, `ENEMY_SLOTS`).
 
 ## Names that are not (yet) confirmed

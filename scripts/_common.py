@@ -15,7 +15,10 @@ def main_file(args):
     cfg = config(args.root)
     m = args.main or cfg.get('SRC_MAIN' if args.phase == 1 else 'PHASE2_MAIN')
     if not m: sys.exit('no main file: pass --main, or set SRC_MAIN / PHASE2_MAIN in project.config')
-    return os.path.join(args.root, m)
+    path = os.path.join(args.root, m)
+    if not os.path.exists(path):
+        sys.exit('main file %s not found (phase %s): this project may not have that phase yet; use --phase 1, or --main FILE' % (m, args.phase))
+    return path
 
 LABEL_FILES = ('symbols.asm', 'zero_page.asm', 'variables.asm', 'constants.asm')   # hold labels only, no code: not expanded into the line stream
 

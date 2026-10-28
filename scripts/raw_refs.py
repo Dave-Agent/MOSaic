@@ -10,6 +10,7 @@ args = a.parse_args(); L = expanded_lines(main_file(args))
 cnt = collections.Counter(); where = collections.defaultdict(list)
 for i, l in enumerate(L[args.first - 1:args.last], args.first):
     code = l.split('//')[0]
+    code = re.sub(r'^\s*(?:[A-Za-z_][\w.]*|!+):\s*', '', code)       # a label in front of the instruction or directive (`Name: .byte ...`, `!: lda ...`)
     if not code.strip() or code.lstrip().startswith(('.', '#')): continue
     for m in re.finditer(r'(?<![#\w$.:+-])\$([0-9a-fA-F]{2,4})\b(?!\s*[:=])', code):
         if re.match(r'^\s*\w+\s+#', code): continue

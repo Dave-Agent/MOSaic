@@ -14,18 +14,22 @@ LAB = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*):')
 NS = re.compile(r'^\.namespace (\w+) *\{[^}]*$')
 OPEN = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*): *\{')
 rows = []
+OPEN_NS = re.compile(r'^\.namespace (\w+) *\{[^}]*$')
 for f in reachable(MAIN):
-    ns, cur, scope = [], None, None
+    blocks, cur = [], None            # blocks: open column-0 `{` blocks as ('ns', name) or ('scope', name)
     for l in open(f).read().split('\n'):
-        m = NS.match(l)
-        if m: ns.append(m.group(1))
-        elif re.match(r'^\} *// (\w+)$', l) and ns and re.match(r'^\} *// (\w+)$', l).group(1) == ns[-1]: ns.pop(); continue
-        if scope and re.match(r'^\} *// ' + scope + r'\b', l): scope = None; continue
+        m = OPEN_NS.match(l)
+        if m: blocks.append(('ns', m.group(1))); continue
+        if re.match(r'^\}', l):
+            if blocks: blocks.pop()
+            continue
+        in_scope = any(k == 'scope' for k, _ in blocks)
         m = LAB.match(l)
-        if m and not scope:
-            parts = [x for x in ns + [m.group(1)]]; parts = [x for i, x in enumerate(parts) if i == 0 or x != parts[i - 1]]; cur = '.'.join(parts)
+        if m and not in_scope:
+            ns = [n for k, n in blocks if k == 'ns']
+            parts = ns + [m.group(1)]; parts = [x for i, x in enumerate(parts) if i == 0 or x != parts[i - 1]]; cur = '.'.join(parts)
             o = OPEN.match(l)
-            if o: scope = o.group(1)
+            if o: blocks.append(('scope', o.group(1)))
             continue
         code = l.split('//')[0]
         for r in REG.finditer(code): rows.append((os.path.relpath(f, ROOT), cur or '(none)', r.group(1), r.group(2)))
