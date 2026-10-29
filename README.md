@@ -28,9 +28,9 @@ MOSaic is a Claude Code skill: a process, its rules, and the scripts that check 
 
 The full step-by-step, from adding the game's image to a finished phase 2, is in [HOWTO.md](HOWTO.md). The short version:
 
-**1. Install the tools.** Python 3, Java 17+, [Kick Assembler](http://theweb.dk/KickAssembler/) (the jar in `~/tools/KickAss.jar`, or set `KICKASS_JAR` in `project.config`), git, [`just`](https://github.com/casey/just), VICE (`x64sc`) with its C64 ROMs, Ghidra 11+ (set `GHIDRA_HOME` if it isn't under `~/ghidra*`) and a C compiler. The Ghidra exporter script is fetched automatically on first use. Pillow is needed for pictures. Developed on Linux; macOS should work; on Windows use WSL.
+**(a) Install the tools.** Python 3, Java 17+, [Kick Assembler](http://theweb.dk/KickAssembler/) (the jar in `~/tools/KickAss.jar`, or set `KICKASS_JAR` in `project.config`), git, [`just`](https://github.com/casey/just), VICE (`x64sc`) with its C64 ROMs, Ghidra 11+ (set `GHIDRA_HOME` if it isn't under `~/ghidra*`) and a C compiler. The Ghidra exporter script is fetched automatically on first use. Pillow is needed for pictures. Developed on Linux; macOS should work; on Windows use WSL.
 
-**2. Install the skill and check the tools.**
+**(b) Install the skill and check the tools.**
 ```
 git clone https://github.com/Dave-Agent/MOSaic.git ~/MOSaic
 mkdir -p ~/.claude/skills
@@ -39,7 +39,7 @@ python3 ~/.claude/skills/mosaic/scripts/check_env.py --role run --role trace --r
 ```
 The link must be named `mosaic`. The last line of the check should read `all required tools present`.
 
-**3. Make a project for the game.** You need the game's disk (`.d64`, `.g64`) or tape (`.tap`) image, preferably one with the copy protection removed. The original is copied into the project's `originals/` and its SHA-256 recorded. It is never modified and never attached to an emulator directly; VICE only runs scratch copies.
+**(c) Make a project for the game.** You need the game's disk (`.d64`, `.g64`) or tape (`.tap`) image, preferably one with the copy protection removed. The original is copied into the project's `originals/` and its SHA-256 recorded. It is never modified and never attached to an emulator directly; VICE only runs scratch copies.
 ```
 python3 ~/.claude/skills/mosaic/scripts/new_project.py --root ~/C64Projects/MyGame --name "My Game" --media /path/to/game.d64
 cd ~/C64Projects/MyGame
@@ -47,12 +47,12 @@ just env
 ```
 MOSaic creates a local git repository in the project and commits after each step. It never pushes.
 
-**4. Open Claude Code in the project folder and ask for the first stage.**
+**(d) Open Claude Code in the project folder and ask for the first stage.**
 > Use the MOSaic skill. Follow `references/new_game.md` from the research step through the first byte-identical build of this game, and don't push.
 
 The agent researches the game, extracts the files, finds the point where the game is fully loaded, derives a clean reference image, exports the disassembly from Ghidra, and builds it back byte for byte. A disk takes tens of minutes and a tape longer. VICE opens windows while it dumps memory; don't type in them.
 
-**5. Tell it to continue when it stops.** The agent finishes the task it was given and stops at each stage boundary. It runs `just status`, tells you what was done and what the next stage is, and asks whether to continue. You can also just say "move to the next stage" (or "what's next?"), and it works out the stage from the project. The prompts below are what each stage amounts to, for when you want to be specific:
+**(e) Tell it to continue when it stops.** The agent finishes the task it was given and stops at each stage boundary. It runs `just status`, tells you what was done and what the next stage is, and asks whether to continue. You can also just say "move to the next stage" (or "what's next?"), and it works out the stage from the project. The prompts below are what each stage amounts to, for when you want to be specific:
 
 | When the agent says… | Ask |
 |---|---|
@@ -60,7 +60,7 @@ The agent researches the game, extracts the files, finds the point where the gam
 | the first build passes | "Start phase 1 following `references/phase1_method.md`: work in slices, ask me what a thing is only after trying the code and a tracer run, and report progress." |
 | phase 1 is complete | "Start phase 2 following `references/phase2_split.md`." |
 
-**6. Check where you are** with `just --list` for the commands, `python3 ~/.claude/skills/mosaic/scripts/p1_complete.py --root . --phase 1` for how much of phase 1 remains, and `docs/` in the project for the research, the boot analysis and the answers recorded from you.
+**(f) Check where you are** with `just --list` for the commands, `python3 ~/.claude/skills/mosaic/scripts/p1_complete.py --root . --phase 1` for how much of phase 1 remains, and `docs/` in the project for the research, the boot analysis and the answers recorded from you.
 
 ## See results
 

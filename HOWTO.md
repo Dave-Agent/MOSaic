@@ -16,7 +16,7 @@ Step 0 sets up your machine (once). Then fourteen steps. Each one says what you 
 
 ## Step 0: set up your machine (once)
 
-**1. Install these tools.** Use your system's package manager where there is one.
+**(a) Install these tools.** Use your system's package manager where there is one.
 
 | Tool | What it is for | Where to get it |
 |---|---|---|
@@ -32,7 +32,7 @@ Step 0 sets up your machine (once). Then fourteen steps. Each one says what you 
 
 The Ghidra exporter script downloads itself the first time it is needed.
 
-**2. Get the skill, and link it so Claude Code can find it.**
+**(b) Get the skill, and link it so Claude Code can find it.**
 ```
 git clone https://github.com/Dave-Agent/MOSaic.git ~/MOSaic
 mkdir -p ~/.claude/skills
@@ -40,7 +40,7 @@ ln -s ~/MOSaic ~/.claude/skills/mosaic
 ```
 The link must be called `mosaic`: that is the name the skill is registered under, and the commands in this guide use that path.
 
-**3. Check the tools.**
+**(c) Check the tools.**
 ```
 python3 ~/.claude/skills/mosaic/scripts/check_env.py --role run --role trace --role ghidra
 ```
@@ -57,28 +57,28 @@ The last line should read `all required tools present for roles: build, ghidra, 
 
 **Do this once, in a terminal:**
 
-1. **Choose a folder for the project.** It can be new or empty. Example: `~/C64Projects/MyGame`.
-2. **Run this command.** Change the three parts after `--root`, `--name` and `--media`:
-   ```
-   python3 ~/.claude/skills/mosaic/scripts/new_project.py \
-     --root ~/C64Projects/MyGame \
-     --name "My Game" \
-     --media ~/Downloads/mygame.d64
-   ```
-   - `--root` is the project folder from step 1.
-   - `--name` is the game's name.
-   - `--media` is the path to the disk or tape file.
-3. **Go into the folder and check your tools:**
-   ```
-   cd ~/C64Projects/MyGame
-   just env
-   ```
-   You should see a list of tools, each marked `ok`. If one says `absent`, install it as the message says, then run `just env` again.
-4. **Check where you are:**
-   ```
-   just status
-   ```
-   The first two lines should say `done  step 1`, and below them `NEXT: step 2`.
+- **(a) Choose a folder for the project.** It can be new or empty. Example: `~/C64Projects/MyGame`.
+- **(b) Run this command.** Change the three values after `--root`, `--name` and `--media`:
+  ```
+  python3 ~/.claude/skills/mosaic/scripts/new_project.py \
+    --root ~/C64Projects/MyGame \
+    --name "My Game" \
+    --media ~/Downloads/mygame.d64
+  ```
+  - `--root` is the folder you chose in (a).
+  - `--name` is the game's name.
+  - `--media` is the path to the game's disk or tape file.
+- **(c) Go into the folder and check your tools:**
+  ```
+  cd ~/C64Projects/MyGame
+  just env
+  ```
+  You should see a list of tools, each marked `ok`. If one says `absent`, install it as the message says, then run `just env` again.
+- **(d) Check where you are:**
+  ```
+  just status
+  ```
+  The first two lines should say `done  step 1`, and below them `NEXT: step 2`.
 
 **What just happened:** a project folder was created. Your game file was copied into its `originals/` folder (your own copy elsewhere is untouched), its SHA-256 fingerprint was saved in `originals.sha256`, and a git repository was started. From now on the original is never changed, and is never loaded into an emulator directly: VICE only ever runs a temporary copy.
 
