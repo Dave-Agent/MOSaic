@@ -6,20 +6,51 @@ You need the tools from the README's *Getting started* (Java, Kick Assembler, `j
 
 **What "phase 1" and "phase 2" mean.** Phase 1 turns the game into one fully commented source file that assembles to exactly the original bytes. Phase 2 splits that source into files, separates the game from the C64 hardware, and makes it relocatable. Phase 1 is frozen once finished (git tag `p1-byte-identical`); phase 2 is a separate copy.
 
+**Words used below.**
+- **Image:** the game's disk or tape file.
+- **Reference:** a memory image of the game alone, with no loader or crack, made in step 4. Every build is checked against it.
+- **Hand-off:** the moment the game is fully loaded in memory and about to start.
+- **Byte-identical:** the source assembles to exactly the same bytes as the reference.
+- **Slice:** one region of the source worked on in a scratch copy and merged back when its checks pass.
+- **Agent:** the Claude session doing the work. You talk to it in Claude Code, inside the project folder.
+
 ---
 
 ## Steps 1 to 8: from the image to a game that builds and starts
 
-### 1. Add the image
-**Goal:** a project folder that holds your copy of the game's disk or tape image.
-**Do:**
-```
-python3 ~/.claude/skills/c64-decomp/scripts/new_project.py --root ~/C64Projects/MyGame --name "My Game" --media /path/to/game.d64
-cd ~/C64Projects/MyGame
-just env
-```
-Use `.d64`, `.g64` or `.tap`, preferably a copy with the copy protection removed. The file is copied into `originals/` and its SHA-256 is written to `originals.sha256`. Add `--protect` to make it read-only. It is never modified, and never attached to an emulator directly (VICE only runs scratch copies).
-**Done when:** `just env` reports no missing tools and `just status` shows the first two steps done.
+### 1. Add the game
+**What you need:** the game's disk or tape file. It ends in `.d64`, `.g64` or `.tap`. A copy with the copy protection removed is best.
+
+**Do this once, in a terminal:**
+
+1. **Choose a folder for the project.** It can be new or empty. Example: `~/C64Projects/MyGame`.
+2. **Run this command.** Change the three parts after `--root`, `--name` and `--media`:
+   ```
+   python3 ~/.claude/skills/c64-decomp/scripts/new_project.py \
+     --root ~/C64Projects/MyGame \
+     --name "My Game" \
+     --media ~/Downloads/mygame.d64
+   ```
+   - `--root` is the project folder from step 1.
+   - `--name` is the game's name.
+   - `--media` is the path to the disk or tape file.
+3. **Go into the folder and check your tools:**
+   ```
+   cd ~/C64Projects/MyGame
+   just env
+   ```
+   You should see a list of tools, each marked `ok`. If one says `absent`, install it as the message says, then run `just env` again.
+4. **Check where you are:**
+   ```
+   just status
+   ```
+   The first two lines should say `done  step 1`, and below them `NEXT: step 2`.
+
+**What just happened:** a project folder was created. Your game file was copied into its `originals/` folder (your own copy elsewhere is untouched), its SHA-256 fingerprint was saved in `originals.sha256`, and a git repository was started. From now on the original is never changed, and is never loaded into an emulator directly: VICE only ever runs a temporary copy.
+
+Optional: add `--protect` to the command to make the copy in `originals/` read-only.
+
+**Done when:** `just env` shows no `absent` tools and `just status` says `NEXT: step 2`.
 
 ### 2. Research the game
 **You say:** "Use the MOSaic skill. Research this game before reading any code."
