@@ -81,6 +81,20 @@ libs-apply:
     python3 {{skill}}/scripts/apply_libs.py --root . --phase 1 --write
     just verify
 
+# The anonymous-label limits (rules.md): fails on !+++ / !--- or a reference over the limits. `anon_labels.py` alone lists the candidates.
+anon-check:
+    python3 {{skill}}/scripts/anon_labels.py --root . --phase 1 --check
+
+# Second conversion step (after libs-apply, before any slice): convert the local labels that qualify to anonymous ones; the gate must stay green.
+anon-apply:
+    python3 {{skill}}/scripts/anon_labels.py --root . --phase 1 --write
+    just verify
+    just anon-check
+
+# The comment rules (rules.md): width, label-line summary, data-row comments. A tools/comment_baseline.tsv makes it a ratchet.
+comment-check:
+    python3 {{skill}}/scripts/comment_check.py --root . --phase 1
+
 # Stage 5b: import the reference into Ghidra, seed it, export Kick Assembler source into ghidra/ (the landing zone: never phase1/src).
 ghidra:
     bash {{skill}}/scripts/ghidra/run.sh .
