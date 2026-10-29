@@ -146,6 +146,26 @@ def split_comment(line):
 
 XREF_LINE = re.compile(r'^\s*//\s*(?:Ghidra\s+)?XREF\b|^\s+//\s+[\w.:]+\([RWcjpd]\)|^\s+//\s+(?:[0-9a-fA-F]{4}|[\w ]+)\([RWcjpd]\)')
 
+TRACE_COMMENT = re.compile(r'//\s*\[[0-9A-Fa-f]{4}[:\]]')
+
+def set_block(L, j, text, indent=None, width=WRAP, keep=False):
+    """The ONE place that decides where a label's description block goes (rename.py and set_comment.py both call it): ABOVE the label's XREF lines, which stay directly above the label
+    line L[j]. An existing plain comment block there (own-line `//` lines that are neither XREF nor trace comments, up to the first blank line or code) is replaced; the XREF lines and
+    the trace comments are kept. Without --indent the block takes the indent of the block it replaces, else column 0 for a `.label` line or a scope opener (`Name: {`), else two
+    spaces (an in-stream data label). keep=True leaves the old block and adds the text after it (still above the XREF lines). Mutates L; returns (number of lines written, the replaced old lines, the new index of the label line)."""
+    k = j
+    while k > 0 and XREF_LINE.match(L[k - 1]): k -= 1                        # the XREF lines directly above the label
+    top = k
+    while top > 0 and re.match(r'^\s*//', L[top - 1]) and not XREF_LINE.match(L[top - 1]) and not TRACE_COMMENT.search(L[top - 1]): top -= 1
+    if indent is not None: ind = indent
+    elif top < k: ind = re.match(r'^\s*', L[top]).group(0)                  # keep the indent of the block being replaced
+    else: ind = '' if re.match(r'^\s*\.label\b', L[j]) or '{' in L[j] else '  '
+    new = wrap_comment(text, ind, width) if text else []
+    if keep: L[k:k] = new; return len(new), [], j + len(new)
+    old = L[top:k]
+    L[top:k] = new
+    return len(new), old, j + len(new) - len(old)
+
 def label_defs(text_lines, name):
     """Line indexes where `name` is defined (`.label name =` or an in-stream `name:`)."""
     pat = re.compile(r'^\s*(?:\.label\s+%s\s*=|%s\s*:(?!\S))' % (re.escape(name), re.escape(name)))

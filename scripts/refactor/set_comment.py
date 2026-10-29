@@ -13,7 +13,7 @@ The block goes ABOVE the label's XREF lines (rules.md); an existing plain commen
 rules.md); a `TODO(tag):` written inside the text is split off the same way. `just todo` and p1_complete.py (TODO(name), TODO(block)) read them there. Without --write it prints what it would change."""
 import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from _common import parser, main_file, code_files, read_tsv, wrap_comment, split_comment, XREF_LINE, WRAP, write_changed, todo_paragraphs
+from _common import parser, main_file, code_files, read_tsv, wrap_comment, split_comment, XREF_LINE, WRAP, set_block, write_changed, todo_paragraphs
 a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('label'); a.add_argument('text', nargs='?'); a.add_argument('--summary'); a.add_argument('--todo'); a.add_argument('--indent'); a.add_argument('--width', type=int, default=WRAP)
 args = a.parse_args(); main = main_file(args); files = code_files(main)
 if args.text is None:
@@ -30,20 +30,11 @@ for name, text, summ, todo in jobs:
         if hit: break
     if not hit: print('SKIP %s: no label found' % name); continue
     f, j, kind = hit; L = texts[f]
-    k = j
-    while k > 0 and XREF_LINE.match(L[k - 1]): k -= 1                        # the XREF lines directly above the label
-    top = k
-    while top > 0 and re.match(r'^\s*//', L[top - 1]) and not XREF_LINE.match(L[top - 1]) and not re.search(r'//\s*\[[0-9A-Fa-f]{4}[:\]]', L[top - 1]): top -= 1
-    if args.indent is not None: ind = args.indent
-    elif top < k: ind = re.match(r'^\s*', L[top]).group(0)                  # keep the indent of the block being replaced
-    else: ind = '' if kind == 'label' or '{' in L[j] else '  '              # a routine / variable-file label: column 0; an in-stream data label: as the code
-    new = wrap_comment(text, ind, args.width) if text else []
-    L[top:k] = new
-    j += len(new) - (k - top)
+    n, old, j = set_block(L, j, text, args.indent, args.width)
     if summ is not None:
         code, cm = split_comment(L[j]); m = re.match(r'^(\s*\S.*?\{?)\s*$', code)
         L[j] = code.rstrip() + ('  // ' + summ if summ else '')
-    print('  %-28s %d comment lines (replaced %d)%s' % (name, len(new), k - top, ', summary set' if summ is not None else ''))
+    print('  %-28s %d comment lines (replaced %d)%s' % (name, n, len(old), ', summary set' if summ is not None else ''))
 changed = {f: '\n'.join(L) for f, L in texts.items() if '\n'.join(L) != open(f).read()}
 print('%d files %s' % (len(changed), '(written)' if args.write else '(dry run; --write applies)'))
 write_changed(changed, args.write)
