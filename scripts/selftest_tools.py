@@ -131,6 +131,9 @@ r = tool('table_counts.py', project("// The step table, 8 bytes, read by index.\
 check('table_counts: a stated size one off from the data is reported, a matching one is not', '1 label(s)' in r.stdout and 'step_tbl' in r.stdout and 'ok_tbl' not in r.stdout, r.stdout + r.stderr)
 r = tool('port_scan.py', project("// TODO(port): spin on the raster register\nTagged:\n  lda VIC.RASTER                      // [0900:ad 12 d0 LDA $d012]\n  bne Tagged                          // [0903:d0 fb    BNE $0900]\n  rts                                 // [0905:60       RTS]\n\nWait:\n  lda VIC.RASTER                      // [0906:ad 12 d0 LDA $d012]\n  bne Wait                            // [0909:d0 fb    BNE $0906]\n  rts                                 // [090B:60       RTS]\n"))
 check('port_scan: an untagged hardware spin is reported, a tagged one is not', 'hw-wait 2' in r.stdout and '  Wait:' in r.stdout and 'Tagged:' not in r.stdout and '1 without a TODO(port)' in r.stdout, r.stdout + r.stderr)
+SRC = "Go:\n" + "".join("  lda #$80                           // [%04X:a9 80    LDA #$80]\n  sta state                           // [%04X:8d 00 04 STA $0400]\n  lda #$ff                            // [%04X:a9 ff    LDA #$ff]\n  sta state                           // [%04X:8d 00 04 STA $0400]\n" % (0x900 + 10 * i, 0x902 + 10 * i, 0x905 + 10 * i, 0x907 + 10 * i) for i in range(2))
+r = tool('magic_scan.py', project(SRC))
+check('magic_scan: a variable stored with two raw state values is reported', '1 variable(s)' in r.stdout and 'state: stored $80 $FF' in r.stdout, r.stdout + r.stderr)
 
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)

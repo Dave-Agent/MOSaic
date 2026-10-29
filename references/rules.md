@@ -96,3 +96,6 @@ The `SECTION:` banners (`framework/conventions/section-marker.md`) tile the whol
 
 ## Tag the machine dependencies
 A routine that spins on a hardware register, reads or patches its own code as data, calls into ROM (an address outside the KERNAL jump table is revision-dependent), switches ROM/I-O banking through the processor port, or relies on the stack pointer it was started with carries a `TODO(port)` line saying which and what a port replaces it with. `port_scan.py` lists the routines that have such a hazard and no tag (a `slice.py check` hint). A table's comment states its size and the data has it: `table_counts.py` reports a near miss (an off-by-n, an unlabelled tail, a table that runs on into the next one).
+
+## Name the values
+A variable that holds one of a few states (a flag with `$00 / $80 / $FF`, a mode number) and the numbers a routine repeats (row stride, column count, table length) get constants, named from what the code does in that state; the raw value is written once, in the definition. `magic_scan.py` lists the candidates (a `slice.py check` hint). Constants for owner-visible meanings (what a mode IS to a player) follow the evidence ladder like any name.
