@@ -37,6 +37,7 @@ def check(root_):
     def gate(name, cmd, ok=lambda r: r.returncode == 0, hint=False):
         r = run(cmd, root_); good = ok(r); tail = (r.stdout + r.stderr).strip().split('\n')
         res.append((name, good, tail[-1][:150] if tail and tail[-1] else '', hint)); return r
+    os.environ['C64_PHASE'] = str(args.phase)            # verify.sh / build.sh gate the phase 2 source (PHASE2_MAIN) when it is 2
     verify = os.path.join(root_, 'framework/scripts/verify.sh')
     gate('verify', ['bash', verify] if os.path.exists(verify) else ['false'])
     ph = ['--root', root_, '--phase', str(args.phase)]
