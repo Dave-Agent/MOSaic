@@ -3,8 +3,7 @@
 
   status.py [--root DIR] [--verify]
 
-Prints each stage as done / not done with the evidence it looked at, then `NEXT:` with the stage to do, what it consists of and the document that describes it. An agent working with a user runs this at the end of every stage,
-tells the user what was done and what comes next, and ASKS whether to continue (SKILL.md, "At every stage boundary"). The stage signals are heuristics from files and commands the process leaves behind: they say where to look,
+Prints each stage as done / not done with the evidence it looked at, then `NEXT:` with the stage to do, what it consists of and the document that describes it. An agent working with a user runs this when a stage ends or the user says to go on (SKILL.md, "Stages"): it announces the step it starts, or reports and asks. The stage signals are heuristics from files and commands the process leaves behind: they say where to look,
 they are not proofs."""
 import glob, os, re, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -66,4 +65,4 @@ for i, (n, d, ev, w, doc) in enumerate(st):
 print()
 if nxt: print('NEXT: step %s: %s\n  what: %s\n  see:  %s' % nxt)
 else: print('NEXT: every step in HOWTO.md is done. Optional: compact the layout into the freed holes, or start another game.')
-print('(skip = no evidence found for that stage, but a later stage is done: its files may be regenerable and git-ignored)\nAsk the user whether to continue with it (SKILL.md, "At every stage boundary"); do not start the next stage unasked.')
+print('(skip = no evidence found for that stage, but a later stage is done: its files may be regenerable and git-ignored)\nIf the user told you to go on, announce this step and start it; steps 2 to 8 are one run. If you have just finished a stage on your own, report and ask whether to continue (SKILL.md, "Stages").')
