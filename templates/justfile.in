@@ -114,3 +114,15 @@ smoke: experiment
 # Render the game's graphics (character set, every sprite block of the VIC bank, the screen) as PNGs into gfx/ with gfx/index.md; extra options pass through, e.g. just gfx --sprites 30:57:3 --columns 0,1,2 --label player (scripts/render/README.md). Look at the pictures; attach one to a naming question.
 gfx *args:
     python3 -B {{skill}}/scripts/render/gfx_sheets.py --root . {{args}}
+
+# Every gate a slice must pass (verify, comment-check, anon-check, unreferenced, p1_complete, sentinel hints): just slice-check [--range LO-HI] [--allow-marked]
+slice-check *args:
+    python3 {{skill}}/scripts/slice.py check --root . {{args}}
+
+# Scratch copy of the project for a slice (an agent works there): just slice-start NAME
+slice-start name:
+    python3 {{skill}}/scripts/slice.py start {{name}} --root .
+
+# Take the scratch repo's commits into this project (git am), then run the checks here: just slice-merge NAME
+slice-merge name:
+    python3 {{skill}}/scripts/slice.py merge {{name}} --root .

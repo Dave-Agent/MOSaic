@@ -41,6 +41,7 @@ One line per decision: **date: what** (who decided) Why. Rule: where it lives. N
 - 2026-10-29: **No echo comments** (user: 'no point having comments match the contents of the lines'). A data row keeps `// [addr]` only; operand-name lists and ASCII dumps are stripped by `comment_check.py --fix` (rule `echo`).
 - 2026-10-29: **Check the end markers of a family of lists** (`sentinel_scan.py`): a list whose terminator is missing or has other data after it was found by the owner reading the source; the scan now hints at it.
 - 2026-10-29: **A table of records is written one record per row** (user: 'if it's a 5 byte record that's how the data should be represented'). The exporter's fixed 16-byte rows split records and hid a missing label after a list; `refactor/records.py` reshapes a table, `sentinel_scan.py` finds the leftovers.
+- 2026-10-29: **A slice is finished by one gate, `slice.py check`** (verify, comment-check, anon-check, unreferenced, p1_complete, sentinel hints), run in the scratch copy and again after the merge. Why: a slice agent skipped a rule that was only prose (tag unreferenced blocks); the rule is now a failing check. Rule: `slice_checklist.md`, `slice_brief.md`.
 
 ## Open questions (waiting for the user)
 - 2026-10-29: **`TODO(port)` is its own tag, separate from `TODO(phase2)`** (user: easier to tick off). It marks each place a hardware dependency is left on purpose for a port to replace; not a phase 1 blocker.
