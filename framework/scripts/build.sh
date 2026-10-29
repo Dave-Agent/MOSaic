@@ -33,7 +33,13 @@ ASM_CMD=( "$JAVA" -jar "$KICKASS_JAR"
           -debugdump )
 
 if [ "$QUIET" = "--quiet" ]; then
-    "${ASM_CMD[@]}" >/dev/null
+    LOG="$(mktemp)"; trap 'rm -f "$LOG"' EXIT
+    if ! "${ASM_CMD[@]}" >"$LOG" 2>&1; then
+        # quiet mode must not hide WHY the assembly failed: show Kick's error lines
+        echo "!! the assembler failed on $SRC_MAIN:" >&2
+        { grep -E -B1 -A4 "Error" "$LOG" | head -30; } >&2 || tail -20 "$LOG" >&2
+        exit 1
+    fi
 else
     echo ">> assembling $SRC_MAIN -> $OUTPUT_PRG"
     "${ASM_CMD[@]}"

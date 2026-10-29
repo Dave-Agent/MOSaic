@@ -18,6 +18,8 @@ Take each documented mechanic and say what it must look like in code: a joystick
 2. **Seen executing** (tracer hits, edges): it really runs, how often, from where.
 3. **Seen behaving as hypothesised** (a write watch over a run, a value that changes as the documents say, a breakpoint in the emulator): enough for a name that claims a role (`lives`, `time_remaining`).
 4. **Confirmed by the user** (what a sprite or a sound IS, an ambiguity): the only rung for names that claim a meaning nobody can prove from code.
+**Rung 3 for state machines and roles, with two examples.** A document that says the game has the thing, plus behaviour seen in a *controlled* tracer run, is rung 3 and allows a role-claiming name: hold an input for N frames, sample the variables per frame (`scripts/trace/sample_report.py`, input changes with `--joy2-at`) and read what changed. Example A, a counter: a documented patch targets its decrement, it is set at the turn start and decremented once when a turn ends: `lives`. Example B, a state byte: the manual says there is a jump; with up held the sprite's Y falls from one value to another and back over 71 frames while a state byte reads `$80`, then `$FF`, then 0: `jump_state` (0 = none, `$80` = rising, `$FF` = coming down). A name needs the document **and** the observation; either alone is rung 1 or 2. User confirmation is for what code cannot show: what a sprite or a sound IS, what a key combination is for, why something is done. A variable the controlled runs never exercised stays neutral with `TODO(name)`.
+
 Mark anything below rung 3 with `TODO(name)` (provisional) and anything only the user can settle with `TODO(user)`. **Never invent a meaning.**
 
 ## 4b. The variable-role protocol
@@ -42,6 +44,8 @@ Mechanical passes first, prose last: a rename after the prose is written means r
 
 ## 6. The work loop
 Per routine or section: read, name, add the section banner, comment (the comment rules), replace raw operands with labels, `just verify` (byte-identical), commit. Small commits; the gate is never red at a commit. Track `p1_complete.py` as the progress number. Keep a log (`docs/phase1_log.md`): order, evidence used, questions for the user.
+
+**Corrections to earlier work.** When your reading contradicts a comment or a name from an earlier slice (a routine described as moving sprites 7 down to 2 that moves 7 down to 3; a routine called a keyboard scan that is the frame dispatcher), fix it in the same commit and list it in the log under "Corrections". An earlier slice's text is evidence, not authority.
 
 ## 7. Things that go wrong
 - Naming by pattern (renaming every `lda #0 / sta x` the same way) without checking each.

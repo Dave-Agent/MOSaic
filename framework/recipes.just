@@ -42,15 +42,15 @@ synced direction:
     @echo "recorded: {{direction}}"
 
 # Commit everything with the project's trailers (COMMIT_TRAILERS in project.config, lines separated by \n). Usage: just commit "message"
-commit msg:
+commit $msg:
     #!/usr/bin/env bash
     set -euo pipefail
     . ./project.config
     git add -A
     if [ -n "${COMMIT_TRAILERS:-}" ]; then
-        git commit -q -m "{{msg}}" -m "$(printf '%b' "$COMMIT_TRAILERS")"
+        git commit -q -m "$msg" -m "$(printf '%b' "$COMMIT_TRAILERS")"
     else
-        git commit -q -m "{{msg}}"
+        git commit -q -m "$msg"
     fi
     git log -1 --oneline
 

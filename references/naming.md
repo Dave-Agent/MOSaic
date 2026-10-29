@@ -30,6 +30,7 @@ Names are the index of the source: grep must find things, and the case of a name
 | `_x`, `_y` | a position component |
 | `_chr` / `_music` etc. | only when the data type helps reasoning and no richer name exists |
 
+- **Generic scratch pointers** (zero-page pairs a routine uses as `(zp),y`) are lettered: `zp_ptr_a`, `zp_ptr_b`, `zp_ptr_c`, then `d`, `e`, `f` as needed, each with its `_hi` (`ptr_a_hi = ptr_a+1`). A pointer that gets a real role is renamed for it; the letters are for the ones whose role differs per routine.
 - **A block of consecutive slots** that code addresses one by one is a `.namespace` with `base` and members named for what the code proves (`slot5`, or the hardware number), never `name+5` at the use site (rules.md, Relocatability; `+N` is allowed in the definition only).
 - **Per-slot aliases** of one variable (per actor, per player) are `<name>_<slot>` defined from the primary slot (`.label x_red = x+1`: a `+N` in a definition is allowed), after it.
 - **Constants:** a family shares a prefix (`STATE_*`, `MSG_ID_*`, `MODE_*`, `OPC_*`); a stride, count or range the code spells as a number gets one (`ACTOR_SLOT_SIZE`, `ACTOR_SLOTS`).
