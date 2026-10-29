@@ -139,6 +139,12 @@ build-phase2:
 verify-p2:
     C64_PHASE=2 bash framework/scripts/verify.sh
 
+# Run the phase 2 build in VICE (symbols loaded) / the unattended start test on it.
+launch-p2: build-phase2
+    python3 -B {{skill}}/scripts/launcher/run_game.py --root . --prg build/p2/game.prg --symbols "$(ls -t build/p2/*.vs | head -1)"
+smoke-p2: build-phase2
+    python3 -B {{skill}}/scripts/launcher/smoke.py --root . --prg build/p2/game.prg
+
 # Routine tests: call routines in the 6510 simulator and compare with Python models (tools/tests/). `test-p1` runs them on the phase 1 build.
 test:
     python3 -B {{skill}}/scripts/sim/run_tests.py --root . --phase 2

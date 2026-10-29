@@ -61,7 +61,7 @@ def inject(cfg, root, vice_cmd, prg, shot, seconds):
 
 def main():
     a = parser('Start the game in VICE (sys or inject mode)', write=False)
-    a.add_argument('--prg'); a.add_argument('--mode'); a.add_argument('--shot'); a.add_argument('--cycles', type=int); a.add_argument('--no-symbols', action='store_true')
+    a.add_argument('--prg'); a.add_argument('--mode'); a.add_argument('--shot'); a.add_argument('--cycles', type=int); a.add_argument('--no-symbols', action='store_true'); a.add_argument('--symbols', help='a VICE symbol file (default VICE_SYMBOLS): for a build that is not OUTPUT_PRG, e.g. the phase 2 one')
     args = a.parse_args(); root = args.root; cfg = config(root)
     prg = os.path.join(root, args.prg or cfg['OUTPUT_PRG']); mode = args.mode or cfg.get('LAUNCH_MODE', 'sys')
     if mode not in ('sys', 'inject'): sys.exit('LAUNCH_MODE %r: this script knows sys and inject' % mode)
@@ -69,8 +69,8 @@ def main():
     pc = cfg.get('HANDOFF_PC') or sys.exit('set HANDOFF_PC in project.config')
     cfg['HANDOFF_PC'] = pc
     vice = [cfg.get('VICE_BIN') or shutil.which('x64sc') or 'x64sc', '+confirmonexit', '-jamaction', '5']     # 5 = continue after a JAM (the game may jam on purpose or by a bug: the screenshot decides)
-    sym = os.path.join(root, cfg.get('VICE_SYMBOLS', ''))
-    if not args.no_symbols and cfg.get('VICE_SYMBOLS') and os.path.exists(sym): vice += ['-moncommands', sym]
+    sym = os.path.join(root, args.symbols or cfg.get('VICE_SYMBOLS', ''))
+    if not args.no_symbols and (args.symbols or cfg.get('VICE_SYMBOLS')) and os.path.exists(sym): vice += ['-moncommands', sym]
     assert '-default' not in vice
     if args.shot:
         vice += ['-warp']; shot = os.path.abspath(args.shot)
