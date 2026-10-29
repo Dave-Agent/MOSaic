@@ -127,3 +127,56 @@ slice-start name:
 # Take the scratch repo's commits into this project (git am), then run the checks here: just slice-merge NAME
 slice-merge name:
     python3 -B {{skill}}/scripts/slice.py merge {{name}} --root .
+
+# --- phase 2 (the setup for a port: references/phase2_split.md; bytes may change, behaviour must not) -----------------------------------
+# Needs the TRACE_* keys (TRACE_RAM, TRACE_ENTRY ...) and tools/golden/{scenarios,state}.txt, tools/tests/test_*.py of the safety net (scripts/golden/README.md, scripts/sim).
+
+# Assemble the phase 2 source into build/p2/ (not byte-identical to reference/): game.prg, game.sym (and a VICE symbol file).
+build-phase2:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source project.config
+    mkdir -p "$BUILD_DIR/p2"
+    out=$("$JAVA" -jar "$KICKASS_JAR" "$PHASE2_MAIN" -o "$BUILD_DIR/p2/game.prg" -odir "$BUILD_DIR/p2" -vicesymbols -symbolfile 2>&1) || { echo "$out" >&2; exit 1; }
+    if grep -q "asserts.*FAILED" <<<"$out"; then echo "$out" | grep -i assert >&2; exit 1; fi
+    echo "built $BUILD_DIR/p2/game.prg"
+
+# Routine tests: call routines in the 6510 simulator and compare with Python models (tools/tests/). `test-p1` runs them on the phase 1 build.
+test:
+    python3 -B {{skill}}/scripts/sim/run_tests.py --root . --phase 2
+test-p1:
+    python3 -B {{skill}}/scripts/sim/run_tests.py --root . --phase 1
+
+# Golden traces: the program's state per video frame in seeded scenarios. `golden-p1` compares the phase 1 build exactly; `golden-t` (timing-tolerant) is the phase 2 check once bytes change.
+# Record only after a deliberate behaviour change: `just golden-record-p1`, `just golden-record-t`.
+golden-p1:
+    python3 -B {{skill}}/scripts/golden/golden.py check --root . --phase 1
+golden-record-p1:
+    python3 -B {{skill}}/scripts/golden/golden.py record --root . --phase 1
+golden-t:
+    python3 -B {{skill}}/scripts/golden/golden.py check-t --root . --phase 2
+golden-record-t:
+    python3 -B {{skill}}/scripts/golden/golden.py record-t --root . --phase 1
+
+# What would break if the image or a variable moved (reloc_scan: indirect addressing, SMC, jmp (), code as data; reloc_hazards: aligned bases, guards, sprite pointers, file I/O).
+reloc phase="1":
+    python3 -B {{skill}}/scripts/reloc_scan.py --root . --phase {{phase}}
+    python3 -B {{skill}}/scripts/reloc_hazards.py --root . --phase {{phase}}
+
+# Relocation stress test: variants with N bytes inserted (and the same N taken from a dead pad), each run against the baseline (scripts/layout_fuzz.py, scripts/trace/layout_compare.py, references/testing.md).
+fuzz-layout *args:
+    python3 -B {{skill}}/scripts/layout_fuzz.py --root . {{args}}
+
+# The phase 1 gate: the byte-identical build plus the safety net on it.
+check-p1:
+    just verify
+    just test-p1
+    just golden-p1
+
+# The phase 2 gate: it assembles, no raw operands, comments conform, routine tests against the CURRENT build, timing-tolerant golden traces.
+check:
+    just build-phase2
+    python3 -B {{skill}}/scripts/raw_refs.py --root . --phase 2
+    python3 -B {{skill}}/scripts/comment_check.py --root . --phase 2
+    just test
+    just golden-t
