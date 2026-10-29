@@ -4,6 +4,8 @@
   slice.py check [--root DIR] [--phase 1|2] [--range LO-HI] [--allow-marked]
   slice.py start NAME [--root DIR]                 scratch copy of the project for an agent (or yourself) to work in
   slice.py merge NAME [--root DIR]                 take the scratch repo's commits into the real project, then run the checks there
+  slice.py status [NAME]                           what a slice (or every slice) has done so far: commits, uncommitted changes, the agent's progress notes, how long since anything moved
+  slice.py note NAME TEXT...                       append a progress note (the slice's agent runs this at every milestone: see references/slice_brief.md)
 
 check   every gate a slice must pass, one verdict (exit 1 when any gate fails):
           verify         the build is byte-identical to the reference (framework/scripts/verify.sh)
@@ -26,7 +28,7 @@ merge   `git format-patch` of the scratch repo since the base commit, `git am` i
 import argparse, os, shutil, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-p.add_argument('cmd', choices=('check', 'start', 'merge')); p.add_argument('name', nargs='?'); p.add_argument('--root', default='.'); p.add_argument('--phase', type=int, default=1)
+p.add_argument('cmd', choices=('check', 'start', 'merge', 'status', 'note')); p.add_argument('name', nargs='?'); p.add_argument('text', nargs='*'); p.add_argument('--root', default='.'); p.add_argument('--phase', type=int, default=1)
 p.add_argument('--range'); p.add_argument('--allow-marked', action='store_true')
 args = p.parse_args(); root = os.path.abspath(args.root)
 SCRATCH = os.environ.get('SLICE_SCRATCH', os.path.join(tempfile.gettempdir(), 'c64-slices'))
@@ -58,7 +60,39 @@ def check(root_):
     for n, good, msg, hint in res: print('%s  %-*s  %s' % ('hint' if hint else ('PASS' if good else 'FAIL'), w, n, msg))
     ok = all(g for _, g, _, h in res if not h); print('slice check: %s' % ('PASS' if ok else 'FAIL')); return ok
 if args.cmd == 'check': sys.exit(0 if check(root) else 1)
+import time
+def ago(t):
+    d = max(0, int(time.time() - t)); return '%ds' % d if d < 120 else ('%dm' % (d // 60) if d < 7200 else '%dh%02dm' % (d // 3600, d % 3600 // 60))
+def status(name):
+    d = os.path.join(SCRATCH, name); proj = os.path.join(d, 'project'); log = os.path.join(d, 'progress.log')
+    if not os.path.isdir(proj): print('%s: no such slice under %s' % (name, SCRATCH)); return
+    base = open(os.path.join(d, 'base')).read().strip() if os.path.exists(os.path.join(d, 'base')) else ''
+    commits = run(['git', 'log', '--format=%ct\t%s', (base + '..HEAD') if base else '-20'], proj).stdout.strip().split('\n'); commits = [c for c in commits if c]
+    dirty = [l for l in run(['git', 'status', '--porcelain', '--untracked-files=normal'], proj).stdout.split('\n') if l.strip() and 'shot_' not in l]
+    latest = [float(c.split('\t')[0]) for c in commits[:1]]
+    if os.path.exists(log): latest.append(os.path.getmtime(log))
+    for dp, dn, fn in os.walk(proj):
+        dn[:] = [x for x in dn if x not in ('.git', 'build', '__pycache__', 'originals')]
+        for f in fn:
+            try: latest.append(os.path.getmtime(os.path.join(dp, f)))
+            except OSError: pass
+    last = max(latest) if latest else 0
+    print('slice %s: %d commit(s) since the base, %d changed file(s) not yet committed, last activity %s ago' % (name, len(commits), len(dirty), ago(last) if last else '?'))
+    for c in commits[:4]: t, _, subj = c.partition('\t'); print('  commit %5s ago  %s' % (ago(float(t)), subj[:110]))
+    if len(commits) > 4: print('  ... %d earlier' % (len(commits) - 4))
+    if dirty: print('  uncommitted: ' + ', '.join(l[3:] for l in dirty[:6]) + (' ...' if len(dirty) > 6 else ''))
+    if os.path.exists(log):
+        for l in open(log).read().strip().split('\n')[-5:]: print('  note   ' + l[:160])
+    else: print('  (no progress notes: the agent was not told to run `slice.py note`)')
+if args.cmd == 'status':
+    names = [args.name] if args.name else sorted(x for x in os.listdir(SCRATCH) if os.path.isdir(os.path.join(SCRATCH, x, 'project'))) if os.path.isdir(SCRATCH) else []
+    for n in names: status(n)
+    sys.exit(0)
 if not args.name: sys.exit('a slice NAME is needed')
+if args.cmd == 'note':
+    nd = os.path.join(SCRATCH, args.name)
+    if not os.path.isdir(nd): sys.exit('no such slice: ' + args.name)
+    open(os.path.join(nd, 'progress.log'), 'a').write('%s | %s\n' % (time.strftime('%H:%M:%S'), ' '.join(args.text))); sys.exit(0)
 dst = os.path.join(SCRATCH, args.name, 'project'); base_file = os.path.join(SCRATCH, args.name, 'base')
 if args.cmd == 'start':
     if os.path.exists(dst): sys.exit('%s exists: pick another NAME or remove it' % dst)
@@ -67,7 +101,8 @@ if args.cmd == 'start':
     for sub in ('trace',):                                              # the tracer build the agent needs for rung 2/3 evidence
         if os.path.isdir(os.path.join(root, 'build', sub)): shutil.copytree(os.path.join(root, 'build', sub), os.path.join(dst, 'build', sub))
     base = run(['git', 'rev-parse', 'HEAD'], dst).stdout.strip(); open(base_file, 'w').write(base + '\n')
-    print('scratch copy: %s\nbase commit:  %s\nwork there, commit there (path-limited git add), then: slice.py check --root %s, slice.py merge %s' % (dst, base[:10], dst, args.name)); sys.exit(0)
+    open(os.path.join(SCRATCH, args.name, 'progress.log'), 'w').write('%s | slice started\n' % time.strftime('%H:%M:%S'))
+    print('scratch copy: %s\nbase commit:  %s\nwork there, commit there (path-limited git add), then: slice.py check --root %s, slice.py merge %s\nprogress: the agent runs `slice.py note %s "what it just finished / what it starts"` at every milestone; you run `slice.py status %s`' % (dst, base[:10], dst, args.name, args.name, args.name)); sys.exit(0)
 base = open(base_file).read().strip()
 dirty = [l for l in run(['git', 'status', '--porcelain', '--untracked-files=no']).stdout.split('\n') if l.strip()]
 if dirty: sys.exit('the real project has uncommitted changes to tracked files: commit or set them aside first:\n' + '\n'.join(dirty[:10]))
