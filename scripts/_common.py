@@ -243,3 +243,47 @@ def parse_addr(s):
     """'$12AB' / '0x12ab' -> int; None when s is not written as an address"""
     m = re.match(r'^(?:\$|0x)([0-9A-Fa-f]{1,4})$', s)
     return int(m.group(1), 16) if m else None
+
+LABEL_LINE = re.compile(r'^\s*([A-Za-z_]\w*):(?!\S)')
+def routine_map(L, flag_addrs=(), stream=None):
+    """(routine, nearest label) per line of L (the nearest label is the last in-stream label above, scoped locals included; the routine is the scope or the nearest label that is an entry). Routine entries: scope openers, `jsr` targets, `jmp` targets reached from another routine, tracer-flagged addresses."""
+    scope_labels = set(); jsr = set(); jmps = []
+    depth = 0; cur = None; label_at = {}
+    for i, l in enumerate(L):
+        code = split_comment(l)[0]; m = LABEL_LINE.match(code)
+        if m and not code.lstrip().startswith(('.', '!')) and depth == 0:
+            label_at[m.group(1)] = i
+            if '{' in code: scope_labels.add(m.group(1))
+        mj = re.match(r'^\s*(?:\w+:\s*)?(jsr|jmp)(?:\.abs)?\s+([A-Za-z_][\w.]*)', code)
+        if mj:
+            t = mj.group(2).split('.')[0]
+            if mj.group(1) == 'jsr': jsr.add(t)
+            else: jmps.append((i, t))
+        depth = max(0, depth + code.count('{') - code.count('}'))
+    entries = scope_labels | {t for t in jsr if t in label_at} | {n for n, i in label_at.items() if stream and stream.get(n) in flag_addrs}
+    def run():
+        out = []; depth = 0; rt = '?'; near = None
+        for l in L:
+            code = split_comment(l)[0]; m = LABEL_LINE.match(code)
+            if m and not code.lstrip().startswith(('.', '!')):
+                near = m.group(1)
+                if depth == 0 and m.group(1) in entries: rt = m.group(1)
+            out.append((rt, near))
+            depth = max(0, depth + code.count('{') - code.count('}'))
+        return out
+    for _ in range(4):                                                  # a jmp from another routine makes its target an entry; repeat until nothing changes
+        rm = run(); add = {t for i, t in jmps if t in label_at and t not in entries and rm[i][0] != rm[label_at[t]][0]}
+        if not add: break
+        entries |= add
+    return run()
+
+def expanded_origin(main, skip=('libs',)):
+    """expanded_lines with the origin: [(file, line number, text)] (label files are not expanded, as in expanded_lines)"""
+    out = []
+    for n, l in enumerate(open(main).read().split('\n'), 1):
+        m = re.match(r'\s*#import\s+"([^"]+\.asm)"', l)
+        q = os.path.normpath(os.path.join(os.path.dirname(main), m.group(1))) if m else None
+        if q and os.path.basename(q) in LABEL_FILES: out.append((main, n, l)); continue
+        if q and os.path.exists(q) and not any(('/%s/' % d) in q.replace(os.sep, '/') for d in skip): out += expanded_origin(q, skip)
+        else: out.append((main, n, l))
+    return out
