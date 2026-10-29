@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """List the open questions in the source: every `// TODO(tag): headline` marker with the label and routine it sits on, grouped by tag, and the `STATUS:  unknown` banners.
 The list for the phase 1 log and for the user ("what do you still have to ask?"): `TODO(user)` needs the user's knowledge, `TODO(name)` is a provisional name, `TODO(block)` any
-other phase 1 blocker (the last two block phase 1 and are counted by p1_complete.py), `TODO(sound)`, `TODO(code)`, `TODO(phase2)` as in rules.md.
+other phase 1 blocker (the last two block phase 1 and are counted by p1_complete.py), `TODO(sound)`, `TODO(code)`, `TODO(phase2)`, `TODO(port)` as in rules.md.
 
   todo_list.py [--tag user,name,block] [--range LO-HI] [--detail] [--phase 1|2 | --main FILE]
 

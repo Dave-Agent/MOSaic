@@ -40,5 +40,5 @@ One line per decision: **date: what** (who decided) Why. Rule: where it lives. N
 - 2026-10-29: **The skill holds no game- or project-specific information** (user): no game names, addresses, file names or hashes; examples use placeholders. Project-specific notes live in the project. The clean-room test (a fresh agent with only the skill and the original media) checks it.
 
 ## Open questions (waiting for the user)
-- Add `TODO(port)` to the TODO tag set? A project used it for each place a hardware-ism is left on purpose (phase 2 step 4).
+- 2026-10-29: **`TODO(port)` is its own tag, separate from `TODO(phase2)`** (user: easier to tick off). It marks each place a hardware dependency is left on purpose for a port to replace; not a phase 1 blocker.
 - 2026-10-29: **Read-only originals are optional.** The user accepts possible writes to the media as part of the process (some games need writes); `check_layout.py` no longer warns on a writable original, still fails on a hash mismatch, and emulators still run on a scratch copy by default.
