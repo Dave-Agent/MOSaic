@@ -54,6 +54,11 @@ if grep -q "asserts.*FAILED" "$LOG"; then
     exit 1
 fi
 
+# Kick writes the symbol file next to the source or the output depending on its version: leave one at a fixed place, $BUILD_DIR/game.sym (phase 2: $BUILD_DIR/p2/game.sym),
+# which TRACE_SYM / TRACE_SYM_P1 and the trace tools point at.
+SYM_NEWEST="$(ls -t "$BUILD_DIR"/*.sym "$(dirname "$SRC_MAIN")"/build/*.sym "$(dirname "$SRC_MAIN")"/build/p2/*.sym 2>/dev/null | grep -v '/game\.sym$' | head -1 || true)"
+[ -n "$SYM_NEWEST" ] && cp "$SYM_NEWEST" "$BUILD_DIR/game.sym"
+
 if [ ! -f "$OUTPUT_PRG" ]; then
     echo "!! build produced no PRG at $OUTPUT_PRG" >&2
     exit 1

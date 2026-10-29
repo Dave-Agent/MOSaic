@@ -131,15 +131,9 @@ slice-merge name:
 # --- phase 2 (the setup for a port: references/phase2_split.md; bytes may change, behaviour must not) -----------------------------------
 # Needs the TRACE_* keys (TRACE_RAM, TRACE_ENTRY ...) and tools/golden/{scenarios,state}.txt, tools/tests/test_*.py of the safety net (scripts/golden/README.md, scripts/sim).
 
-# Assemble the phase 2 source into build/p2/ (not byte-identical to reference/): game.prg, game.sym (and a VICE symbol file).
+# Assemble the phase 2 source into build/p2/ (not byte-identical to reference/ once step 6 changes bytes): game.prg, game.sym (and a VICE symbol file).
 build-phase2:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    source project.config
-    mkdir -p "$BUILD_DIR/p2"
-    out=$("$JAVA" -jar "$KICKASS_JAR" "$PHASE2_MAIN" -o "$BUILD_DIR/p2/game.prg" -odir "$BUILD_DIR/p2" -vicesymbols -symbolfile 2>&1) || { echo "$out" >&2; exit 1; }
-    if grep -q "asserts.*FAILED" <<<"$out"; then echo "$out" | grep -i assert >&2; exit 1; fi
-    echo "built $BUILD_DIR/p2/game.prg"
+    C64_PHASE=2 bash framework/scripts/build.sh
 
 # Step 3 of phase 2 (split into files) is byte-identical: the same gate as `verify`, on the phase 2 source (PHASE2_MAIN -> build/p2/game.prg).
 verify-p2:

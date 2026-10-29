@@ -158,6 +158,14 @@ if os.path.exists(_jar) and subprocess.run(['java', '-version'], capture_output=
     bad = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_fuzz.py'), '--root', d, '--main', 'main.asm', '--label', 'A', '--take', 'pad', '--variant', 'A:9', '--cmd', 'true'], capture_output=True, text=True)
     check('layout_fuzz: --take of more bytes than the pad has fails the variant', bad.returncode == 1 and 'has 8 bytes' in bad.stdout, bad.stdout + bad.stderr)
 else: print('SKIP layout_fuzz: no Java / Kick Assembler')
+# ---- split_all.py ------------------------------------------------------------------------------------------------------------------------------------------
+BANNER = lambda n, a, b: '//==============================================================================\n// SECTION: %s\n// RANGE:   $%04X-$%04X\n// STATUS:  understood\n// SUMMARY: x\n//==============================================================================\n' % (n, a, b)
+d = project('.pc = $0800 "RAM"\n' + BANNER('alpha', 0x800, 0x801) + '  nop // [0800:ea       NOP]\n  nop // [0801:ea       NOP]\n' + BANNER('beta', 0x802, 0x802) + '  rts // [0802:60       RTS]\n')
+subprocess.run('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm base', shell=True, cwd=d, capture_output=True)
+plan = os.path.join(d, 'plan.tsv'); open(plan, 'w').write('game\talpha\talpha_file\ndata\tbeta\tbeta_file\n')
+r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'split_all.py'), plan, '--root', d, '--main', 'main.asm', '--gate', 'true'], capture_output=True, text=True)
+log = subprocess.run('git log --oneline', shell=True, cwd=d, capture_output=True, text=True).stdout
+check('split_all: two sections are moved into files, gated and committed one by one', r.returncode == 0 and os.path.exists(os.path.join(d, 'game', 'alpha_file.asm')) and os.path.exists(os.path.join(d, 'data', 'beta_file.asm')) and log.count('Phase 2 step 3') == 2 and '#import' in text(d), r.stdout + r.stderr + log)
 
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
