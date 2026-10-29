@@ -186,6 +186,14 @@ d = tempfile.mkdtemp(prefix='c64st_'); open(os.path.join(d, 'm.tsv'), 'w').write
 code = "import sys; sys.path.insert(0, %r); import symbols; t = {'PollInput': 5}; print(symbols.lookup(t, 'Input.Poll'), symbols.lookup(t, 'PollInput'))" % os.path.join(HERE, 'sim')
 r = subprocess.run([sys.executable, '-B', '-c', code], capture_output=True, text=True, env=dict(os.environ, C64_NAME_MAP=os.path.join(d, 'm.tsv')))
 check('sim symbols: a name map finds a renamed routine under its other spelling (both ways)', r.stdout.strip() == '5 5', r.stdout + r.stderr)
+# ---- ghidra/fetch_exporter.py ---------------------------------------------------------------------------------------------------------------------------------
+import hashlib
+fx = os.path.join(HERE, 'ghidra', 'fetch_exporter.py'); d = tempfile.mkdtemp(prefix='c64st_'); os.makedirs(os.path.join(d, 'src', 'ghidra_scripts'))
+open(os.path.join(d, 'src', 'ghidra_scripts', 'KickAssemblerExport.py'), 'w').write('# not the pinned exporter\n')
+r = subprocess.run([sys.executable, '-B', fx, '--root', d, '--dest', os.path.join(d, 'out'), '--source', os.path.join(d, 'src')], capture_output=True, text=True)
+check('fetch_exporter: a file that does not match the pinned SHA-256 is refused and not installed', r.returncode != 0 and 'pinned SHA-256' in (r.stdout + r.stderr) and not os.path.exists(os.path.join(d, 'out', 'KickAssemblerExport.py')), r.stdout + r.stderr)
+r = subprocess.run([sys.executable, '-B', fx, '--root', d, '--dest', os.path.join(d, 'out'), '--source', os.path.join(d, 'missing')], capture_output=True, text=True)
+check('fetch_exporter: an unreachable source gives a clear message', r.returncode != 0 and 'could not fetch' in (r.stdout + r.stderr), r.stdout + r.stderr)
 
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)

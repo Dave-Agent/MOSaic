@@ -6,7 +6,7 @@
 #   LABELS  file, one "ADDR NAME" per line (comments after //): labels to apply (missing file = none)
 #   HOLES   file, one "LO HI" per line (hex): ranges to REMOVE from the program so they are not exported as zero bytes (missing file = none)
 #   OUTDIR  directory the Kick Assembler export is written to (the landing zone, never the canonical source)
-#   EXPORTER path of KickAssemblerExport.py (default ~/ghidra_scripts/KickAssemblerExport.py; https://github.com/Dave-Agent/ghidra-kickass-export)
+#   EXPORTER path of KickAssemblerExport.py (passed by run.sh: see fetch_exporter.py; https://github.com/Dave-Agent/ghidra-kickass-export)
 import os
 from java.io import File
 from ghidra.program.model.symbol import SourceType

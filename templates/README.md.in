@@ -5,7 +5,7 @@ A Kick Assembler reconstruction of this Commodore 64 game. Status: **phase 1, ju
 **No game binary is in this repository** (`reference.sha256` holds the SHA-256 the build is checked against). You supply the original media and derive the reference yourself.
 
 ## What you need
-Linux or macOS; Java 17+ and Kick Assembler; VICE with its C64 ROMs and `c1541`; `just`; Python 3; `gcc`; Ghidra 11+ with the `ghidra-kickass-export` script in `~/ghidra_scripts`; the `c64-decomp` skill (`~/.claude/skills/c64-decomp`, or set `C64_DECOMP`). `just env` checks them.
+Linux or macOS; Java 17+ and Kick Assembler; VICE with its C64 ROMs and `c1541`; `just`; Python 3; `gcc`; Ghidra 11+ (the Kick Assembler exporter script is fetched automatically, pinned, on first use); the `c64-decomp` skill (`~/.claude/skills/c64-decomp`, or set `C64_DECOMP`). `just env` checks them.
 
 ## Supplying the data
 Put the media in `originals/` (read-only, with their SHA-256 in `originals.sha256`; **never attach an original to an emulator directly**: VICE writes disk images back).

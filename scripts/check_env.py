@@ -23,6 +23,10 @@ def kickass():
     for x in (cfg.get('KICKASS_JAR', ''), os.environ.get('KICKASS_JAR', ''), home + '/tools/KickAss.jar', home + '/KickAss.jar', '/opt/KickAss/KickAss.jar'):
         if x and os.path.isfile(os.path.expanduser(x)): return os.path.expanduser(x)
     return ''
+def exporter():
+    for x in (cfg.get('GHIDRA_EXPORTER', ''), os.path.join(args.root, 'tools/ghidra/exporter/KickAssemblerExport.py'), home + '/ghidra_scripts/KickAssemblerExport.py'):
+        if x and os.path.isfile(os.path.expanduser(x)): return os.path.expanduser(x)
+    return ''
 def ghidra():
     for x in [cfg.get('GHIDRA_HOME', ''), os.environ.get('GHIDRA_HOME', '')] + glob.glob(home + '/ghidra*/ghidra_*') + glob.glob(home + '/ghidra*') + glob.glob('/opt/ghidra*'):
         if x and os.path.isfile(os.path.join(os.path.expanduser(x), 'support', 'analyzeHeadless')): return os.path.join(os.path.expanduser(x), 'support', 'analyzeHeadless')
@@ -45,6 +49,7 @@ rows = [
  ('exomizer', find_cmd(('exomizer', 'EXOMIZER')), '', 'packing a disk build (optional)', 'disk', 'https://bitbucket.org/magli143/exomizer', None),
  ('C compiler (cc/gcc)', shutil.which('cc') or shutil.which('gcc') or '', '', 'building the c64trace tracer', 'trace', 'apt install build-essential | xcode-select --install', None),
  ('Ghidra headless', ghidra(), '', 'importing the reference and exporting to Kick Assembler (set GHIDRA_HOME)', 'ghidra', 'https://ghidra-sre.org (needs Java 17+)', None),
+ ('Kick Assembler exporter for Ghidra', exporter(), '', 'KickAssemblerExport.py, run inside Ghidra by `just ghidra` (optional: when missing, `just ghidra` fetches it at a pinned commit from github.com/Dave-Agent/ghidra-kickass-export, no install needed)', 'optional', 'python3 scripts/ghidra/fetch_exporter.py', None),
  ('Mesen', mesen(), '', 'NES work only', 'nes', 'https://www.mesen.ca', None),
  ('RetroDebugger', find_cmd(('retrodebugger', 'RETRODEBUGGER_BIN')), '', 'optional alternative debugger', 'optional', 'https://github.com/slajerek/RetroDebugger', None),
 ]

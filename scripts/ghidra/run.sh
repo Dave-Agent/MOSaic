@@ -4,7 +4,7 @@
 #
 #   run.sh [PROJECT_ROOT]       project.config keys: PROJECT_NAME, REFERENCE_PRG, LOAD_ADDRESS (hex, e.g. 0x0800), GHIDRA_EXPORT_DIR (default ghidra),
 #                               GHIDRA_HOME (else ~/ghidra*/ghidra_*), GHIDRA_SEEDS / GHIDRA_LABELS / GHIDRA_HOLES (default tools/ghidra/seeds.txt, labels.txt, holes.txt),
-#                               GHIDRA_PROCESSOR (default 6502:LE:16:default)
+#                               GHIDRA_PROCESSOR (default 6502:LE:16:default), GHIDRA_EXPORTER (path of KickAssemblerExport.py; else fetched, pinned, into tools/ghidra/exporter/)
 set -euo pipefail
 ROOT="$(cd "${1:-.}" && pwd)"; cd "$ROOT"; HERE="$(cd "$(dirname "$0")" && pwd)"
 source ./project.config
@@ -12,11 +12,23 @@ GH="${GHIDRA_HOME:-$(ls -d "$HOME"/ghidra*/ghidra_* 2>/dev/null | grep -v zip | 
 [ -x "$GH/support/analyzeHeadless" ] || { echo "Ghidra not found: set GHIDRA_HOME (project.config or environment)"; exit 1; }
 OUT="${GHIDRA_EXPORT_DIR:-ghidra}"; NAME="${PROJECT_NAME:-project}"
 SEEDS="${GHIDRA_SEEDS:-tools/ghidra/seeds.txt}"; LABELS="${GHIDRA_LABELS:-tools/ghidra/labels.txt}"; HOLES="${GHIDRA_HOLES:-tools/ghidra/holes.txt}"
+# The exporter (KickAssemblerExport.py) is found, in this order: GHIDRA_EXPORTER (project.config), the project's own tools/ghidra/exporter/ (fetched, pinned), ~/ghidra_scripts/ (a hand-installed copy),
+# else it is fetched now from its repository at a pinned commit (fetch_exporter.py: needs the network once; nothing is installed into Ghidra's script directories, which differ per system).
+EXP=""
+for c in "${GHIDRA_EXPORTER:-}" "tools/ghidra/exporter/KickAssemblerExport.py" "$HOME/ghidra_scripts/KickAssemblerExport.py"; do
+    if [ -n "$c" ] && [ -f "$c" ]; then EXP="$c"; break; fi
+done
+if [ -z "$EXP" ]; then
+    echo "Kick Assembler exporter not found: fetching it (pinned) from https://github.com/Dave-Agent/ghidra-kickass-export"
+    python3 -B "$HERE/fetch_exporter.py" --root "$ROOT" || { echo "no exporter: fetch failed (see above); set GHIDRA_EXPORTER to a copy of KickAssemblerExport.py"; exit 1; }
+    EXP="tools/ghidra/exporter/KickAssemblerExport.py"
+fi
+case "$EXP" in /*) ;; *) EXP="$ROOT/$EXP";; esac
 [ -f "$SEEDS" ] || { echo "no seeds file $SEEDS (scripts/ghidra/make_seeds.py writes one)"; exit 1; }
 mkdir -p "$OUT"
 # remove only this project's previous Ghidra project files; ${VAR:?} stops the shell if a name is empty
 rm -rf "${OUT:?}/${NAME:?}.rep" "${OUT:?}/${NAME:?}.gpr"
 "$GH/support/analyzeHeadless" "$ROOT/$OUT" "$NAME" -import "$ROOT/$REFERENCE_PRG" \
     -processor "${GHIDRA_PROCESSOR:-6502:LE:16:default}" -loader BinaryLoader -loader-baseAddr "${LOAD_ADDRESS:-0x0800}" -overwrite \
-    -scriptPath "$HERE" -postScript setup.py "$ROOT/$SEEDS" "$ROOT/$LABELS" "$ROOT/$HOLES" "$ROOT/$OUT" 2>&1 | grep -E "Export Complete|ERROR|Exception|Traceback|seeded|File|\.asm" || true
+    -scriptPath "$HERE" -postScript setup.py "$ROOT/$SEEDS" "$ROOT/$LABELS" "$ROOT/$HOLES" "$ROOT/$OUT" "$EXP" 2>&1 | grep -E "Export Complete|ERROR|Exception|Traceback|seeded|File|\.asm" || true
 ls -la "$OUT"

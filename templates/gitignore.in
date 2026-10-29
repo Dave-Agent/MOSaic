@@ -17,3 +17,4 @@ __pycache__/
 # Kick working copies next to the source
 phase1/src/build/
 phase2/src/build/
+/tools/ghidra/exporter/
