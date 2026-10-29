@@ -51,7 +51,7 @@ print('''
 Next steps (references/new_game.md):
   1. just env                              check the tools
   2. stage 0b: research the game, fill docs/background.md
-  3. stage 2: extract the files (c1541 -attach IMG -read NAME out), disassemble the boot stub (scripts/disasm/dis6502.py), find the depacker and its exit
+  3. stage 2: extract the files (disk: c1541 -attach IMG -read NAME out, or scripts/disk/extract_files.py; tape: scripts/tape/tap_extract.py IMG.tap --out DIR), disassemble the boot stub (scripts/disasm/dis6502.py), find the depacker and its exit
      (scripts/vice/vice_handoff.py to dump, scripts/trace/c64trace for the jump edges), then set DUMP_PC and HANDOFF_PC in project.config
   4. just derive                           reference/ + reference.sha256
   5. just seeds && just ghidra             Kick Assembler export into ghidra/; copy it to phase1/src, set SRC_MAIN, just verify''')

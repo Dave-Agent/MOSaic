@@ -68,6 +68,7 @@ Not proven: NTSC media, tape media, fast-loader media that need more than a key 
 
 ## Added after the clean-room run
 - `scripts/disk/extract_files.py IMAGE --out DIR`: every file of a disk image (read-only) with a manifest of load addresses and lengths.
+- `scripts/tape/tap_extract.py IMAGE.tap --out DIR`: the same for a `.tap` tape image: the standard KERNAL tape format is decoded (leader, byte markers, countdown, header and data blocks, each recorded twice with a checksum; a bad first copy is replaced by the second) into PRGs and a manifest. `--histogram` shows the pulse clusters. A tape with a turbo or custom loader gives the normal-format loader stub (disassemble it: that is the boot chain) and a report that the rest is not decoded; take that rest through the hand-off route below (the tape is attached from a scratch copy like any medium, `vice_handoff.py --media IMG.tap`), since the loader itself does the decoding.
 - `scripts/reference/file_coverage.py --dump DUMP FILES...`: which program files are in a dump and where; the hand-off validity check (`new_game.md` stage 2, 5b).
 - `vice_handoff.py` keeps the reply of the monitor's `x` command, so a breakpoint hit within the first 0.2 s after resuming is no longer lost (consecutive `--step`s a few frames apart).
 - In `just dumps`, `DUMP_STEPS` and `DUMP_FEED` (project.config) pass the title's key or fire waits.

@@ -28,4 +28,5 @@ Needs Python 3, Java 17+, Kick Assembler, git and [`just`](https://github.com/ca
 python3 -B scripts/selftest_tools.py
 python3 -B scripts/refactor/selftest.py
 python3 -B scripts/render/selftest.py
+python3 -B scripts/tape/selftest.py
 ```
