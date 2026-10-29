@@ -32,10 +32,12 @@ The full step-by-step, from adding the game's image to a finished phase 2, is in
 
 **2. Install the skill and check the tools.**
 ```
-git clone https://github.com/Dave-Agent/MOSaic.git
-ln -s "$PWD/MOSaic" ~/.claude/skills/c64-decomp
+git clone https://github.com/Dave-Agent/MOSaic.git ~/MOSaic
+mkdir -p ~/.claude/skills
+ln -s ~/MOSaic ~/.claude/skills/c64-decomp
 python3 ~/.claude/skills/c64-decomp/scripts/check_env.py --role run --role trace --role ghidra
 ```
+The link must be named `c64-decomp`. The last line of the check should read `all required tools present`.
 
 **3. Make a project for the game.** You need the game's disk (`.d64`, `.g64`) or tape (`.tap`) image, preferably one with the copy protection removed. The original is copied into the project's `originals/` and its SHA-256 recorded. It is never modified and never attached to an emulator directly; VICE only runs scratch copies.
 ```

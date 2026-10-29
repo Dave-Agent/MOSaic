@@ -1,8 +1,6 @@
 # HOWTO: from a game image to a finished phase 2
 
-Fourteen steps. Each one says what you tell Claude, what the agent does, and how you know it is done. At any point, `just status` in the project names the step you are on, and saying **"move to the next stage"** to Claude does the next one.
-
-You need the tools from the README's *Getting started* (Java, Kick Assembler, `just`, VICE, Ghidra, git). Check them with `just env` once the project exists.
+Step 0 sets up your machine (once). Then fourteen steps. Each one says what you tell Claude, what the agent does, and how you know it is done. At any point, `just status` in the project names the step you are on, and saying **"move to the next stage"** to Claude does the next one.
 
 **What "phase 1" and "phase 2" mean.** Phase 1 turns the game into one fully commented source file that assembles to exactly the original bytes. Phase 2 splits that source into files, separates the game from the C64 hardware, and makes it relocatable. Phase 1 is frozen once finished (git tag `p1-byte-identical`); phase 2 is a separate copy.
 
@@ -13,6 +11,42 @@ You need the tools from the README's *Getting started* (Java, Kick Assembler, `j
 - **Byte-identical:** the source assembles to exactly the same bytes as the reference.
 - **Slice:** one region of the source worked on in a scratch copy and merged back when its checks pass.
 - **Agent:** the Claude session doing the work. You talk to it in Claude Code, inside the project folder.
+
+---
+
+## Step 0: set up your machine (once)
+
+**1. Install these tools.** Use your system's package manager where there is one.
+
+| Tool | What it is for | Where to get it |
+|---|---|---|
+| Python 3 | runs the skill's scripts | your package manager |
+| Java 17 or newer | runs Kick Assembler | your package manager |
+| Kick Assembler | assembles the source | download from theweb.dk/KickAssembler and put `KickAss.jar` in `~/tools/` |
+| git | keeps the history | your package manager |
+| `just` | runs the project's commands | github.com/casey/just |
+| VICE (`x64sc`) with its C64 ROM files | runs the game and takes memory dumps | your package manager, or vice-emu.sourceforge.io |
+| Ghidra 11 or newer | the first disassembly | ghidra-sre.org: unzip it in your home folder (or set `GHIDRA_HOME`) |
+| a C compiler (`gcc` or `clang`) | builds the skill's tracer | your package manager |
+| Claude Code | the agent you talk to | claude.com/claude-code |
+
+The Ghidra exporter script downloads itself the first time it is needed.
+
+**2. Get the skill, and link it so Claude Code can find it.**
+```
+git clone https://github.com/Dave-Agent/MOSaic.git ~/MOSaic
+mkdir -p ~/.claude/skills
+ln -s ~/MOSaic ~/.claude/skills/c64-decomp
+```
+The link must be called `c64-decomp`: that is the name the skill is registered under, and the commands in this guide use that path.
+
+**3. Check the tools.**
+```
+python3 ~/.claude/skills/c64-decomp/scripts/check_env.py --role run --role trace --role ghidra
+```
+The last line should read `all required tools present for roles: build, ghidra, run, trace`. If it lists missing tools, install them and run it again.
+
+**Done when:** that last line says all required tools are present.
 
 ---
 
