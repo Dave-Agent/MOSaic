@@ -13,7 +13,7 @@ check   every gate a slice must pass, one verdict (exit 1 when any gate fails):
           p1_complete    the phase 1 completeness report; with --range LO-HI it is the slice's range alone (a slice with no raw operand or placeholder left is CLEAN)
           sentinel_scan  hints only (a list with a missing or misplaced end marker): reported, never fails
         A slice is not done until `check` passes in the scratch copy and again after the merge.
-start   copies the project (git repo included, `originals/` and `build/` skipped) to $SLICE_SCRATCH/NAME/project (default /tmp/c64-slices) and records the base commit. The agent works there
+start   copies the project (git repo included, `originals/` skipped, `build/` skipped except `build/trace/`, the tracer) to $SLICE_SCRATCH/NAME/project (default /tmp/c64-slices) and records the base commit. The agent works there
         and commits there; it never touches the real project.
 merge   `git format-patch` of the scratch repo since the base commit, `git am` into the real project (the real tree must have no uncommitted changes to tracked files: untracked
         files are fine), then `check`. A failed `am` is aborted (`git am --abort`), nothing is left half applied."""
@@ -51,6 +51,8 @@ if args.cmd == 'start':
     if os.path.exists(dst): sys.exit('%s exists: pick another NAME or remove it' % dst)
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     shutil.copytree(root, dst, ignore=shutil.ignore_patterns('originals', 'build', '__pycache__'))
+    for sub in ('trace',):                                              # the tracer build the agent needs for rung 2/3 evidence
+        if os.path.isdir(os.path.join(root, 'build', sub)): shutil.copytree(os.path.join(root, 'build', sub), os.path.join(dst, 'build', sub))
     base = run(['git', 'rev-parse', 'HEAD'], dst).stdout.strip(); open(base_file, 'w').write(base + '\n')
     print('scratch copy: %s\nbase commit:  %s\nwork there, commit there (path-limited git add), then: slice.py check --root %s, slice.py merge %s' % (dst, base[:10], dst, args.name)); sys.exit(0)
 base = open(base_file).read().strip()

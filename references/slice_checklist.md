@@ -7,6 +7,10 @@ Read before starting a slice, and run `just slice-check` (`scripts/slice.py chec
 - The build stays byte-identical at every commit (`just verify`).
 - No guessing: describe what the code does; a name that claims a role needs the document (rung 1) AND an observation (rung 3, a controlled tracer run). Otherwise a descriptive name plus `TODO(name)`. Ask the owner only what a thing IS to a player, with a picture, after trying the code.
 
+**Slices run in parallel**: do not run `just align` / `align_comments.py` in a slice (it rewrites the comment columns of the whole file and every other slice then conflicts on merge); the lead runs it once, between merges. Edit only your range.
+- A whole-source `slice check` cannot pass while other slices still carry `TODO(name)` markers: judge a slice by `--range LO-HI --allow-marked`; the whole-source check is for the last slice.
+- Tracer flags cannot tell ROM code from RAM data at the same address: with the ROM banked in, check 7 of `p1_complete` can list ROM routines as "data rows that ran as code": pass `--exec-ignore LO-HI`.
+
 **Markers (every one has a headline sentence)**
 - `TODO(user)` needs the owner; `TODO(name)` provisional name; `TODO(block)` other phase 1 blocker; `TODO(sound)`, `TODO(code)`, `TODO(port)` hardware dependency, `TODO(phase2)` change for phase 2.
 - **A label nothing refers to** (dead code, a utility nothing calls, leftover data) gets `TODO(phase2): remove? unreferenced, never executed`. `unreferenced.py --write` puts it on; `slice-check` fails without it. Decode and comment it anyway; never delete it in phase 1.
@@ -15,6 +19,8 @@ Read before starting a slice, and run `just slice-check` (`scripts/slice.py chec
 - One record per row for a table of fixed-size records (`refactor/records.py`); a list's end marker on its own row; a block that runs past its end marker is a label missing (`sentinel_scan.py`).
 - Text is text (the project's text macro), never `.byte` rows.
 - A data row keeps `// [addr]` only: no operand-name list, no ASCII dump (`comment_check.py --fix`).
+- Data reached by index, not by name (sprite or character pictures, tile tables): `unreferenced.py` sees no reference. Give it one that states the index: a `.assert` or a constant that names the label and its index (`.assert "frame block", <expression using the label>, $NN`), so the label is referenced and the number is checked. Mark `TODO(phase2): remove?` only where the code and the runs show it is unused.
+- Ghidra puts labels of ROM routines into RAM data and disassembles pixel or table bytes as instructions there (fake `ror`, `brk`, raw operands under the ROM): the ROM routine labels belong in `variables.asm` (as `.label ROM_x = $ADDR`), and the fake instructions go back to data rows (`refactor/code_to_bytes.py`).
 - Pointers are labels (`.word label`, `#<label`); no raw `$ADDR` operands; no `label+n` in uses.
 
 **Names**

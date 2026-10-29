@@ -21,7 +21,7 @@ Checks (1, 2 and 2b must be 0; the other two list candidates that are reviewed, 
   6. unlabelled data runs  data rows that follow code (or open the range) with no label of their own: a table nobody named
   7. data rows that ran as code (review, optional)   `.byte` / `.word` rows whose bytes the tracer EXECUTED: code nobody disassembled yet (a raster IRQ left as rows although it ran
                            thousands of times). Needs tracer flag files: `--flags PREFIX` (repeatable; PREFIX.flags), else the project's `COVERAGE_DIR` (default `$BUILD_DIR/coverage`) `*.flags`, else
-                           `$BUILD_DIR/trace/cov.flags` (the seeded run); none found = the check is skipped with one line (`--no-flags` skips it on purpose). Uses coverage/raw_executed.py. Not a failure.
+                           `$BUILD_DIR/trace/cov.flags` (the seeded run); none found = the check is skipped with one line (`--no-flags` skips it on purpose). `--exec-ignore LO-HI` drops runs in a range where the game runs ROM code while RAM data lies at the same addresses (the tracer's flags cannot tell the two apart; the ROM is banked in for a while). Uses coverage/raw_executed.py. Not a failure.
   The range summary line says how many instruction lines and data rows the range holds, and warns when it holds NO instruction line (checks 1-3 see only instructions: a
   slice that is all tables is judged by 5 and 6 and by reading it).
 
@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser, main_file, reachable, config, source_labels, split_comment
 here = os.path.dirname(os.path.abspath(__file__))
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--extra', help='an extra regex for placeholder names'); a.add_argument('--lo', type=lambda x: int(x, 0), default=0x0800); a.add_argument('--hi', type=lambda x: int(x, 0), default=0xFFFF); a.add_argument('--range'); a.add_argument('--allow-marked', action='store_true')
-a.add_argument('--flags', action='append', default=[], help='tracer output PREFIX (PREFIX.flags) for check 7; repeatable'); a.add_argument('--no-flags', action='store_true', help='skip check 7')
+a.add_argument('--flags', action='append', default=[], help='tracer output PREFIX (PREFIX.flags) for check 7; repeatable'); a.add_argument('--no-flags', action='store_true', help='skip check 7'); a.add_argument('--exec-ignore', action='append', default=[], help='check 7: hex range LO-HI whose executed bytes are ROM code that runs at the same addresses as RAM data (the flags cannot tell them apart); repeatable')
 args = a.parse_args(); main = main_file(args)
 base = [sys.executable]; common = ['--root', args.root] + (['--main', args.main] if args.main else ['--phase', str(args.phase)])
 RANGE = tuple(int(x, 16) for x in args.range.split('-')) if args.range else None
@@ -153,7 +153,7 @@ else:
         if not pre: exe_note = 'skipped: no tracer .flags file found (--flags PREFIX, COVERAGE_DIR or build/trace/cov)'
         else:
             from _common import expanded_lines
-            exe_runs = [(s_, e_) for s_, e_ in raw_executed_runs(expanded_lines(main), load_flags(pre), args.lo, args.hi) if inside(s_) or inside(e_)]
+            exe_runs = [(s_, e_) for s_, e_ in raw_executed_runs(expanded_lines(main), load_flags(pre), args.lo, args.hi) if (inside(s_) or inside(e_)) and not any(a_ <= s_ <= b_ for a_, b_ in ((int(r_.split('-')[0], 16), int(r_.split('-')[1], 16)) for r_ in args.exec_ignore))]
     except (OSError, ImportError, SystemExit) as ex: exe_note = 'skipped: %s' % ex
 sorted_labels = sorted(label_by)
 def label_before(ad):

@@ -97,6 +97,17 @@ with open(os.path.join(real, 'main.asm'), 'w') as f: f.write(clean)      # undo 
 r = slice_('merge', 'one', '--root', real, env=env)      # the gates after the merge may fail without an assembler: only the merge itself is tested
 check('slice merge: the scratch commit lands in the real project', 'merged 1 commit' in r.stdout and 'slice work' in git(real, 'log', '--format=%s').stdout and '// a comment added in the scratch copy' in text(real), r.stdout + r.stderr)
 
+# ---- code_to_bytes.py: instructions the export read from data go back to .byte rows -------------------------------------------------------------------------------
+d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'src'))
+with open(os.path.join(d, 'project.config'), 'w') as f: f.write('SRC_MAIN="src/m.asm"\n')
+with open(os.path.join(d, 'src', 'm.asm'), 'w') as f: f.write('.pc = $1000 "x"\nstart:\n  ror $fc55,x // [1000:7e 55 fc ROR $fc55,X]\n  brk // [1003:00       BRK]\nafter:\n  rts // [1004:60       RTS]\n')
+c2b = os.path.join(HERE, 'refactor', 'code_to_bytes.py')
+r = subprocess.run([sys.executable, '-B', c2b, '--root', d, '--main', 'src/m.asm', '--range', '1000-1003', '--write'], capture_output=True, text=True)
+t = open(os.path.join(d, 'src', 'm.asm')).read()
+check('code_to_bytes: instructions become one .byte row with the original address', '.byte $7e,$55,$fc,$00 // [1000]' in t and 'rts' in t and 'ror' not in t, r.stdout + r.stderr + t)
+r = subprocess.run([sys.executable, '-B', c2b, '--root', d, '--main', 'src/m.asm', '--range', '1004-1004'], capture_output=True, text=True)
+check('code_to_bytes: dry run leaves the file alone', 'rts' in open(os.path.join(d, 'src', 'm.asm')).read(), r.stdout)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')
