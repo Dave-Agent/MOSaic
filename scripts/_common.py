@@ -259,6 +259,30 @@ def source_labels(main):
             for _ in range(code.count('{')): scope.append('?')
     return {**stream, **sym}, stream
 
+def symbol_files(root, phase, explicit=None):
+    """The symbol files that can resolve scoped names (`Namespace.member`, `Routine.local`), best first: --sym, the phase's TRACE_SYM(_P1) / C64_SYM, a `.sym` next to the build
+    (the newest `*.sym` under SRC_DIR/build or BUILD_DIR), then project.config VICE_SYMBOLS (`.vs`: flat names, Kick drops the namespace prefix)."""
+    cfg = config(root); out = []
+    def add(p):
+        if p:
+            p = p if os.path.isabs(p) else os.path.join(root, p)
+            if os.path.exists(p) and p not in out: out.append(p)
+    add(explicit); add(os.environ.get('C64_SYM')); add(cfg.get('TRACE_SYM_P1' if phase == 1 else 'TRACE_SYM'))
+    dirs = [os.path.join(root, d, 'build') for d in (cfg.get('SRC_DIR' if phase == 1 else 'PHASE2_DIR'),) if d] + [os.path.join(root, cfg.get('BUILD_DIR', 'build'))]
+    cands = [f for d in dirs for f in glob.glob(os.path.join(d, '**', '*.sym'), recursive=True)]
+    for f in sorted(cands, key=os.path.getmtime, reverse=True)[:1]: add(f)
+    add(cfg.get('VICE_SYMBOLS'))
+    return out
+
+def load_symbols(files):
+    """{name: address} merged from symbol files (earlier files win); `.sym` gives full scope paths."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sim'))
+    import symbols
+    tab = {}
+    for f in files:
+        for k, v in symbols.load(f).items(): tab.setdefault(k, v)
+    return tab
+
 def parse_addr(s):
     """'$12AB' / '0x12ab' -> int; None when s is not written as an address"""
     m = re.match(r'^(?:\$|0x)([0-9A-Fa-f]{1,4})$', s)

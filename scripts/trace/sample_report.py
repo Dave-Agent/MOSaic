@@ -12,6 +12,8 @@ VAR       a label (the label files, in-stream labels and `Scope.local` of the so
           --ram IMAGE --pc HEX (--sp --p --port as the program needs) --frames N and the input (--joy2 HEX, or --joy1-at / --joy2-at / --keymat-at FRAME=...: c64trace.c, "Input that
           changes during a run"). --rom-dir (project.config / $VICE_ROM_DIR) and --out (a scratch prefix) are added when missing. With TRACE_ENTRY in project.config the --ram/--pc/register
           arguments are filled from it when you give no --ram.
+--keep-run PREFIX   keep the scratch run's coverage files (PREFIX.hits, .flags ...) instead of deleting them: `hit_counts.py ADDR|LABEL --runs PREFIX` then counts which side of a branch ran.
+--sym FILE        a symbol file for names the source cannot give (`Namespace.member`): default is the build's .sym (TRACE_SYM(_P1), else the newest .sym under SRC_DIR/build or BUILD_DIR), then VICE_SYMBOLS.
 --from N --to M   only the frames N..M.   --table   one row per frame in which anything changed (all VARs side by side) instead of one line per variable.   --max-runs N   runs per variable (default 60).
 Frame numbers are the tracer's frame counter: the sample of frame N is taken at the start of frame N, BEFORE the input events and pokes of frame N are applied (so an input set
 with `--joy2-at 10=fe` first shows in the sample of frame 11). Example:
@@ -19,11 +21,11 @@ with `--joy2-at 10=fe` first shows in the sample of frame 11). Example:
 Read-only for the source; --run writes the sample file (default build/trace/sample.smp) and a scratch coverage prefix under build/trace."""
 import os, re, shlex, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, os.path.dirname(HERE)); sys.path.insert(0, HERE)
-from _common import parser, main_file, source_labels, parse_addr, config
+from _common import parser, main_file, source_labels, parse_addr, config, symbol_files, load_symbols
 a = parser(__doc__.split('\n')[0], write=False, phase=True)
 a.add_argument('vars', nargs='*'); a.add_argument('--smp'); a.add_argument('--ranges'); a.add_argument('--run', action='store_true'); a.add_argument('--out')
 a.add_argument('--from', dest='lo', type=int, default=1); a.add_argument('--to', dest='hi', type=int, default=1 << 30); a.add_argument('--table', action='store_true'); a.add_argument('--max-runs', type=int, default=60)
-a.add_argument('--sym', help='a .vs / .sym file for names the source does not define')
+a.add_argument('--sym', help='a .sym / .vs file for names the source does not define (default: the build\'s .sym, see _common.symbol_files)'); a.add_argument('--keep-run', metavar='PREFIX', help='with --run: keep the run\'s coverage files as PREFIX.hits / .flags / .edges / .writer (for hit_counts.py --runs PREFIX); PREFIX is relative to --root')
 argv = sys.argv[1:]; tracer_args = []
 if '--' in argv: k = argv.index('--'); tracer_args = argv[k + 1:]; argv = argv[:k]
 args = a.parse_args(argv)
@@ -39,12 +41,10 @@ def resolve(spec):
     if not hasattr(resolve, 'tab'):
         try: resolve.tab = source_labels(main_file(args))[0]
         except SystemExit: resolve.tab = {}
-        sf = args.sym or (os.path.join(root, cfg['VICE_SYMBOLS']) if cfg.get('VICE_SYMBOLS') else None)
-        if sf and os.path.exists(sf):
-            sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'sim')); import symbols
-            for k, v in symbols.load(sf).items(): resolve.tab.setdefault(k, v)
+        resolve.files = symbol_files(root, args.phase, args.sym)       # scoped names (`Scope.member`) come from the assembler's .sym file
+        for k, v in load_symbols(resolve.files).items(): resolve.tab.setdefault(k, v)
     if spec not in resolve.tab:
-        import difflib; sys.exit('unknown variable %r (closest: %s)' % (spec, ', '.join(difflib.get_close_matches(spec, resolve.tab, 4)) or 'none'))
+        import difflib; sys.exit('unknown variable %r (closest: %s; symbol files tried: %s)' % (spec, ', '.join(difflib.get_close_matches(spec, resolve.tab, 4)) or 'none', ', '.join(os.path.relpath(f, root) for f in resolve.files) or 'none: build first, or --sym FILE'))
     return spec, resolve.tab[spec], n
 V = [resolve(s) for s in args.vars]
 
@@ -60,12 +60,15 @@ if args.run:
     if '--ram' not in tracer_args: cmd += env.base_args(env.ram_path)
     else: cmd += ['--rom-dir', env.rom_dir] if '--rom-dir' not in tracer_args else []
     cmd += tracer_args
-    if '--out' not in tracer_args: cmd += ['--out', os.path.join(os.path.dirname(smp), 'sample_run')]
+    keep = os.path.join(root, args.keep_run) if args.keep_run else None
+    if keep and '--out' in tracer_args: sys.exit('--keep-run and a tracer --out both name the coverage prefix: give one (a tracer --out already keeps the files)')
+    if keep: os.makedirs(os.path.dirname(keep) or '.', exist_ok=True)
+    if '--out' not in tracer_args: cmd += ['--out', keep or os.path.join(os.path.dirname(smp), 'sample_run')]
     cmd += ['--sample-set', smp, rng]
     r = subprocess.run(cmd, capture_output=True, text=True)
     for suf in ('flags', 'hits', 'edges', 'writer'):                       # the scratch coverage prefix is not wanted
         p = os.path.join(os.path.dirname(smp), 'sample_run.' + suf)
-        if '--out' not in tracer_args and os.path.exists(p): os.remove(p)
+        if '--out' not in tracer_args and not keep and os.path.exists(p): os.remove(p)
     if r.returncode: sys.exit('tracer failed (%d): %s' % (r.returncode, (r.stdout + r.stderr).strip()[-400:]))
     print('# ' + ' '.join(shlex.quote(c) for c in cmd)); print('# ' + (r.stdout.strip().splitlines() or [''])[-1])
 if not os.path.exists(smp): sys.exit('sample file %s not found (give --smp FILE, or --run)' % smp)
