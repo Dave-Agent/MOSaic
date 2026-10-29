@@ -172,7 +172,7 @@ def label_defs(text_lines, name):
     return [i for i, l in enumerate(text_lines) if pat.match(l)]
 
 ROW = re.compile(r'^(\s*)\.byte ((?:\$[0-9a-fA-F]{2},?)+)\s*// \[([0-9a-fA-F]{4})\] ?(.*)$')
-INS = re.compile(r'^\s+(?!\.)(\w+)\s?.*?// \[([0-9A-Fa-f]{4}):((?:[0-9a-fA-F]{2} ?)+)')
+INS = re.compile(r'^\s+(?!\.)(\w+)\s?.*?// \[([0-9A-Fa-f]{4}):((?:[0-9a-fA-F]{2}\b ?)+)')
 
 def find_cover(addr, files, texts=None):
     """Where does the original address `addr` live: (file, line index, kind, offset) with kind 'ins' (an instruction starts there, offset 0, or the address is inside it, offset > 0)

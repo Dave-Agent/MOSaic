@@ -73,7 +73,7 @@ def waivers(files):
         close()
     return out
 
-TRACE_INS = re.compile(r'//\s*\[([0-9A-Fa-f]{4}):((?:[0-9a-fA-F]{2} ?)+)')
+TRACE_INS = re.compile(r'//\s*\[([0-9A-Fa-f]{4}):((?:[0-9a-fA-F]{2}\b ?)+)')
 
 def instruction_interior(files):
     """the set of original addresses that lie INSIDE an instruction (not on its first byte), from the `[ADDR:bytes MNEMONIC]` trace comments: a pointer does not point there

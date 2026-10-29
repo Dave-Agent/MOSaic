@@ -25,7 +25,7 @@ RANGE = tuple(int(x, 16) for x in args.range.split('-')) if args.range else None
 SKIP3 = {0x2C, 0x0C, 0x1C, 0x3C, 0x5C, 0x7C, 0xDC, 0xFC}                         # BIT abs, NOP abs, NOP abs,x
 SKIP2 = {0x24, 0x04, 0x44, 0x64, 0x14, 0x34, 0x54, 0x74, 0xD4, 0xF4, 0x80, 0x82, 0x89, 0xC2, 0xE2}   # BIT zp, NOP zp, NOP zp,x, NOP #imm
 files = reachable(main); texts = {f: open(f).read().split('\n') for f in code_files(main)}
-INS = re.compile(r'^(\s+)(?!\.)([A-Za-z]\w*(?:\.\w+)?)\s?(.*?)//\s*\[([0-9A-Fa-f]{4}):((?:[0-9a-fA-F]{2} ?)+)')
+INS = re.compile(r'^(\s+)(?!\.)([A-Za-z]\w*(?:\.\w+)?)\s?(.*?)//\s*\[([0-9A-Fa-f]{4}):((?:[0-9a-fA-F]{2}\b ?)+)')
 ins = []                                                                              # (file, line index, addr, bytes, indent)
 for f in files:
     for i, l in enumerate(texts[f]):
