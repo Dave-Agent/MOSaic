@@ -111,7 +111,7 @@ launch: experiment
 smoke: experiment
     python3 -B {{skill}}/scripts/launcher/smoke.py --root .
 
-# Render the game's graphics (character set, every sprite block of the VIC bank, the screen) as PNGs into gfx/ with gfx/index.md; extra options pass through, e.g. just gfx --sprites 30:57:3 --columns 0,1,2 --label player (scripts/render/README.md). Look at the pictures; attach one to a naming question.
+# Render the game's graphics (character set, every sprite block of the VIC bank, the screen) as PNGs into docs/gfx/ with docs/gfx/index.md; extra options pass through, e.g. just gfx --sprites 30:57:3 --columns 0,1,2 --label player (scripts/render/README.md). Look at the pictures; attach one to a naming question.
 gfx *args:
     python3 -B {{skill}}/scripts/render/gfx_sheets.py --root . {{args}}
 

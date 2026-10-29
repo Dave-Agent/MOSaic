@@ -1,11 +1,11 @@
 """Render a game's graphics from the hand-off RAM to PNG pictures, so a question "what is this sprite / character / animation?" can be answered by SEEING it.
 
-  python3 -B gfx_sheets.py --root .                       the default render (no other argument needed): into <root>/gfx/
-  python3 -B gfx_sheets.py --root . --sprites 30:57:3 --label player      a pointer range, 3 sprites per row, named gfx/sprites_player_*.png
+  python3 -B gfx_sheets.py --root .                       the default render (no other argument needed): into <root>/docs/gfx/
+  python3 -B gfx_sheets.py --root . --sprites 30:57:3 --label player      a pointer range, 3 sprites per row, named docs/gfx/sprites_player_*.png
   python3 -B gfx_sheets.py --root . --chars A6:A9,F2 --label anim         a character range from the character set
   python3 -B gfx_sheets.py --root . --char-anim 'table=NAME,stride=8,count=7,period=0,frames=1,bytes=2,ptr=6,dest_lo=NAME,dest_hi=NAME'
 
-DEFAULT RENDER (no --sprites / --chars / --char-anim; or with --all next to them). Everything the VIC bank can show, written to <out> (default gfx/) with an index.md that
+DEFAULT RENDER (no --sprites / --chars / --char-anim; or with --all next to them). Everything the VIC bank can show, written to <out> (default docs/gfx/) with an index.md that
 says what each picture shows and which addresses and colours were used:
   chars_hires.png / chars_mc.png   the character set as a 16x16 sheet, every cell labelled with its char code in hex (the same bytes read as hires and as multicolour)
   sprites_PP-QQ_hires.png / _mc.png  every 64-byte block of the VIC bank that holds data, 8 per row, labelled by its sprite POINTER in hex (the value stored in the
@@ -61,7 +61,7 @@ CUSTOM RENDERS (they replace the default render unless --all is given):
   --label NAME        file name part: sprites_NAME_*.png, chars_NAME_*.png, charanim_NAME_*.png
   --mc / --hires      render only that variant (default: both, as two files)
 Limits: one palette per picture, expansion only for blocks drawn as a real sprite, no FLI / raster splits / sprite multiplexing (a picture shows
-the one state of the dump), no ECM in bitmap mode, the character ROM only through --chargen. Pictures are derived data: gfx/ is not committed.
+the one state of the dump), no ECM in bitmap mode, the character ROM only through --chargen. Pictures are derived data but small: docs/gfx/ is committed so source comments that cite a picture resolve; renders of a tracer state (docs/gfx/<state>/) are scratch and git-ignored.
 """
 import argparse, os, re, sys, glob
 
@@ -645,7 +645,7 @@ def write_index(out, st, idx, root, cmd):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--root', default='.', help='project root (default: current directory)')
-    ap.add_argument('--out', default=None, help='output folder, relative to --root (default gfx; with --state: gfx/<state file name>, so a picture of a tracer state never lands outside gfx/ or overwrites the hand-off render)')
+    ap.add_argument('--out', default=None, help='output folder, relative to --root (default docs/gfx; with --state: docs/gfx/<state file name>, so a picture of a tracer state never lands outside docs/gfx/ or overwrites the hand-off render)')
     ap.add_argument('--ram', help='64 KB RAM image (default dumps/handoff.bin)')
     ap.add_argument('--state', help='state file: RAM + 64 VIC registers + 1024 colour RAM + $DD00 (default dumps/handoff_state.bin when present)')
     ap.add_argument('--sym', help='symbol file for label arguments (default: the build\'s newest .sym, as the other tools)')
@@ -692,7 +692,7 @@ def main():
     root = os.path.abspath(args.root); args.root = root
     cfg = _common.config(root); load_syms(args)
     st = State(args, cfg, root)
-    if args.out is None: args.out = 'gfx/' + os.path.splitext(os.path.basename(args.state))[0] if args.state else 'gfx'
+    if args.out is None: args.out = 'docs/gfx/' + os.path.splitext(os.path.basename(args.state))[0] if args.state else 'docs/gfx'
     out = os.path.join(root, args.out); idx = Index(out)
     custom = bool(args.sprites or args.chars or args.char_anim or args.records)
     nbad = None

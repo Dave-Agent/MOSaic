@@ -1,6 +1,6 @@
 # scripts/render: see the game's graphics
 
-Why: the agents working on the source keep asking the user "what is this sprite / character / animation?", and the user can only answer by SEEING it. These tools turn the hand-off RAM into pictures in `gfx/` (project root, not committed) so a naming question can attach the right picture. Rendering is part of the process: do it once the libs and anon passes are done and before the first slice, regenerate on demand (`just gfx`).
+Why: the agents working on the source keep asking the user "what is this sprite / character / animation?", and the user can only answer by SEEING it. These tools turn the hand-off RAM into pictures in `docs/gfx/` (committed) so a naming question can attach the right picture. Rendering is part of the process: do it once the libs and anon passes are done and before the first slice, regenerate on demand (`just gfx`).
 
 ```
 just gfx                                   # the default render, no arguments: everything below
@@ -9,12 +9,12 @@ just gfx --chars A6:A9,F2 --label anim
 just gfx --char-anim 'table=LABEL,stride=8,count=7,period=0,frames=1,bytes=2,ptr=6,dest_lo=LABEL,dest_hi=LABEL' --label anims
 python3 -B scripts/render/gfx_sheets.py --help             # the full option list (gfx_sprites.py is the same tool)
 ```
-Pillow is required. At the end the tool prints the folder and the first file names; `gfx/index.md` lists every picture, what it shows, the addresses used and **how its colours and modes were derived**.
+Pillow is required. At the end the tool prints the folder and the first file names; `docs/gfx/index.md` lists every picture, what it shows, the addresses used and **how its colours and modes were derived**.
 
 ## One place for pictures
-Every generated picture goes under `gfx/` (git-ignored), never `build/`, `dumps/`, `/tmp` or the project root. The hand-off render is `gfx/`; a render of a tracer state (`--state FILE`) goes to `gfx/<state file name>/` by default. A picture worth keeping as evidence (it backs a name, an owner answer) is COPIED to `docs/` under a descriptive name and committed; `gfx/` stays regenerable.
+Every generated picture goes in `docs/gfx/`, never `build/`, `dumps/`, `/tmp` or the project root, and `docs/gfx/` is committed (small PNGs; source comments and `docs/*.md` cite them by that path). The hand-off render and custom renders (`--label`) are its files; a render of a tracer state (`--state FILE`) goes to `docs/gfx/<state file name>/` by default, which is scratch and git-ignored. A picture that backs a name or an owner answer is rendered with a descriptive `--label` (or copied from a state folder under a descriptive name) into `docs/gfx/` itself.
 
-## Default render (`gfx/`)
+## Default render (`docs/gfx/`)
 | file | shows |
 |---|---|
 | `chars_hires.png`, `chars_mc.png` | the character set, 16x16 cells labelled with the char code in hex (all read as hires / as multicolour); with a per-character colour table: `chars_auto.png`, each cell in its own mode and colour |
