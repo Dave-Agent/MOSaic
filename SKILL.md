@@ -15,7 +15,7 @@ Run `scripts/check_env.py` from the project root (add `--role run|disk|trace|ghi
 
 1. **Act and check, never reason blind.** Make the change, assemble it, run the gate, then, if it affects running, the smoke test. Know the result. Use the project's recipes by role (`references/just.md`: assemble, gate, tests, smoke, and what to do when a project lacks a recipe); phase 1's gate is `verify` (byte-identical to `reference/`).
 2. **Phase 2** has no byte gate; its gate is the project's `check` (build, raw-address check, alignment, `scripts/sim/run_tests.py`, `scripts/golden/golden.py check-t`); phase 1 runs the same tests with `--phase 1` and the exact `golden.py check`. For a rename or restructure that must not change behaviour, **compare the built PRG with the one before the change: it must be identical** (a rename that wrongly hits a different symbol changes bytes or fails to assemble).
-3. Commit after each step with the project's attribution lines. **Push only when the user says to.** Never discard uncommitted work (`git checkout/reset/restore/clean`).
+3. Commit after each step. **Push only when the user says to.** Never discard uncommitted work (`git checkout/reset/restore/clean`).
 4. A decision made together goes in `references/decisions.md` (date, what, why) and, if it is a rule, in `references/rules.md`.
 
 ## Phases
