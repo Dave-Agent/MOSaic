@@ -12,7 +12,7 @@ default:
 
 # Check the tools this project needs are installed (run first on a new machine).
 env:
-    python3 -B {{skill}}/scripts/check_env.py --role run --role disk --role trace --role ghidra
+    @python3 -B {{skill}}/scripts/check_env.py --role run --role disk --role trace --role ghidra
 
 # Check the layout rules: no game binaries tracked, originals read-only with a recorded hash.
 layout:
@@ -199,4 +199,4 @@ check phase=active_phase:
 
 # Where the project is in the MOSaic process and what comes next (--verify also runs the gate and the phase 1 completeness report). An agent runs this at every stage boundary and asks the user whether to continue.
 status *args:
-    python3 -B {{skill}}/scripts/status.py --root . {{args}}
+    @python3 -B {{skill}}/scripts/status.py --root . {{args}}

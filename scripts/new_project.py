@@ -49,10 +49,7 @@ if media:                                                    # the SHA-256 of ev
 if not args.no_git and not os.path.isdir(os.path.join(root, '.git')):
     subprocess.run(['git', 'init', '-q', '-b', 'main'], cwd=root); print('git init (local)')
 print('''
-Next steps (references/new_game.md):
-  1. just env                              check the tools
-  2. stage 0b: research the game, fill docs/background.md
-  3. stage 2: extract the files (disk: c1541 -attach IMG -read NAME out, or scripts/disk/extract_files.py; tape: scripts/tape/tap_extract.py IMG.tap --out DIR), disassemble the boot stub (scripts/disasm/dis6502.py), find the depacker and its exit
-     (scripts/vice/vice_handoff.py to dump, scripts/trace/c64trace for the jump edges), then set DUMP_PC and HANDOFF_PC in project.config
-  4. just derive                           reference/ + reference.sha256
-  5. just seeds && just ghidra             Kick Assembler export into ghidra/; copy it to phase1/src, set SRC_MAIN, just verify''')
+Next:
+  1. cd into the project and run `just env` to check the tools, then `just status` to see where you are.
+  2. Open Claude Code in the project folder and say: "Use the MOSaic skill. Research this game, then continue to the first byte-identical build."
+     Afterwards, "move to the next stage" does the next step. The full step-by-step is HOWTO.md in the skill (steps 2 to 8 cover this stage).''')
