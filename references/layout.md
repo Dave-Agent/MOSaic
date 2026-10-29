@@ -5,7 +5,7 @@
 project.config        the ONLY place project paths, names and addresses live (framework and skill scripts read it)
 justfile              thin: imports framework/recipes.just, adds project recipes
 README.md             what the project is, and exactly how to SUPPLY the original data and verify (see below)
-CLAUDE.md             what is specific to this game; everything shared lives in the c64-decomp skill
+CLAUDE.md             what is specific to this game; everything shared lives in the MOSaic skill
 
 phase1/src/           the byte-identical monolith + label files (symbols, zero_page, variables, constants) + libs/
 phase2/src/           the split source: game/ platform/ data/ + label files + libs/ (a main file that imports the rest)

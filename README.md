@@ -34,14 +34,14 @@ The full step-by-step, from adding the game's image to a finished phase 2, is in
 ```
 git clone https://github.com/Dave-Agent/MOSaic.git ~/MOSaic
 mkdir -p ~/.claude/skills
-ln -s ~/MOSaic ~/.claude/skills/c64-decomp
-python3 ~/.claude/skills/c64-decomp/scripts/check_env.py --role run --role trace --role ghidra
+ln -s ~/MOSaic ~/.claude/skills/mosaic
+python3 ~/.claude/skills/mosaic/scripts/check_env.py --role run --role trace --role ghidra
 ```
-The link must be named `c64-decomp`. The last line of the check should read `all required tools present`.
+The link must be named `mosaic`. The last line of the check should read `all required tools present`.
 
 **3. Make a project for the game.** You need the game's disk (`.d64`, `.g64`) or tape (`.tap`) image, preferably one with the copy protection removed. The original is copied into the project's `originals/` and its SHA-256 recorded. It is never modified and never attached to an emulator directly; VICE only runs scratch copies.
 ```
-python3 ~/.claude/skills/c64-decomp/scripts/new_project.py --root ~/C64Projects/MyGame --name "My Game" --media /path/to/game.d64
+python3 ~/.claude/skills/mosaic/scripts/new_project.py --root ~/C64Projects/MyGame --name "My Game" --media /path/to/game.d64
 cd ~/C64Projects/MyGame
 just env
 ```
@@ -60,7 +60,7 @@ The agent researches the game, extracts the files, finds the point where the gam
 | the first build passes | "Start phase 1 following `references/phase1_method.md`: work in slices, ask me what a thing is only after trying the code and a tracer run, and report progress." |
 | phase 1 is complete | "Start phase 2 following `references/phase2_split.md`." |
 
-**6. Check where you are** with `just --list` for the commands, `python3 ~/.claude/skills/c64-decomp/scripts/p1_complete.py --root . --phase 1` for how much of phase 1 remains, and `docs/` in the project for the research, the boot analysis and the answers recorded from you.
+**6. Check where you are** with `just --list` for the commands, `python3 ~/.claude/skills/mosaic/scripts/p1_complete.py --root . --phase 1` for how much of phase 1 remains, and `docs/` in the project for the research, the boot analysis and the answers recorded from you.
 
 ## See results
 

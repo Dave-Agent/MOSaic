@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare a project's framework/ with the skill's master (c64-decomp/framework) and optionally update it.
+"""Compare a project's framework/ with the skill's master (MOSaic/framework) and optionally update it.
 
 The master lives in the skill; a project holds a COPY and never edits it in place (a needed change is made in the skill, then copied). This lists files that differ,
 are missing in the project, or exist only in the project (a local edit: move it into the skill or remove it).

@@ -1,5 +1,5 @@
 ---
-name: c64-decomp
+name: mosaic
 description: Process, rules and decisions for Commodore 64 decompilation projects (turning a game's disk or tape image into byte-identical, commented, relocatable Kick Assembler source; MOSaic). Use when working in such a repo (a project folder with project.config and framework/), starting a new game from its original media, when the user says to continue, move to the next stage or asks what comes next in such a project, running a refactor across the source (labels, namespaces, symbols files), or when a convention question comes up (naming, SMC, locals, zero page, phases, gates). Read before changing label or file structure.
 ---
 
@@ -37,7 +37,7 @@ When a stage finishes (research, extraction and the boot chain, the clean refere
 
 ## Where things are
 
-This skill is a folder that is a git repository (every change is a commit; several agents may edit it, so commit your own and never discard others' work). It is loaded by Claude Code through `~/.claude/skills/c64-decomp` (a symlink to the folder); scripts refer to it as `<skill>`, and recipes find it through the `C64_DECOMP` variable.
+This skill is a folder that is a git repository (every change is a commit; several agents may edit it, so commit your own and never discard others' work). It is loaded by Claude Code through `~/.claude/skills/mosaic` (a symlink to the folder); scripts refer to it as `<skill>`, and recipes find it through the `MOSAIC` variable.
 
 
 `phase1/src` (monolith) and `phase2/src` (split); `symbols.asm` is the index and imports `zero_page.asm`, `variables.asm`, `constants.asm`; `framework/` generic tooling: **the master is this skill's `framework/`**; a project holds a copy, never edits it in place (change it in the skill, then `scripts/framework_sync.py --write`), and it never holds a project value (specifics go in `project.config`); `tools/` project scripts; `tools/migrations/` one-off, already-applied rewrites (copy one as a template for a new bulk change); `reference/`, `originals/`, `dumps/` are supplied data, immutable and not committed (`references/layout.md`).

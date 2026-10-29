@@ -1,4 +1,4 @@
-# Boot chain (stage 2 of the c64-decomp playbook)
+# Boot chain (stage 2 of the MOSaic playbook)
 Observations only; nothing here is a claim about what the game does.
 
 ## What runs, in order

@@ -13,9 +13,9 @@
 - **A recipe prints its result and exits non-zero on failure**, so `just check && git commit` works.
 
 ## Calling the skill's scripts from a justfile
-Define the skill's location once and call its scripts through it, so the justfile works on any machine (`C64_DECOMP` overrides the default, which is the symlink Claude Code uses):
+Define the skill's location once and call its scripts through it, so the justfile works on any machine (`MOSAIC` overrides the default, which is the symlink Claude Code uses):
 ```
-skill := env_var_or_default("C64_DECOMP", home_directory() / ".claude/skills/c64-decomp")
+skill := env_var_or_default("MOSAIC", home_directory() / ".claude/skills/mosaic")
 test:        python3 {{skill}}/scripts/sim/run_tests.py --root .
 golden:      python3 {{skill}}/scripts/golden/golden.py check
 golden-t:    python3 {{skill}}/scripts/golden/golden.py check-t

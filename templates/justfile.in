@@ -1,7 +1,7 @@
-# justfile: thin. Generic recipes come from framework/recipes.just; the c64-decomp skill's scripts are called through `skill`.
+# justfile: thin. Generic recipes come from framework/recipes.just; the MOSaic skill's scripts are called through `skill`.
 set allow-duplicate-recipes := true
 set shell := ["bash", "-euo", "pipefail", "-c"]      # the recipes use bash arrays: on Windows run just from Git Bash or WSL
-skill := env_var_or_default("C64_DECOMP", home_directory() / ".claude/skills/c64-decomp")
+skill := env_var_or_default("MOSAIC", home_directory() / ".claude/skills/mosaic")
 rom_dir := env_var_or_default("VICE_ROM_DIR", home_directory() / ".local/share/vice/C64")
 # The phase the bare commands work on: ACTIVE_PHASE in project.config (1 until phase 2 starts; set it to 2 then). Every command below takes the phase as its argument: `just verify`, `just verify 2`.
 active_phase := `bash -c 'source project.config 2>/dev/null; echo "${ACTIVE_PHASE:-1}"'`

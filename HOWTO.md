@@ -36,13 +36,13 @@ The Ghidra exporter script downloads itself the first time it is needed.
 ```
 git clone https://github.com/Dave-Agent/MOSaic.git ~/MOSaic
 mkdir -p ~/.claude/skills
-ln -s ~/MOSaic ~/.claude/skills/c64-decomp
+ln -s ~/MOSaic ~/.claude/skills/mosaic
 ```
-The link must be called `c64-decomp`: that is the name the skill is registered under, and the commands in this guide use that path.
+The link must be called `mosaic`: that is the name the skill is registered under, and the commands in this guide use that path.
 
 **3. Check the tools.**
 ```
-python3 ~/.claude/skills/c64-decomp/scripts/check_env.py --role run --role trace --role ghidra
+python3 ~/.claude/skills/mosaic/scripts/check_env.py --role run --role trace --role ghidra
 ```
 The last line should read `all required tools present for roles: build, ghidra, run, trace`. If it lists missing tools, install them and run it again.
 
@@ -60,7 +60,7 @@ The last line should read `all required tools present for roles: build, ghidra, 
 1. **Choose a folder for the project.** It can be new or empty. Example: `~/C64Projects/MyGame`.
 2. **Run this command.** Change the three parts after `--root`, `--name` and `--media`:
    ```
-   python3 ~/.claude/skills/c64-decomp/scripts/new_project.py \
+   python3 ~/.claude/skills/mosaic/scripts/new_project.py \
      --root ~/C64Projects/MyGame \
      --name "My Game" \
      --media ~/Downloads/mygame.d64
@@ -129,7 +129,7 @@ Optional: add `--protect` to the command to make the copy in `originals/` read-o
 - works in **slices**: `just slice-start NAME` makes a scratch copy, the agent names and comments one region there, `just slice-check` must pass, then `just slice-merge NAME` takes the commits into the project. `just slice-status` shows progress while a slice runs;
 - names things from evidence only: the code plus an observation from a tracer run (`just trace-run`). A name that claims a role needs both;
 - **asks you** one question at a time about what a thing is to a player (what a sprite, sound or mode is), with a picture, and records each answer in `docs/user_answers.md`. It never asks what the code does.
-**Check progress:** `python3 ~/.claude/skills/c64-decomp/scripts/p1_complete.py --root . --phase 1` lists what remains.
+**Check progress:** `python3 ~/.claude/skills/mosaic/scripts/p1_complete.py --root . --phase 1` lists what remains.
 **Done when:** that report says `VERDICT: COMPLETE`, `just verify` passes and `just smoke` passes. Tag it: `git tag p1-byte-identical`. Play the game once.
 
 ---

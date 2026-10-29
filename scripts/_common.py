@@ -1,4 +1,4 @@
-"""Shared helpers for the c64-decomp scripts. Every script runs from a project root (the directory with project.config) or takes --root."""
+"""Shared helpers for the MOSaic scripts. Every script runs from a project root (the directory with project.config) or takes --root."""
 import argparse, glob, os, re, sys
 
 def parser(desc, write=True, phase=False):
