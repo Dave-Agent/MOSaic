@@ -8,6 +8,7 @@ Read first: <skill>/SKILL.md, references/slice_checklist.md, references/phase1_m
 Slice: <what to cover: an address range LO-HI, a routine family, a table family; what is already known; what the owner has answered (docs/user_answers.md)>.
 Do: <the passes: name, comment, replace raw operands, ... or the one job>.
 Done means: `python3 <skill>/scripts/slice.py check --root . --range LO-HI` prints PASS (use --allow-marked when provisional names remain, each with TODO(name)).
+Report progress as you go: at every milestone (a group committed, a gate run, a decision, a blocker, starting a long run) run `python3 <skill>/scripts/slice.py note NAME "one line: what you just finished / what you start now"` (NAME is the slice name; it appends to a log outside the repo). The person who started you reads it with `slice.py status NAME`, so write for them: say what is done out of what, and when something will take a long time say how long.
 Commit in the scratch repo (path-limited `git add`). Report: the commits, the check output, p1_complete before/after, what you could not settle.
 ```
 

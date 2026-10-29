@@ -32,3 +32,4 @@ Read before starting a slice, and run `just slice-check` (`scripts/slice.py chec
 - A comment says what the line does not. Keep every `[ADDR:bytes MNEMONIC]` trace comment.
 
 **Report back**: the commits, the `slice check` output, `p1_complete` before/after, anything not settled (as a marker, not a guess).
+- Progress notes: `slice.py note NAME "..."` at every milestone and before any run that takes more than a couple of minutes; the starter reads `slice.py status NAME` (commits, uncommitted files, the last notes, time since anything moved). A slice with no notes and no activity is a stuck slice.

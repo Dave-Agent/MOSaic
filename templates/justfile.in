@@ -118,6 +118,10 @@ slice-check *args:
 slice-start name:
     python3 -B {{skill}}/scripts/slice.py start {{name}} --root .
 
+# What a slice has done so far (commits, uncommitted files, the agent's progress notes, time since anything moved); no NAME = every slice: just slice-status [NAME]
+slice-status name="":
+    python3 -B {{skill}}/scripts/slice.py status {{name}} --root .
+
 # Take the scratch repo's commits into this project (git am), then run the checks here: just slice-merge NAME
 slice-merge name:
     python3 -B {{skill}}/scripts/slice.py merge {{name}} --root .
