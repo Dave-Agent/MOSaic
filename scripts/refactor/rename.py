@@ -7,6 +7,7 @@ MAP.tsv:  OLD<TAB>NEW[<TAB>DESCRIPTION[<TAB>TODO(tag): text]]    ('#' lines and 
   - Only the code part of a line changes: never a `// comment` (unless --comments, which also renames prose mentions but never the XREF or [ADDR:bytes] trace comments) and never a "string".
   - Whole-name match; a name reached through a path (`Scope.old`) is not touched, `old.member` becomes `new.member`.
   - Refuses a NEW that already exists as an identifier (a rename must not merge two names) unless --allow-existing; two OLDs may not map to the same NEW.
+  - A `-` in the TODO column (or --drop-todo) removes the old `TODO(tag)` paragraphs of the block the row rewrites (the name is settled). After `--comments` a longer name can push a comment line past the width limit: run `comment_check.py --fix`.
   - A DESCRIPTION is written as a wrapped `// NEW: description` block ABOVE the definition's XREF lines (the same place set_comment.py writes: both call _common.set_block). An older block there is
     REPLACED (and reported) only when it is recognisably a description a tool wrote: at most --max-replace (8) own-line lines, no section banner (SECTION/RANGE/STATUS/SUMMARY, rule lines), no XREF / access notes
     (`1a2b(R)`, `name(W)`), not a note that opens `// OTHER: ...` for another symbol; its TODO paragraphs survive. Any other block is KEPT, the new text goes after it, and a `REVIEW kept ...` line says so (nothing is
@@ -18,16 +19,17 @@ Without --write it prints what it would change."""
 import os, re, sys, collections
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from _common import parser, main_file, code_files, read_tsv, map_code, split_comment, block_flags, wrap_comment, set_block, write_changed, todo_paragraphs
-a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('map'); a.add_argument('--comments', action='store_true', help='also rename in prose comments (never in XREF / [ADDR:bytes] trace comments)'); a.add_argument('--allow-existing', action='store_true'); a.add_argument('--keep-old', action='store_true', help='keep an older comment block above the label (the new description goes after it)'); a.add_argument('--max-replace', type=int, default=8, help='an older block above a label longer than this is kept, not replaced (default 8)'); a.add_argument('--max-list', type=int, default=200)
+a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('map'); a.add_argument('--drop-todo', action='store_true', help='every description written replaces the old TODO paragraphs of its block too (a `-` in the TODO column does it per row)'); a.add_argument('--comments', action='store_true', help='also rename in prose comments (never in XREF / [ADDR:bytes] trace comments)'); a.add_argument('--allow-existing', action='store_true'); a.add_argument('--keep-old', action='store_true', help='keep an older comment block above the label (the new description goes after it)'); a.add_argument('--max-replace', type=int, default=8, help='an older block above a label longer than this is kept, not replaced (default 8)'); a.add_argument('--max-list', type=int, default=200)
 args = a.parse_args(); main = main_file(args); files = code_files(main)
-ren = {}; desc = {}; todo = {}
+ren = {}; desc = {}; todo = {}; drop = set()
 for p in read_tsv(args.map):
     if len(p) < 2: sys.exit('bad map line (need OLD<TAB>NEW): %r' % p)
     if len(p) > 4: sys.exit('rename map row for %s has %d columns, at most 4 (OLD NEW description TODO): several TODOs go in column 4 as `TODO(name): a\\nTODO(user): b` (the two characters backslash-n between them)' % (p[0], len(p)))
     if p[0] in ren: sys.exit('duplicate OLD in the map: ' + p[0])
     ren[p[0]] = p[1].strip()
     if len(p) > 2 and p[2].strip(): desc[p[0]] = p[2].strip()
-    if len(p) > 3 and p[3].strip(): todo[p[0]] = todo_paragraphs(p[3])
+    if len(p) > 3 and p[3].strip() == '-': drop.add(p[0])                      # `-` in the TODO column: the old TODO paragraphs go (the name is settled)
+    elif len(p) > 3 and p[3].strip(): todo[p[0]] = todo_paragraphs(p[3])
 texts = {f: open(f).read().split('\n') for f in files}
 idents = set()
 for L in texts.values():
@@ -60,9 +62,9 @@ for f, L in texts.items():
         dm = re.match(r'^(\s*)(?:\.label\s+(\w+)\s*=|(\w+):(?!\S))', code)
         o = (dm.group(2) or dm.group(3)) if dm else None
         out.append(new)
-        if o in desc or o in todo:                                  # one block, above the XREF lines (set_comment.py does the same: _common.set_block)
+        if o in desc or o in todo or o in drop:                                  # one block, above the XREF lines (set_comment.py does the same: _common.set_block)
             text = '\n'.join(x for x in ('%s: %s' % (re.sub(r'\+.*$', '', ren[o]), desc[o]) if o in desc else '', todo.get(o, '')) if x)
-            n, oldb, _ = set_block(out, len(out) - 1, text, keep=args.keep_old or o not in desc, notes=kept_notes, max_replace=args.max_replace)    # a TODO alone is added to the existing description
+            n, oldb, _ = set_block(out, len(out) - 1, text, keep=args.keep_old or o not in desc, notes=kept_notes, max_replace=args.max_replace, drop_todo=o in drop or args.drop_todo)    # a TODO alone is added to the existing description
             if oldb:
                 dropped.append((os.path.relpath(f, os.path.dirname(main)), ln, ren[o], oldb))
     nt = '\n'.join(out)

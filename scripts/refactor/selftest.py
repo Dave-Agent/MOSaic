@@ -89,6 +89,8 @@ TODO_SRC = '''
 '''
 d3b = project(TODO_SRC); tool('set_comment.py', d3b, 'LAB_0800', 'Does another thing.', '--drop-todo', '--write'); t = text(d3b)
 check('set_comment --drop-todo: the old TODO paragraph (with its continuation) is removed', '// Does another thing.' in t and 'TODO' not in t and 'second line' not in t and 'Does a thing' not in t, t)
+d3d = project(TODO_SRC); tool('rename.py', d3d, tsv(d3d, 'rn.tsv', [['LAB_0800', 'DoesThing', 'Does another thing.', '-']]), '--write'); t = text(d3d)
+check('rename map: `-` in the TODO column drops the old TODO', 'DoesThing' in t and '// DoesThing: Does another thing.' in t and 'TODO' not in t and 'second line' not in t, t)
 d3c = project(TODO_SRC); tool('set_comment.py', d3c, tsv(d3c, 'drop.tsv', [['LAB_0800', 'Does another thing.', '', '-']]), '--write'); t = text(d3c)
 check('set_comment map: `-` in the TODO column drops the old TODO', '// Does another thing.' in t and 'TODO' not in t, t)
 d3d = project(TODO_SRC); tool('set_comment.py', d3d, 'LAB_0800', 'Does another thing.', '--drop-todo', '--todo', 'TODO(name): new question', '--write'); t = text(d3d)

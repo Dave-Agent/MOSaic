@@ -71,3 +71,9 @@ What a port cannot take from these: anything hardware-only (picture, sound, timi
 - `scripts/trace/hit_counts.py ADDR|LABEL... --runs PREFIX...` shows how often each instruction started in each run: which side of a branch ran, which routine never did.
 - **Which side of a branch ran:** `sample_report.py ... --keep-run PREFIX` keeps the run's coverage files; `hit_counts.py ADDR|LABEL --runs PREFIX` counts them. Scoped names (`Scope.member`) resolve from the build's `.sym` file.
 - `sample_report.py --poke F:ADDR=VAL` takes the hex address and value WITHOUT `$`.
+
+## Notes from slice runs (sample_report and pokes)
+- The sample at frame N is taken BEFORE the events (pokes, inputs) of frame N: a flag set by a poke at frame N shows from N+1; a one-frame poke often shows nothing.
+- A flag set and cleared inside one frame does not show in per-frame samples: use `--memlog` (every write of the address).
+- `sample_report.py --from N --to N` (one frame) prints nothing: use a range of at least two frames. `--table` is an option of `sample_report.py`, not of the tracer: do not pass it after `--`.
+- A game that clears its own variables at entry (the stage number, the lives) cannot be started in another state by a frame-0 poke: poke mid-game, before the event that reads the variable (a turn end, a stage start).

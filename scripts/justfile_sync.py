@@ -9,10 +9,11 @@ import argparse, os, re, sys
 SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter); p.add_argument('--root', default='.'); p.add_argument('--write', action='store_true')
 args = p.parse_args(); jf = os.path.join(args.root, 'justfile')
-have = open(jf).read(); names = set(re.findall(r'^([A-Za-z_][\w-]*)\b[^:=\n]*:(?!=)', have, re.M))
+RECIPE = r'^([A-Za-z_][\w-]*)(?:[ \t]+[^:\n]*?)?:(?!=)(?:[ \t]|$)'          # `name args:` (a parameter may have a default with `=`); not `name := value`
+have = open(jf).read(); names = set(re.findall(RECIPE, have, re.M))
 tpl = open(os.path.join(SKILL, 'templates/justfile.in')).read().split('\n\n'); add = []
 for blk in tpl:
-    m = re.search(r'^([A-Za-z_][\w-]*)\b[^:=\n]*:(?!=)', blk, re.M)
+    m = re.search(RECIPE, blk, re.M)
     if m and m.group(1) not in names and not blk.lstrip().startswith(('set ', 'skill :=', 'rom_dir')): add.append((m.group(1), blk.strip('\n')))
 for n, _ in add: print('missing: %s' % n)
 if args.write and add: open(jf, 'a').write('\n' + '\n\n'.join(b for _, b in add) + '\n'); print('appended %d recipe(s)' % len(add))
