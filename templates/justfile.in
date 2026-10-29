@@ -147,7 +147,7 @@ test:
 test-p1:
     python3 -B {{skill}}/scripts/sim/run_tests.py --root . --phase 1
 
-# Golden traces: the program's state per video frame in seeded scenarios. `golden-p1` compares the phase 1 build exactly; `golden-t` (timing-tolerant) is the phase 2 check once bytes change.
+# Golden traces (tools/golden/scenarios.txt: `name: tracer args`, `name!:` = exact-only; state.txt, optional GOLDEN_STATE_T): the program's state per video frame in seeded scenarios. `golden-p1` compares the phase 1 build exactly; `golden-t` (timing-tolerant) is the phase 2 check once bytes change.
 # Record only after a deliberate behaviour change: `just golden-record-p1`, `just golden-record-t`.
 golden-p1:
     python3 -B {{skill}}/scripts/golden/golden.py check --root . --phase 1
@@ -155,6 +155,8 @@ golden-record-p1:
     python3 -B {{skill}}/scripts/golden/golden.py record --root . --phase 1
 golden-t:
     python3 -B {{skill}}/scripts/golden/golden.py check-t --root . --phase 2
+golden-t-p1:
+    python3 -B {{skill}}/scripts/golden/golden.py check-t --root . --phase 1
 golden-record-t:
     python3 -B {{skill}}/scripts/golden/golden.py record-t --root . --phase 1
 
@@ -172,6 +174,7 @@ check-p1:
     just verify
     just test-p1
     just golden-p1
+    just golden-t-p1
 
 # The phase 2 gate: it assembles, no raw operands, comments conform, routine tests against the CURRENT build, timing-tolerant golden traces.
 check:

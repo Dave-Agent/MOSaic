@@ -3,7 +3,7 @@
 
   golden.py record            run the scenarios on the current build, write <GOLDEN_DIR>/<scenario>.crc (one CRC-32 per frame) and golden.json   (exact; byte-identical builds only)
   golden.py check             run them again and compare; reports the first frame that differs (exit 1 on any difference)
-  golden.py record-t | check-t [--skew N]    the timing-tolerant set (see timing_check): for refactorings that change bytes and so cycle timing
+  golden.py record-t | check-t [--skew N]    the timing-tolerant set (see timing_check): for refactorings that change bytes and so cycle timing. --skew N delays the program by N cycles at the start: the quickest way to measure how tolerant a trace set and its state list are (try 500; a cell that then differs persistently is timing, not behaviour: exclude it from the tolerant state). A scenario written `name!: args` is exact-only and skipped by record-t / check-t.
   golden.py dump NAME FRAME [N]              print the sampled state of frames FRAME..FRAME+N-1 of one scenario as per-range hex (to compare two builds by hand)
   options: --root DIR  --phase 1|2  --only NAME[,NAME]  --prg FILE --sym FILE  (the build to run; default from project.config, see scripts/trace/c64env.py)
 
@@ -15,6 +15,7 @@ project.config keys (besides TRACE_RAM, TRACE_ENTRY, TRACE_A/X/Y/SP/P, TRACE_PRG
   GOLDEN_DIR               directory of the recordings and the two input files (default tools/golden)
   GOLDEN_SCENARIOS         scenario list (default <GOLDEN_DIR>/scenarios.txt): one `name: tracer arguments` per line, # comments. The arguments steer the run: --seed N, --chaos N,
                            --poke FRAME[+PERIOD]:ADDR=VAL (hex ADDR/VAL) ... e.g.  `demo2: --seed 2 --chaos 6`   `bonus1: --seed 1 --chaos 0 --poke 100+1500:019C=02`
+  GOLDEN_STATE_T           optional state file for the timing-tolerant mode (record-t / check-t) only: leave out cells that are a function of a tick phase or of loop progress (sound modulation, scroll phase, scratch of a long builder) and so differ persistently when cycle timing shifts; find them with `check-t --skew 500`. Without it GOLDEN_STATE is used.
   GOLDEN_STATE             state to sample (default <GOLDEN_DIR>/state.txt): one range per line `LO HI  comment`, hex. Either end may be a symbol name of the build (`@name`, or a name
                            that is not made only of hex digits; `name+N` allowed), so the list survives a layout change. A line `!LO HI` EXCLUDES a range from every other line: use it for
                            state that holds an ADDRESS (a pointer into the code or data, the scratch of a routine that builds one), whose value moves with the layout and is not behaviour.
@@ -39,7 +40,7 @@ def parse_scenarios(path):
         l = l.split('#')[0].strip()
         if not l: continue
         name, _, rest = l.partition(':')
-        out[name.strip()] = rest.strip()
+        out[name.strip()] = rest.strip()                 # `name!: args` marks a scenario EXACT-ONLY (see Golden.exact_only)
     return out
 
 class Golden:
@@ -50,8 +51,11 @@ class Golden:
         self.state_file = env.path(c.get('GOLDEN_STATE')) or os.path.join(self.dir, 'state.txt')
         self.frames = int(c.get('GOLDEN_FRAMES', 6000)); self.min_clean = int(c.get('GOLDEN_MIN_CLEAN', 500)); self.persist = int(c.get('GOLDEN_PERSIST', 4))
         self.flags = c.get('GOLDEN_TRACE_FLAGS', '').split(); self.entropy = c.get('GOLDEN_ENTROPY_ROUTINES', '').split()
-        self.scenarios = parse_scenarios(self.scen_file)
-        self._ranges = None
+        raw = parse_scenarios(self.scen_file)
+        self.exact_only = {n.rstrip('!') for n in raw if n.endswith('!')}           # `name!: args`: a free-running scenario (attract / idle mode) that is exact-compatible but cannot be timing-tolerant: record-t / check-t skip it
+        self.scenarios = {n.rstrip('!'): v for n, v in raw.items()}
+        self.state_file_t = env.path(c.get('GOLDEN_STATE_T'))                       # optional: the state of the timing-tolerant mode (fewer ranges: cells that are a function of tick phase or loop progress)
+        self.tolerant = False; self._ranges = None
 
     # ---- the state to sample ----------------------------------------------------------------------------------------
     def _addr(self, tok):
@@ -64,7 +68,7 @@ class Golden:
     def ranges(self):
         if self._ranges is None:
             inc, exc = [], []
-            for l in open(self.state_file):
+            for l in open(self.state_file_t if self.tolerant and self.state_file_t else self.state_file):
                 l = l.split('#')[0].strip()
                 if not l: continue
                 neg = l.startswith('!'); f = l.lstrip('!').split()
@@ -123,7 +127,9 @@ class Golden:
             rf = d + '/ranges.txt'; open(rf, 'w').write(''.join('%04x %04x\n' % r for r in self.ranges()))
             if '--raster-entropy' in extra: extra += ['--site-map', self.site_map()]
             cmd = [env.trace_bin] + env.base_args(d + '/in.bin') + ['--frames', str(self.frames), '--out', d + '/o', '--sample-set', d + '/s.bin', rf] + self.scenarios[name].split() + self.flags + extra
-            subprocess.run(cmd, capture_output=True, check=True)
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            if r.returncode or not os.path.exists(d + '/s.bin'):
+                sys.exit('the tracer failed in scenario %s (exit %d): %s\n  (scenario arguments: frame numbers in --poke / --joy*-at are DECIMAL, addresses and values hex)' % (name, r.returncode, (r.stderr or r.stdout).strip()[-400:]))
             return open(d + '/s.bin', 'rb').read()
 
     def crcs(self, data):
@@ -133,7 +139,9 @@ class Golden:
         """Timing-tolerant comparison (for refactorings that change bytes and so cycle timing): the trace is taken with --raster-entropy, so the noise does not depend on the raster, and
         compared cell by cell with the recording t_<name>.z; a cell that differs for fewer than GOLDEN_PERSIST consecutive frames is ignored (the tracer samples at raster line 0 while the
         program updates a state in the middle of a frame). -> (persistent differences [(frame, cell)], transient cells, frames)"""
-        ref = zlib.decompress(open(os.path.join(self.dir, 't_' + name + '.z'), 'rb').read()); now = self.run(name, ['--raster-entropy'] + list(extra)); n = self.frame_size()
+        zf = os.path.join(self.dir, 't_' + name + '.z')
+        if not os.path.exists(zf): sys.exit('no timing-tolerant recording for scenario %s: run `golden.py record-t` (or mark the scenario exact-only with `%s!:` in the scenarios file)' % (name, name))
+        ref = zlib.decompress(open(zf, 'rb').read()); now = self.run(name, ['--raster-entropy'] + list(extra)); n = self.frame_size()
         frames = min(len(ref), len(now)) // n; run_len = {}; persistent = []; transient = 0
         for f in range(frames):
             a, b = ref[f * n:(f + 1) * n], now[f * n:(f + 1) * n]
@@ -155,6 +163,9 @@ def main():
     args = a.parse_args()
     g = Golden(Env(args.root, args.phase, args.prg, args.sym)); mode = args.mode
     names = [n for n in g.scenarios if not args.only or n in args.only.split(',')]
+    if mode in ('record-t', 'check-t'):
+        g.tolerant = True; skipped = [n for n in names if n in g.exact_only]; names = [n for n in names if n not in g.exact_only]
+        if skipped: print('exact-only (skipped here): %s' % ', '.join(skipped))
     if mode == 'dump':
         name, frame = args.rest[0], int(args.rest[1]); count = int(args.rest[2]) if len(args.rest) > 2 else 1; data = g.run(name); n = g.frame_size()
         for f in range(frame, frame + count):
