@@ -47,3 +47,7 @@ python3 -B scripts/refactor/selftest.py
 python3 -B scripts/render/selftest.py
 python3 -B scripts/tape/selftest.py
 ```
+
+## Licence
+
+MIT (see `LICENSE`): use it freely, all care and no responsibility, with no warranty and no liability.
