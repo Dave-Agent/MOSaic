@@ -16,6 +16,8 @@ Checks (1, 2 and 2b must be 0; the other two list candidates that are reviewed, 
   5. address bytes         pointer-table candidates in `.byte` DATA rows (`// [addr]` rows), found by addr_tables.py: words at a fixed stride that climb or all hit labels, a table
                            of addresses or an address field of a record table (`.byte $79,$9d` at +6 of each 8-byte record): raw pointers that should be `.word label` or
                            `<label` / `>label`. The targets with no label are listed: UNLABELLED TABLE STARTS that something refers to.
+                           A table of values marked `// NOT-POINTERS: reason` on its label line is waived: counted and listed, not reported (addr_tables.py waivers()); the heuristic also drops
+                           climbing series whose words land inside instructions. Everything else stays a candidate.
   6. unlabelled data runs  data rows that follow code (or open the range) with no label of their own: a table nobody named
   The range summary line says how many instruction lines and data rows the range holds, and warns when it holds NO instruction line (checks 1-3 see only instructions: a
   slice that is all tables is judged by 5 and 6 and by reading it).
@@ -109,15 +111,17 @@ for f in sorted(set(reachable(main))):
                 n_rows += 1; rowlist.append((f, n, ad, l, prev == 'code' and not pend_label or (prev == 'start' and False)))
             prev = 'data'; pend_label = False
         elif l.strip() and not l.lstrip().startswith('//') and not code.strip() == '' and not LBL.match(code): pass
-from addr_tables import data_runs, candidates
+from addr_tables import data_runs, candidates, instruction_interior, waivers
 label_by = {}
 try:
     for nm, ad in source_labels(main)[0].items():
         if '.' not in nm: label_by.setdefault(ad, nm)
 except SystemExit: pass
-pairs = []; unlab_targets = {}
-for ad, stride, cnt_, ws in candidates(data_runs(reachable(main)), set(label_by), args.lo, args.hi):
+pairs = []; unlab_targets = {}; waived = []; wv = waivers(reachable(main)); wv_hit = set()
+for ad, stride, cnt_, ws in candidates(data_runs(reachable(main)), set(label_by), args.lo, args.hi, interior=instruction_interior(reachable(main))):
     if not inside(ad): continue
+    w = next((i for i, x in enumerate(wv) if x[0] <= ad < x[1]), None)
+    if w is not None: wv_hit.add(w); waived.append((ad, wv[w])); continue                      # `// NOT-POINTERS` on the table: values, not addresses
     pairs.append(('table', '$%04X' % ad, 'stride %d, %d words, %d/%d targets labelled: %s%s' % (stride, cnt_, sum(w in label_by for w in ws), cnt_, ' '.join('$%04X' % w for w in ws[:5]), ' ...' if cnt_ > 5 else '')))
     for w in ws:
         if w not in label_by: unlab_targets[w] = unlab_targets.get(w, 0) + 1
@@ -145,7 +149,9 @@ print(f'  2c. provisional, MARKED    {len(marked):5d}   (TODO(name) markers and 
 if marked: print('       by kind:', kinds(marked))
 print(f'  3. address pairs (review)  {imm:5d}   (python3 addr_immediates.py for the list; pairs already written #<label / #>label are not counted)')
 print(f'  4. .word $addr lines       {len(words):5d}   (review: value tables such as note frequencies are data, not addresses)'); [print(f'       {f}:{n}  {t}') for f, n, t in words[:8]]
-print(f'  5. address bytes in rows   {len(pairs):5d}   (review: pointer-table candidates in .byte rows, see addr_tables.py: pointers that should be .word label / <label)'); [print(f'       {k} {f}  {t}') for k, f, t in pairs[:8]]
+print(f'  5. address bytes in rows   {len(pairs):5d}   (review: pointer-table candidates in .byte rows, see addr_tables.py: pointers that should be .word label / <label; {len(waived)} more waived by `// NOT-POINTERS`)'); [print(f'       {k} {f}  {t}') for k, f, t in pairs[:8]]
+for ad, x in waived[:6]: print('       waived $%04X %s: %s  (%s:%d)' % (ad, x[2] or '(no label)', x[3] or 'no reason given', os.path.relpath(x[4], args.root), x[5]))
+if any(i not in wv_hit and inside(wv[i][0]) for i in range(len(wv))): print('       note: %d `// NOT-POINTERS` marker(s) matched no candidate (a stale waiver does no harm; remove it if the table is not address-like)' % sum(1 for i in range(len(wv)) if i not in wv_hit and inside(wv[i][0])))
 if unlab_targets: print('       targets with NO label (unlabelled table starts that something refers to): ' + ', '.join('$%04X x%d' % (t, c) for t, c in sorted(unlab_targets.items())[:12]))
 print(f'  6. unlabelled data runs    {len(runs):5d}   (review: data rows after code with no label of their own)'); [print(f'       {f}:{n}  {t}') for f, n, t in runs[:6]]
 print(f'  range content: {n_ins} instruction lines, {n_rows} data rows' + (('   NOTE: no instruction line in this range: checks 1-3 had nothing to see; this slice is judged by checks 5 and 6 and by reading it') if n_ins == 0 else ''))
