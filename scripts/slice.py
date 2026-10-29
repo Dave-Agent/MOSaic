@@ -10,6 +10,7 @@ check   every gate a slice must pass, one verdict (exit 1 when any gate fails):
           comment-check  the comment rules, including no echo comments (comment_check.py)
           anon-check     the anonymous-label limits (anon_labels.py --check)
           unreferenced   no label that nothing refers to without a `TODO(phase2): remove?` marker (unreferenced.py)
+          sections       the SECTION banners tile the whole image, no gap or overlap (section_coverage.py)
           p1_complete    the phase 1 completeness report; with --range LO-HI it is the slice's range alone (a slice with no raw operand or placeholder left is CLEAN)
           sentinel_scan  hints only (a list with a missing or misplaced end marker): reported, never fails
         A slice is not done until `check` passes in the scratch copy and again after the merge.
@@ -37,6 +38,7 @@ def check(root_):
     gate('comment-check', [sys.executable, '-B', os.path.join(HERE, 'comment_check.py')] + ph)
     gate('anon-check', [sys.executable, '-B', os.path.join(HERE, 'anon_labels.py')] + ph + ['--check'])
     gate('unreferenced', [sys.executable, '-B', os.path.join(HERE, 'unreferenced.py')] + ph)
+    gate('sections', [sys.executable, '-B', os.path.join(HERE, 'section_coverage.py')] + ph)
     pc = [sys.executable, '-B', os.path.join(HERE, 'p1_complete.py')] + ph + (['--range', args.range] if args.range else []) + (['--allow-marked'] if args.allow_marked else [])
     r = run(pc, root_); v = [l for l in r.stdout.split('\n') if l.startswith('VERDICT')]
     res.append(('p1_complete', bool(v) and ('COMPLETE' in v[0] and 'NOT COMPLETE' not in v[0] or 'SLICE CLEAN' in v[0]), v[0][:150] if v else 'no verdict', False))

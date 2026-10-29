@@ -87,3 +87,6 @@ Applies to: every project.
 
 ## Pictures live in one place
 Every generated picture (sprites, characters, screens, tracer-state renders, record sheets) is written in `docs/gfx/` (committed), never `build/`, `dumps/`, `/tmp` or the project root; a state render defaults to `docs/gfx/<state name>/`. Tracer-state renders live in git-ignored subfolders `docs/gfx/<state name>/`; a picture that backs a name or an owner answer is copied up into `docs/gfx/` with a descriptive name. Do not invent another folder: `--out` is `docs/gfx/` or a subfolder of it.
+
+## Every byte sits under a section banner
+The `SECTION:` banners (`framework/conventions/section-marker.md`) tile the whole image: first to last byte, no gap, no overlap, data regions included (stage tables, graphics, music data get banners too, named for what they hold). A region that mixes code and data says so in its SUMMARY and lists its data families. A banner's STATUS is `understood` before phase 1 is closed. `scripts/section_coverage.py` is the check (a `slice.py check` gate); it is comments only, so it never touches byte identity. A label with no banner is invisible to a reader who skims by banner, and a routine's apparent extent runs on into the next banner.

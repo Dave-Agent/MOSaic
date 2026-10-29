@@ -20,6 +20,8 @@ A section opens with a banner block. The machine-readable parts are the
 ;==============================================================================
 ```
 
+The banners must tile the whole image (`scripts/section_coverage.py` fails on a gap or overlap): data regions get banners as well as code, and a region that mixes both says so in SUMMARY.
+
 A section closes implicitly at the next `SECTION:` banner, so no end marker is
 needed. Keep one section per contiguous region; if a region splits as
 understanding sharpens, split the banner.
