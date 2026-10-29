@@ -7,7 +7,7 @@ Creates in DIR (made if missing): project.config, justfile, README.md, .gitignor
 phase1/src/libs/ (the skill's hardware libs), framework/ (a copy of the skill's master), and the empty dirs the recipes use (originals, dumps, reference, build).
 --media FILE   copy a medium into DIR/originals/ if it is not there already (the original file is never modified)
 --handoff-media NAME  which file in originals/ the hand-off dumps are taken from (default: the first image alphabetically, with a warning when there are several)
---protect      record the SHA-256 of everything in originals/ in originals.sha256 and make the files read-only (do this BEFORE anything touches them)
+--protect      make the files in originals/ read-only (their SHA-256 is always recorded in originals.sha256; do this BEFORE anything touches them)
 Existing files are left alone unless --force. A `git init` is made unless --no-git (local only; nothing is pushed). Prints the next steps."""
 import os, re, shutil, subprocess, sys, hashlib, glob
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -40,11 +40,12 @@ for f in glob.glob(os.path.join(SKILL, 'libs', '*.asm')):
     if not os.path.exists(d) or args.force: shutil.copy2(f, d)
 subprocess.run([sys.executable, os.path.join(SKILL, 'scripts', 'framework_sync.py'), '--root', root, '--write'], capture_output=True)
 print('copied framework/ and phase1/src/libs/')
-if args.protect:
+if media:                                                    # the SHA-256 of every original is always recorded (check_layout compares it); --protect also makes the files read-only
     sums = []
     for f in media:
-        p = os.path.join(root, 'originals', f); sums.append('%s  originals/%s' % (hashlib.sha256(open(p, 'rb').read()).hexdigest(), f)); os.chmod(p, 0o444)
-    open(os.path.join(root, 'originals.sha256'), 'w').write('\n'.join(sums) + '\n'); print('protected %d original file(s): SHA-256 in originals.sha256, read-only' % len(media))
+        p = os.path.join(root, 'originals', f); sums.append('%s  originals/%s' % (hashlib.sha256(open(p, 'rb').read()).hexdigest(), f))
+        if args.protect: os.chmod(p, 0o444)
+    open(os.path.join(root, 'originals.sha256'), 'w').write('\n'.join(sums) + '\n'); print('recorded the SHA-256 of %d original file(s) in originals.sha256%s' % (len(media), ', files made read-only' if args.protect else ''))
 if not args.no_git and not os.path.isdir(os.path.join(root, '.git')):
     subprocess.run(['git', 'init', '-q', '-b', 'main'], cwd=root); print('git init (local)')
 print('''

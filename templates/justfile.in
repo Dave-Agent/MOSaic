@@ -129,7 +129,7 @@ slice-merge name:
 # --- build, check, run: every command takes the phase (1 = phase1/src, byte-identical; 2 = phase2/src, the split source) ---------------------------------------
 # `just <command>` works on ACTIVE_PHASE (project.config); `just <command> 1` / `just <command> 2` names it. Phase 2 needs the safety net (tools/golden, tools/tests; references/phase2_split.md).
 
-# Assemble a phase's source (no comparison): phase 1 -> build/gianna_game.prg (OUTPUT_PRG), phase 2 -> build/p2/game.prg. The symbol file is left at build/game.sym (build/p2/game.sym).
+# Assemble a phase's source (no comparison): phase 1 -> OUTPUT_PRG (project.config), phase 2 -> build/p2/game.prg. The symbol file is left at build/game.sym (build/p2/game.sym).
 build phase=active_phase:
     C64_PHASE={{phase}} bash framework/scripts/build.sh
 

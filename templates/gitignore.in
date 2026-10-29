@@ -18,3 +18,4 @@ __pycache__/
 phase1/src/build/
 phase2/src/build/
 /tools/ghidra/exporter/
+*.log
