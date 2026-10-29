@@ -65,13 +65,26 @@ def scratch_copy(media):
     d = tempfile.mkdtemp(prefix='vice_media_'); dst = os.path.join(d, os.path.basename(media)); shutil.copy2(media, dst); os.chmod(dst, 0o444)   # also read-only
     return dst, d
 
-def start_vice(vice_bin, media, port=6510, warp=True, limit_cycles=None, extra=()):
+def display_wrap(cmd, mode=None):
+    """Make an UNATTENDED VICE run (dumps, hand-off, smoke test) leave the user's desktop alone: mode `minimized` (the default: -minimized, the window never takes focus on most desktops), `xvfb` (the command is run on a virtual
+    display by xvfb-run when it is installed: no window at all, falls back to minimized with a hint), `normal` (a plain window: for debugging a run you want to watch). mode comes from the argument, else $VICE_DISPLAY, else project.config
+    VICE_DISPLAY (the callers pass it), else `minimized`. An interactive run (`just launch`) never calls this."""
+    mode = (mode or os.environ.get('VICE_DISPLAY') or 'minimized').lower()
+    if mode == 'normal': return cmd
+    if mode == 'xvfb':
+        import shutil
+        if shutil.which('xvfb-run'): return ['xvfb-run', '-a', '-s', '-screen 0 1280x1024x24'] + cmd
+        sys.stderr.write('VICE_DISPLAY=xvfb but xvfb-run is not installed (apt install xvfb): using minimized\n')
+    return cmd[:1] + ['-minimized'] + cmd[1:]
+
+def start_vice(vice_bin, media, port=6510, warp=True, limit_cycles=None, extra=(), display=None):
     """Start VICE with the remote text monitor open and the media autostarted from a scratch COPY (see scratch_copy); returns the Popen (kill it when done, and rmtree proc.scratch_dir)."""
     scratch = None
     if media.lower().endswith(DISK_MEDIA): media, scratch = scratch_copy(media)
     a = [vice_bin] + (['-warp'] if warp else []) + ['+confirmonexit', '-drive8truedrive', '-drive8type', '1541', '-jamaction', '2', '-remotemonitor',
         '-remotemonitoraddress', 'ip4://127.0.0.1:%d' % port] + (['-limitcycles', str(limit_cycles)] if limit_cycles else []) + list(extra) + ['-autostart', media]
     assert '-default' not in a
+    a = display_wrap(a, display)
     proc = subprocess.Popen(a, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); proc.scratch_dir = scratch
     import atexit, shutil
     if scratch: atexit.register(shutil.rmtree, scratch, True)

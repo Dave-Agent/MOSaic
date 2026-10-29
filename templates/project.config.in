@@ -62,3 +62,6 @@ GOLDEN_T_SET=""
 
 # Phase 2 byte-changing steps: the C64 address ranges (hex LO-HI, one per line) in which the phase 2 image may differ from the reference on purpose (removed dead blocks, rewritten operands); `just verify 2` fails on a changed byte anywhere else. Empty/unset = byte-identical.
 PHASE2_ALLOWED_DIFF=""
+
+# Unattended VICE runs (dumps, hand-off, smoke test) must not take the desktop focus: minimized (default) | xvfb (a virtual display through xvfb-run: no window at all; apt install xvfb) | normal (a plain window, to watch a run). `just launch` is interactive and always a normal window.
+VICE_DISPLAY="minimized"

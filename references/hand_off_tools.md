@@ -72,3 +72,6 @@ Not proven: NTSC media, tape media, fast-loader media that need more than a key 
 - `scripts/reference/file_coverage.py --dump DUMP FILES...`: which program files are in a dump and where; the hand-off validity check (`new_game.md` stage 2, 5b).
 - `vice_handoff.py` keeps the reply of the monitor's `x` command, so a breakpoint hit within the first 0.2 s after resuming is no longer lost (consecutive `--step`s a few frames apart).
 - In `just dumps`, `DUMP_STEPS` and `DUMP_FEED` (project.config) pass the title's key or fire waits.
+
+## Unattended runs and the desktop
+The dump, hand-off and smoke-test runs open VICE and nobody should have to watch or touch it. `VICE_DISPLAY` in project.config (or the environment) chooses how: `minimized` (the default: `-minimized`, the window does not take focus on most desktops), `xvfb` (the run goes through `xvfb-run` on a virtual display: no window at all; install `xvfb`; falls back to minimized with a message when it is missing), `normal` (a plain window, to watch a run). The window of a run that is NOT minimized or virtual receives your keystrokes: typing in it changes what the run captures. `just launch` is interactive and always a normal window.

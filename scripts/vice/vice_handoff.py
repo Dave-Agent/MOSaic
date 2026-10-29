@@ -45,7 +45,7 @@ def main():
     tmo = args.timeout or float(cfg.get('HANDOFF_TIMEOUT', 300)); port = args.port or int(cfg.get('VICE_MONITOR_PORT', 6510))
     vice = args.vice or cfg.get('VICE_BIN') or 'x64sc'
     if not os.path.exists(media): sys.exit('media not found: ' + media)
-    proc = start_vice(vice, media, port, warp=not args.no_warp, limit_cycles=args.limit_cycles); ok = True
+    proc = start_vice(vice, media, port, warp=not args.no_warp, limit_cycles=args.limit_cycles, display=cfg.get('VICE_DISPLAY')); ok = True
     try:
         m = Monitor(port); m.read(1)
         for st in args.step:

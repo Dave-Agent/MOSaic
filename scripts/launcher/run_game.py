@@ -73,7 +73,8 @@ def main():
     if not args.no_symbols and (args.symbols or cfg.get('VICE_SYMBOLS')) and os.path.exists(sym): vice += ['-moncommands', sym]
     assert '-default' not in vice
     if args.shot:
-        vice += ['-warp']; shot = os.path.abspath(args.shot)
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'vice')); from vice_monitor import display_wrap
+        vice = display_wrap(vice, cfg.get('VICE_DISPLAY')) + ['-warp']; shot = os.path.abspath(args.shot)        # the unattended smoke run must not take the desktop's focus (VICE_DISPLAY)
         if os.path.exists(shot): os.remove(shot)
         cycles = args.cycles or int(cfg.get('SMOKE_CYCLES', 200000000))
     if mode == 'sys':
