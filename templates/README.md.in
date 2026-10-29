@@ -16,3 +16,7 @@ Put the media in `originals/` (read-only, with their SHA-256 in `originals.sha25
     just seeds       # coverage run in the tracer, then Ghidra seeds from what executed
     just ghidra      # import into Ghidra and export to ghidra/ (the landing zone; phase1/src is hand-edited from the first seeding on)
 `just --list` shows everything. Background research: `docs/background.md`; boot analysis: `docs/boot_analysis.md`.
+
+---
+
+Decompiled with [MOSaic](https://github.com/Dave-Agent/MOSaic) (MOS AI deCompiler).
