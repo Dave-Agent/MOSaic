@@ -10,6 +10,21 @@ MOSaic is a Claude Code skill: a process, its rules, and the scripts that check 
 - `scripts/`: refactoring tools, checks, a 6510 tracer, a routine-test simulator, graphics renderer, Ghidra and VICE glue
 - `templates/`, `framework/`, `libs/`: project scaffold, byte-identity gate, C64 hardware definitions
 
+## See results
+
+In a project made with MOSaic (`new_project.py`), every command takes the phase: `1` is the frozen, byte-identical reconstruction, `2` is the split, refactored source. With no argument it uses `ACTIVE_PHASE` from `project.config`.
+
+```
+just verify        # assemble and compare byte for byte with the original image: the gate
+just smoke         # boot it headless in VICE and check the screen against a reference picture
+just launch        # run it in VICE at real speed, symbols loaded
+just check         # everything that must stay green: verify, tests, golden traces
+just verify 1      # name the phase: 1 or 2
+just --list        # every command with its description
+```
+
+`docs/` in the project holds the pictures the process produces (`docs/gfx/`), the answers recorded from the game's owner, and for phase 2 the file map (`docs/phase2_files.md`).
+
 ## Use
 
 Link it as a skill, then scaffold a project:

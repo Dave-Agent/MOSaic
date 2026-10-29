@@ -4,7 +4,7 @@
   split_all.py PLAN [--phase 2] [--gate CMD] [--no-commit] [--stop-on-fail]
   PLAN    a text file, one line per file: `DIR<TAB>SECTION[,SECTION...]<TAB>BASE`   (# comments, blank lines ignored). DIR is the sub-directory of the source (game, platform, data ...),
           BASE the file name without .asm; a mixed code/data section keeps whole, name it `..._mixed`.
-  --gate  the command run after each move from the project root (default: `just verify-p2`); the move is committed only when it exits 0, otherwise it is reported and, with
+  --gate  the command run after each move from the project root (default: `just verify 2`); the move is committed only when it exits 0, otherwise it is reported and, with
           --stop-on-fail, the run ends (the file is left moved so you can look; nothing is reverted: use git yourself).
 Each commit is path-limited (the new file and the main file) with the message "Phase 2 step 3: move SECTION to DIR/BASE.asm". split_section.py does the moving (references/phase2_split.md)."""
 import os, subprocess, sys

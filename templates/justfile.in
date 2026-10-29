@@ -3,6 +3,8 @@ set allow-duplicate-recipes := true
 set shell := ["bash", "-euo", "pipefail", "-c"]      # the recipes use bash arrays: on Windows run just from Git Bash or WSL
 skill := env_var_or_default("C64_DECOMP", home_directory() / ".claude/skills/c64-decomp")
 rom_dir := env_var_or_default("VICE_ROM_DIR", home_directory() / ".local/share/vice/C64")
+# The phase the bare commands work on: ACTIVE_PHASE in project.config (1 until phase 2 starts; set it to 2 then). Every command below takes the phase as its argument: `just verify`, `just verify 2`.
+active_phase := `bash -c 'source project.config 2>/dev/null; echo "${ACTIVE_PHASE:-1}"'`
 import 'framework/recipes.just'
 
 default:
@@ -104,14 +106,6 @@ ghidra:
 trace-run vars inputs="" frames="300":
     . ./project.config; python3 -B {{skill}}/scripts/trace/sample_report.py --root . --phase 1 {{vars}} --run -- --ram dumps/handoff.bin --rom-dir {{rom_dir}} --pc "$HANDOFF_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port 35 --frames {{frames}} --seed 1 --chaos 6 --joy1 ff {{inputs}}
 
-# Build, then start the game in VICE at real speed with symbols, as the original hand-off left it (project.config LAUNCH_MODE: sys = `sys HANDOFF_PC` on the bare PRG, inject = restore the dumped low RAM and registers through the monitor).
-launch: experiment
-    python3 -B {{skill}}/scripts/launcher/run_game.py --root .
-
-# Unattended start test (about 20 s): build, boot headless in VICE (warp), screenshot after SMOKE_CYCLES, fail when the game did not start. The first run creates the reference screenshot (JUDGE_REF): look at it once and commit it.
-smoke: experiment
-    python3 -B {{skill}}/scripts/launcher/smoke.py --root .
-
 # Render the game's graphics (character set, every sprite block of the VIC bank, the screen) as PNGs into docs/gfx/ with docs/gfx/index.md; extra options pass through, e.g. just gfx --sprites 30:57:3 --columns 0,1,2 --label player (scripts/render/README.md). Look at the pictures; attach one to a naming question.
 gfx *args:
     python3 -B {{skill}}/scripts/render/gfx_sheets.py --root . {{args}}
@@ -128,44 +122,58 @@ slice-start name:
 slice-merge name:
     python3 -B {{skill}}/scripts/slice.py merge {{name}} --root .
 
-# --- phase 2 (the setup for a port: references/phase2_split.md; bytes may change, behaviour must not) -----------------------------------
-# Needs the TRACE_* keys (TRACE_RAM, TRACE_ENTRY ...) and tools/golden/{scenarios,state}.txt, tools/tests/test_*.py of the safety net (scripts/golden/README.md, scripts/sim).
+# --- build, check, run: every command takes the phase (1 = phase1/src, byte-identical; 2 = phase2/src, the split source) ---------------------------------------
+# `just <command>` works on ACTIVE_PHASE (project.config); `just <command> 1` / `just <command> 2` names it. Phase 2 needs the safety net (tools/golden, tools/tests; references/phase2_split.md).
 
-# Assemble the phase 2 source into build/p2/ (not byte-identical to reference/ once step 6 changes bytes): game.prg, game.sym (and a VICE symbol file).
-build-phase2:
-    C64_PHASE=2 bash framework/scripts/build.sh
+# Assemble a phase's source (no comparison): phase 1 -> build/gianna_game.prg (OUTPUT_PRG), phase 2 -> build/p2/game.prg. The symbol file is left at build/game.sym (build/p2/game.sym).
+build phase=active_phase:
+    C64_PHASE={{phase}} bash framework/scripts/build.sh
 
-# Step 3 of phase 2 (split into files) is byte-identical: the same gate as `verify`, on the phase 2 source (PHASE2_MAIN -> build/p2/game.prg).
-verify-p2:
-    C64_PHASE=2 bash framework/scripts/verify.sh
+# `build` under its older name (fast iteration, no comparison).
+experiment phase=active_phase: (build phase)
 
-# Run the phase 2 build in VICE (symbols loaded) / the unattended start test on it.
-launch-p2: build-phase2
-    python3 -B {{skill}}/scripts/launcher/run_game.py --root . --prg build/p2/game.prg --symbols "$(ls -t build/p2/*.vs | head -1)"
-smoke-p2: build-phase2
-    python3 -B {{skill}}/scripts/launcher/smoke.py --root . --prg build/p2/game.prg
+# THE GATE: assemble a phase and compare it byte for byte with the reference image. Phase 2 stays byte-identical until the byte-changing removals (step 6).
+verify phase=active_phase:
+    C64_PHASE={{phase}} bash framework/scripts/verify.sh
 
-# Routine tests: call routines in the 6510 simulator and compare with Python models (tools/tests/). `test-p1` runs them on the phase 1 build.
-test:
-    python3 -B {{skill}}/scripts/sim/run_tests.py --root . --phase 2
-test-p1:
-    python3 -B {{skill}}/scripts/sim/run_tests.py --root . --phase 1
+# Run a phase in VICE at real speed with its symbols, as the original hand-off left it (project.config LAUNCH_MODE: sys = `sys HANDOFF_PC` on the bare PRG, inject = restore the dumped low RAM and registers through the monitor).
+launch phase=active_phase: (build phase)
+    #!/usr/bin/env bash
+    set -euo pipefail
+    extra=(); if [ "{{phase}}" = "2" ]; then extra=(--prg build/p2/game.prg --symbols "$(ls -t build/p2/*.vs | head -1)"); fi
+    python3 -B {{skill}}/scripts/launcher/run_game.py --root . ${extra[@]+"${extra[@]}"}
 
-# Golden traces (tools/golden/scenarios.txt: `name: tracer args`, `name!:` = exact-only; state.txt, optional GOLDEN_STATE_T): the program's state per video frame in seeded scenarios. `golden-p1` compares the phase 1 build exactly; `golden-t` (timing-tolerant) is the phase 2 check once bytes change.
-# Record only after a deliberate behaviour change: `just golden-record-p1`, `just golden-record-t`.
-golden-p1:
-    python3 -B {{skill}}/scripts/golden/golden.py check --root . --phase 1
-golden-record-p1:
+# Unattended start test (about 20 s): boot a phase headless in VICE (warp), screenshot after SMOKE_CYCLES, fail when the game did not start or the picture differs from the reference (tools/smoke_ref.png; the first run creates it: look at it once and commit it).
+smoke phase=active_phase: (build phase)
+    #!/usr/bin/env bash
+    set -euo pipefail
+    extra=(); if [ "{{phase}}" = "2" ]; then extra=(--prg build/p2/game.prg); fi
+    python3 -B {{skill}}/scripts/launcher/smoke.py --root . ${extra[@]+"${extra[@]}"}
+
+# Routine tests: call routines in the 6510 simulator and compare with Python models (tools/tests/), against a phase's build.
+test phase=active_phase: (build phase)
+    python3 -B {{skill}}/scripts/sim/run_tests.py --root . --phase {{phase}}
+
+# Golden traces: the program's state per video frame in seeded scenarios (tools/golden/scenarios.txt: `name: tracer args`, `name!:` = exact-only; state.txt, optional GOLDEN_STATE_T; project.config GOLDEN_T_SET = the scenarios of the timing-tolerant set, comma separated).
+# Phase 1 is compared exactly and then timing-tolerantly; phase 2 (bytes may change) timing-tolerantly. `just golden-record` records both sets on the PHASE 1 build, only after a deliberate behaviour change.
+golden phase=active_phase: (build phase)
+    #!/usr/bin/env bash
+    set -euo pipefail
+    . ./project.config
+    only=(); [ -n "${GOLDEN_T_SET:-}" ] && only=(--only "$GOLDEN_T_SET")
+    g="python3 -B {{skill}}/scripts/golden/golden.py"
+    if [ "{{phase}}" = "1" ]; then $g check --root . --phase 1; fi
+    $g check-t --root . --phase {{phase}} ${only[@]+"${only[@]}"}
+golden-record: (build "1")
+    #!/usr/bin/env bash
+    set -euo pipefail
+    . ./project.config
+    only=(); [ -n "${GOLDEN_T_SET:-}" ] && only=(--only "$GOLDEN_T_SET")
     python3 -B {{skill}}/scripts/golden/golden.py record --root . --phase 1
-golden-t:
-    python3 -B {{skill}}/scripts/golden/golden.py check-t --root . --phase 2
-golden-t-p1:
-    python3 -B {{skill}}/scripts/golden/golden.py check-t --root . --phase 1
-golden-record-t:
-    python3 -B {{skill}}/scripts/golden/golden.py record-t --root . --phase 1
+    python3 -B {{skill}}/scripts/golden/golden.py record-t --root . --phase 1 ${only[@]+"${only[@]}"}
 
 # What would break if the image or a variable moved (reloc_scan: indirect addressing, SMC, jmp (), code as data; reloc_hazards: aligned bases, guards, sprite pointers, file I/O).
-reloc phase="1":
+reloc phase=active_phase:
     python3 -B {{skill}}/scripts/reloc_scan.py --root . --phase {{phase}}
     python3 -B {{skill}}/scripts/reloc_hazards.py --root . --phase {{phase}}
 
@@ -173,17 +181,14 @@ reloc phase="1":
 fuzz-layout *args:
     python3 -B {{skill}}/scripts/layout_fuzz.py --root . {{args}}
 
-# The phase 1 gate: the byte-identical build plus the safety net on it.
-check-p1:
-    just verify
-    just test-p1
-    just golden-p1
-    just golden-t-p1
-
-# The phase 2 gate: it assembles, no raw operands, comments conform, routine tests against the CURRENT build, timing-tolerant golden traces.
-check:
-    just build-phase2
-    python3 -B {{skill}}/scripts/raw_refs.py --root . --phase 2
-    python3 -B {{skill}}/scripts/comment_check.py --root . --phase 2
-    just test
-    just golden-t
+# Everything that must stay green, per phase. Phase 1: the byte-identical build, routine tests, golden traces. Phase 2: it assembles (and, until step 6, is byte-identical), no raw operands, comments conform, routine tests, timing-tolerant golden traces.
+check phase=active_phase:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just verify {{phase}}
+    if [ "{{phase}}" = "2" ]; then
+        python3 -B {{skill}}/scripts/raw_refs.py --root . --phase 2
+        python3 -B {{skill}}/scripts/comment_check.py --root . --phase 2
+    fi
+    just test {{phase}}
+    just golden {{phase}}

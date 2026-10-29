@@ -20,14 +20,14 @@ test:        python3 {{skill}}/scripts/sim/run_tests.py --root .
 golden:      python3 {{skill}}/scripts/golden/golden.py check
 golden-t:    python3 {{skill}}/scripts/golden/golden.py check-t
 coverage:    python3 {{skill}}/scripts/coverage/run_scenarios.py
-check:       build-phase2 test golden-t     # plus the raw-address and align checks
+check:       just verify {{phase}}; just test {{phase}}; just golden {{phase}}     # see templates/justfile.in
 ```
 
 ## Recipe contract (roles, and the fallback when a project lacks one)
 The skill and its agents refer to recipes by **role**, because projects do not all spell them the same (one has `assemble`, `verify`, `todos`, `p2todos`). Required: `default` (lists recipes) and a phase 1 gate named `verify`. Everything else is a role with a fallback:
 | Role | Usual name | If the project has none |
 |---|---|---|
-| assemble, no diff | `experiment` (or `assemble`) | run `framework/scripts/build.sh` |
+| assemble, no diff | `build` (older name `experiment`, or `assemble`) | run `framework/scripts/build.sh` |
 | phase 2 gate | `check` | run its parts: build phase 2, `scripts/raw_refs.py`, align check, the tests, the golden traces |
 | tests | `test` | run the project's test runner directly |
 | list TODO markers | `todo [tag]` (or `todos`, `p2todos`) | `grep -rn 'TODO(' phase*/src` |
@@ -39,18 +39,22 @@ Shipped in `templates/justfile.in` (role `gfx`: `just gfx [ARGS]` renders the ga
 A project that lacks a role-recipe the loop needs should add it (named as above) rather than rely on the fallback.
 
 ## The standard recipe set
-Present in every project (names fixed so the skill and agents can rely on them):
+Present in every project (names fixed so the skill and agents can rely on them). **Every build, check and run command takes the phase as its argument**: `just verify 1`, `just verify 2`; with no argument it uses `ACTIVE_PHASE` in `project.config` (1 until phase 2 starts, then 2: one line to change).
 | Recipe | Meaning |
 |---|---|
-| `verify` | assemble the canonical source and diff against `reference/`; the phase 1 gate (reports the first differing offset as a C64 address) |
-| `experiment` | assemble the working source, no diff; fast iteration |
-| `check` | the phase 2 gate: build, raw-address check, alignment, routine tests, golden traces |
-| `test` | routine tests (code run in a simulator against models) |
-| `sections` / `todo [tag]` | list section banners / regions still unknown and TODO markers (by tag) |
-| `align` / `align-check` | align `//` comments to the project's column / fail if not aligned |
-| `launch` / `smoke` | run in an emulator with symbols / unattended boot and screenshot judge |
+| `build [phase]` (alias `experiment`) | assemble a phase's source, no comparison; leaves `build/game.sym` (`build/p2/game.sym`) |
+| `verify [phase]` | **the gate**: assemble and compare byte for byte with `reference/` (reports the first differing offset as a C64 address); phase 2 is byte-identical until the byte-changing removals |
+| `launch [phase]` | run in VICE at real speed with symbols, as the hand-off left it |
+| `smoke [phase]` | unattended boot in VICE (warp), screenshot, compared with `tools/smoke_ref.png` |
+| `test [phase]` | routine tests (code run in the 6510 simulator against Python models) |
+| `golden [phase]` | golden traces: phase 1 exact then timing-tolerant, phase 2 timing-tolerant; `golden-record` records on phase 1 |
+| `check [phase]` | everything that must stay green: verify, (phase 2: raw-address and comment checks), test, golden |
+| `reloc [phase]` / `fuzz-layout` | what would break if things moved / the relocation stress test |
+| `sections` / `todo [tag]` | list section banners / TODO markers (by tag) |
+| `align` / `comment-check` / `anon-check` | the source-tidiness checks |
+| `slice-check` / `slice-start` / `slice-merge` | the checks of a slice, a scratch copy for an agent, taking its commits back (these use the active phase) |
 | `sync-state` / `synced <dir>` | which of Ghidra and the source was last synced / record a sync |
-Projects add their own (`golden`, `fuzz-layout`, `reloc`, `build-disk`, `comment-check`, `progress` ...). The skill's `scripts/` are called from recipes (for example `check-layout` -> `scripts/check_layout.py`).
+Projects add their own (`gfx`, `build-disk`, `progress` ...). The skill's `scripts/` are called from recipes (for example `layout` -> `scripts/check_layout.py`).
 
 ## Check
 At the time of writing only `default`, `launch` and `verify` exist in all three projects; `align`, `experiment`, `sections`, `smoke`, `sync-state`, `synced`, `todo` exist in two. Bringing each project to the standard set is that project's agent's job.

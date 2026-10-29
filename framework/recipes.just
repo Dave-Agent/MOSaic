@@ -8,18 +8,7 @@
 export PROJECT_ROOT := justfile_directory()
 export PYTHONDONTWRITEBYTECODE := "1"
 
-# Assemble canonical source and diff against the reference PRG. The gate.
-verify:
-    bash framework/scripts/verify.sh
-
-# Assemble current working source, no diff, for fast iteration.
-experiment:
-    PROJECT_ROOT="{{justfile_directory()}}" bash framework/scripts/build.sh
-
-# Experiment-build then launch emulator with symbols. target=vice|retro (default vice).
-# Optional pokes JSON patches a binary copy before launch: just launch vice pokes/example.json
-launch target="vice" pokes="":
-    bash framework/scripts/launch.sh {{target}} {{pokes}}
+# verify, build, launch, smoke, test, golden, check and reloc take the phase as an argument: they are in the project justfile (templates/justfile.in).
 
 # List section banners in the phase 1 source (SECTION: tags; see framework/conventions).
 sections:
