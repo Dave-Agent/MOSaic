@@ -61,7 +61,9 @@ case "$TARGET" in
             --spec "$SNAPSHOT_SPEC" --prg "$LAUNCH_PRG" --symbols "$VICE_SYMBOLS"
     else
         echo ">> launching VICE x64 with symbols${POKES_FILE:+ (poked PRG)}"
-        "$VICE_BIN" -moncommands "$VICE_SYMBOLS" -keybuf "sys 2064\x0d" "$LAUNCH_PRG"
+        # A bare image has no BASIC stub (VICE autostart types RUN, not SYS): type the SYS ourselves, to the hand-off address. The file must be the LAST argument.
+        SYS_ADDR=$(( 16#${HANDOFF_PC:-0810} ))
+        "$VICE_BIN" -moncommands "$VICE_SYMBOLS" -keybuf "sys $SYS_ADDR\x0d" "$LAUNCH_PRG"
     fi
     ;;
   retro)

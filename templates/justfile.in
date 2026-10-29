@@ -102,3 +102,11 @@ ghidra:
 # Per-frame samples of variables under a scripted input (rung 3 evidence): just trace-run 'NAME_A NAME_B' '--joy2-at 5=ef' 300
 trace-run vars inputs="" frames="300":
     . ./project.config; python3 {{skill}}/scripts/trace/sample_report.py --root . --phase 1 {{vars}} --run -- --ram dumps/handoff.bin --rom-dir {{rom_dir}} --pc "$HANDOFF_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port 35 --frames {{frames}} --seed 1 --chaos 6 --joy1 ff {{inputs}}
+
+# Build, then start the game in VICE at real speed with symbols, as the original hand-off left it (project.config LAUNCH_MODE: sys = `sys HANDOFF_PC` on the bare PRG, inject = restore the dumped low RAM and registers through the monitor).
+launch: experiment
+    python3 {{skill}}/scripts/launcher/run_game.py --root .
+
+# Unattended start test (about 20 s): build, boot headless in VICE (warp), screenshot after SMOKE_CYCLES, fail when the game did not start. The first run creates the reference screenshot (JUDGE_REF): look at it once and commit it.
+smoke: experiment
+    python3 {{skill}}/scripts/launcher/smoke.py --root .

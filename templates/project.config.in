@@ -49,3 +49,8 @@ SEED_RUNS="6"
 
 # --- Commits ---
 COMMIT_TRAILERS=""             # attribution lines appended by `just commit "msg"`, separated by \n (decided per project and author)
+
+# --- Launch and smoke (scripts/launcher/README.md) ---
+LAUNCH_MODE="sys"               # sys: `sys HANDOFF_PC` typed into VICE on the bare PRG (try first); inject: restore dumps/handoff.bin low RAM + registers (HANDOFF_SP/P, LAUNCH_PORT, LAUNCH_POKES) through the monitor
+SMOKE_CYCLES="200000000"        # the screenshot is taken after this many cycles in warp (about 20 s per 100 M)
+JUDGE_CROP=""                   # X0,Y0,X1,Y1 of something static on the start screen (not a scroller); empty = whole picture
