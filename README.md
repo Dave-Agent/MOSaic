@@ -51,6 +51,17 @@ python3 scripts/new_project.py --help
 
 Needs Python 3, Java 17+, Kick Assembler, git and [`just`](https://github.com/casey/just). VICE, Ghidra, a C compiler, and Pillow are needed for some steps; `check_env.py` reports what each role requires. Developed on Linux; macOS should work; on Windows use WSL.
 
+MOSaic creates a local git repository in each project and commits after each step. It never pushes.
+
+## Known limitations
+
+- Commodore 64 only: the hardware libraries, the tracer and the VICE glue are C64-specific.
+- Disk images are read with `c1541`. A tape's standard-format files are decoded; a turbo or custom tape loader needs a decoder written for that loader (`tap_extract.py` extracts the stub, reports the rest, and the hand-off dump from VICE gets the game itself). Cartridge images are not handled.
+- The reference comes from a medium with the copy protection removed; analysing a protected original is manual work.
+- The tracer is not a full emulator: it does not draw sprites or characters, model collisions, or produce SID output. Checking pictures and sound needs VICE, and the game's owner.
+- The relocation sweep compares the program's state and its timing; it cannot see where data the VIC reads sits.
+- Naming what a thing is to a player needs someone who knows the game; without one, names stay descriptions of what the code does.
+
 ## Tests
 
 ```
