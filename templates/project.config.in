@@ -59,3 +59,6 @@ JUDGE_CROP=""                   # X0,Y0,X1,Y1 of something static on the start s
 ACTIVE_PHASE="1"
 # Phase 2 safety net: the scenarios of the timing-tolerant golden set (comma separated; the others are exact-only). Empty = all.
 GOLDEN_T_SET=""
+
+# Phase 2 byte-changing steps: the C64 address ranges (hex LO-HI, one per line) in which the phase 2 image may differ from the reference on purpose (removed dead blocks, rewritten operands); `just verify 2` fails on a changed byte anywhere else. Empty/unset = byte-identical.
+PHASE2_ALLOWED_DIFF=""

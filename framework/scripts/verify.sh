@@ -110,6 +110,24 @@ if [ "$REF_SIZE" -ne "$OUT_SIZE" ]; then
     exit 1
 fi
 
+# Phase 2, byte-changing steps with APPROVED changes (PHASE2_ALLOWED_DIFF: a file of `LO-HI` C64 address ranges in hex, one per line, `#` comments): the built image may differ from the reference
+# only inside those ranges (a removed block left as a hole, an operand rewritten on purpose); every other byte must be identical. A byte outside them fails the gate and names the first one.
+if [ "${C64_PHASE:-1}" = "2" ] && [ -n "${PHASE2_ALLOWED_DIFF:-}" ] && [ -f "$PHASE2_ALLOWED_DIFF" ] && ! cmp -s "$REFERENCE_PRG" "$BUILT_IMAGE"; then
+    python3 - "$REFERENCE_PRG" "$BUILT_IMAGE" "$PHASE2_ALLOWED_DIFF" "$(( LOAD_ADDRESS ))" <<'PY'
+import sys
+ref, new, rf, load = open(sys.argv[1], 'rb').read(), open(sys.argv[2], 'rb').read(), sys.argv[3], int(sys.argv[4])
+rng = []
+for l in open(rf):
+    l = l.split('#')[0].strip()
+    if l: lo, hi = l.replace('$', '').split('-'); rng.append((int(lo, 16), int(hi, 16)))
+bad = [load + i for i in range(len(ref)) if ref[i] != new[i] and not any(lo <= load + i <= hi for lo, hi in rng)]
+changed = sum(1 for i in range(len(ref)) if ref[i] != new[i])
+if bad: print('FAIL: %d byte(s) differ outside the allowed ranges (%s); first at $%04X: reference %02X, built %02X' % (len(bad), rf, bad[0], ref[bad[0] - load], new[bad[0] - load])); sys.exit(1)
+print('PASS: identical to the reference except %d byte(s), all inside the allowed ranges (%d ranges in %s)' % (changed, len(rng), rf))
+PY
+    exit $?
+fi
+
 if cmp -s "$REFERENCE_PRG" "$BUILT_IMAGE"; then
     if [ -n "$EXPECTED_SHA" ] && [ "$EXPECTED_SHA" != "$BUILT_SHA" ]; then
         echo "FAIL: built image is identical to $REFERENCE_PRG, but the SHA-256 recorded in"
