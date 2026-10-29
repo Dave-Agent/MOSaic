@@ -166,6 +166,21 @@ plan = os.path.join(d, 'plan.tsv'); open(plan, 'w').write('game\talpha\talpha_fi
 r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'split_all.py'), plan, '--root', d, '--main', 'main.asm', '--gate', 'true'], capture_output=True, text=True)
 log = subprocess.run('git log --oneline', shell=True, cwd=d, capture_output=True, text=True).stdout
 check('split_all: two sections are moved into files, gated and committed one by one', r.returncode == 0 and os.path.exists(os.path.join(d, 'game', 'alpha_file.asm')) and os.path.exists(os.path.join(d, 'data', 'beta_file.asm')) and log.count('Phase 2 step 3') == 2 and '#import' in text(d), r.stdout + r.stderr + log)
+# ---- cut_section.py ----------------------------------------------------------------------------------------------------------------------------------------
+BAN2 = lambda n, a, b: '//' + '=' * 78 + '\n// SECTION: %s\n// RANGE:   $%04X-$%04X\n// STATUS:  understood\n// SUMMARY: x\n//' % (n, a, b) + '=' * 78 + '\n'
+d = project('.pc = $0800 "RAM"\n#import "game/g.asm"\n#import "game/h.asm"\n')
+os.makedirs(os.path.join(d, 'game')); open(os.path.join(d, 'game', 'g.asm'), 'w').write(BAN2('gsec', 0x800, 0x80A) + 'First:\n  nop // [0800:ea       NOP]\n  rts // [0801:60       RTS]\n\n// the second routine\nSecond: {\n  lda #1 // [0802:a9 01    LDA #$01]\n  bne done // [0804:d0 03    BNE $0809]\ndone:\n  rts // [0806:60       RTS]\n}\n\nThird:\n  nop // [0807:ea       NOP]\n')
+open(os.path.join(d, 'game', 'h.asm'), 'w').write(BAN2('hsec', 0x80B, 0x80B) + '  rts // [080b:60       RTS]\n')
+r = tool('cut_section.py', d, 'gsec', '--at', 'Second', 'gsec_b', 'platform/second', '--write')
+mt = text(d); ft = text(d, 'game/g.asm'); st2 = text(d, 'platform/second.asm')
+check('cut_section: a section is cut at a label with fresh banners, computed ranges and an import after the original', r.returncode == 0 and 'RANGE:   $0800-$0801' in ft and 'RANGE:   $0802-$080A' in st2 and '// the second routine' in st2 and mt.index('game/g.asm') < mt.index('platform/second.asm') < mt.index('game/h.asm') and 'Second:' not in ft, r.stdout + r.stderr + ft + st2 + mt)
+r = tool('cut_section.py', d, 'gsec_b', '--at', 'done', 'x', 'platform/x')
+check('cut_section: a label inside a { } scope is refused', r.returncode != 0 and 'inside a { } scope' in (r.stdout + r.stderr), r.stdout + r.stderr)
+# ---- sim/symbols.py name map -------------------------------------------------------------------------------------------------------------------------------
+d = tempfile.mkdtemp(prefix='c64st_'); open(os.path.join(d, 'm.tsv'), 'w').write('# phase 2 name\tphase 1 name\nInput.Poll\tPollInput\n')
+code = "import sys; sys.path.insert(0, %r); import symbols; t = {'PollInput': 5}; print(symbols.lookup(t, 'Input.Poll'), symbols.lookup(t, 'PollInput'))" % os.path.join(HERE, 'sim')
+r = subprocess.run([sys.executable, '-B', '-c', code], capture_output=True, text=True, env=dict(os.environ, C64_NAME_MAP=os.path.join(d, 'm.tsv')))
+check('sim symbols: a name map finds a renamed routine under its other spelling (both ways)', r.stdout.strip() == '5 5', r.stdout + r.stderr)
 
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)

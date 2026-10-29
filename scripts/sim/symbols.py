@@ -8,7 +8,7 @@
 
 No project names in here; the file comes from project.config (TRACE_SYM / TRACE_SYM_P1) or an argument.
 """
-import difflib, re
+import difflib, os, re
 
 def _parse(path, locals_too):
     syms = {}; stack = []      # stack entries: (name, is_routine_scope)
@@ -39,7 +39,20 @@ def routines(path):
     """labels reachable from outside their routine (a `.sym` file only)"""
     return _parse(path, False)
 
+def _aliases():
+    """NAME<TAB>OTHER lines of tools/name_map.tsv (or $C64_NAME_MAP), both ways: a routine renamed into a namespace in phase 2 is still found under its phase 1 spelling by a test or a golden-state range written for both phases."""
+    if not hasattr(_aliases, 'm'):
+        m = {}; f = os.environ.get('C64_NAME_MAP') or os.path.join(os.environ.get('C64_ROOT', '.'), 'tools', 'name_map.tsv')
+        if os.path.exists(f):
+            for l in open(f):
+                p = l.rstrip('\n').split('\t')
+                if len(p) >= 2 and not l.lstrip().startswith('#'): m[p[0]] = p[1]; m.setdefault(p[1], p[0])
+        _aliases.m = m
+    return _aliases.m
+
 def lookup(table, name):
     if name in table: return table[name]
+    other = _aliases().get(name)
+    if other in table: return table[other]
     close = difflib.get_close_matches(name, table, 5)
     raise KeyError('symbol %r not found%s' % (name, (' (closest: %s)' % ', '.join(close)) if close else ''))

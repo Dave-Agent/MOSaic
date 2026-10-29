@@ -105,3 +105,8 @@ A variable that holds one of a few states (a flag with `$00 / $80 / $FF`, a mode
 
 ## Make the assumption checkable
 Where code or data relies on a layout (a buffer on a page boundary, a page count, two tables adjacent, a block at a VIC-bank offset, a loop that must not cross a page, a file that bakes in a load address), write the assumption as an `.assert` next to it, and write bank-relative numbers (sprite pointers, character screen offsets) as expressions of the labels (`SpritePointer(label)`), never as numbers. `reloc_hazards.py` lists what is still a raw number or an unchecked assumption (a `slice.py check` hint); `reloc_scan.py` covers pointers, SMC and indirect jumps.
+
+## Namespaces in phase 2
+- A routine's `TODO(port)` (and every phase 2 marker `port_scan` looks for) sits inside the comment block directly above its label; a `.namespace X {` line between the comment and the label hides it from the scans, so put the namespace line above the whole comment block.
+- A rename into a namespace (`PollInput` to `Input.Poll`) breaks tests and golden-state ranges that name the old label: list the renames in `tools/name_map.tsv` (`NEW<TAB>OLD`, both ways); the simulator and the golden tools find a name under either spelling, so the same test runs on both phases.
+- A mid-section cut (a routine that starts where phase 1 had no banner) is `scripts/cut_section.py SECTION --at LABEL NEWNAME DIR/BASE`; it keeps the banners tiling the image. A fall-through into the next routine, or a label inside a `{ }` scope, blocks a cut: leave it, tag it `TODO(port)` and say why in the porting document.
