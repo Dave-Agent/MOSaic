@@ -2,7 +2,8 @@
 import argparse, glob, os, re, sys
 
 def parser(desc, write=True, phase=False):
-    p = argparse.ArgumentParser(description=desc)
+    full = getattr(sys.modules.get('__main__'), '__doc__', None)                  # --help shows the whole module docstring of the script (its map formats, rules and options)
+    p = argparse.ArgumentParser(description=full or desc, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--root', default='.', help='project root (default: current directory)')
     if write: p.add_argument('--write', action='store_true', help='apply the change; without it the script only reports')
     if phase:

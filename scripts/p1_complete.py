@@ -19,6 +19,9 @@ Checks (1, 2 and 2b must be 0; the other two list candidates that are reviewed, 
                            A table of values marked `// NOT-POINTERS: reason` on its label line is waived: counted and listed, not reported (addr_tables.py waivers()); the heuristic also drops
                            climbing series whose words land inside instructions. Everything else stays a candidate.
   6. unlabelled data runs  data rows that follow code (or open the range) with no label of their own: a table nobody named
+  7. data rows that ran as code (review, optional)   `.byte` / `.word` rows whose bytes the tracer EXECUTED: code nobody disassembled yet (a raster IRQ left as rows although it ran
+                           thousands of times). Needs tracer flag files: `--flags PREFIX` (repeatable; PREFIX.flags), else the project's `COVERAGE_DIR` (default `$BUILD_DIR/coverage`) `*.flags`, else
+                           `$BUILD_DIR/trace/cov.flags` (the seeded run); none found = the check is skipped with one line (`--no-flags` skips it on purpose). Uses coverage/raw_executed.py. Not a failure.
   The range summary line says how many instruction lines and data rows the range holds, and warns when it holds NO instruction line (checks 1-3 see only instructions: a
   slice that is all tables is judged by 5 and 6 and by reading it).
 
@@ -32,6 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser, main_file, reachable, config, source_labels, split_comment
 here = os.path.dirname(os.path.abspath(__file__))
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--extra', help='an extra regex for placeholder names'); a.add_argument('--lo', type=lambda x: int(x, 0), default=0x0800); a.add_argument('--hi', type=lambda x: int(x, 0), default=0xFFFF); a.add_argument('--range'); a.add_argument('--allow-marked', action='store_true')
+a.add_argument('--flags', action='append', default=[], help='tracer output PREFIX (PREFIX.flags) for check 7; repeatable'); a.add_argument('--no-flags', action='store_true', help='skip check 7')
 args = a.parse_args(); main = main_file(args)
 base = [sys.executable]; common = ['--root', args.root] + (['--main', args.main] if args.main else ['--phase', str(args.phase)])
 RANGE = tuple(int(x, 16) for x in args.range.split('-')) if args.range else None
@@ -136,6 +140,24 @@ for f in sorted(set(reachable(main))):
         elif ROW_L.match(l):
             if state in ('code', 'start') and not seen_label and inside(int(ROW_L.match(l).group(2), 16)): runs.append((os.path.relpath(f, args.root), n, l.strip()[:90]))
             state = 'data'; seen_label = False
+exe_runs = None; exe_note = ''                                  # check 7: executed bytes in data rows (optional, needs the tracer's flag files)
+if args.no_flags: exe_note = 'skipped (--no-flags)'
+else:
+    sys.path.insert(0, os.path.join(here, 'coverage'))
+    try:
+        from raw_executed import find_flags, raw_executed_runs
+        from unexecuted import load_flags
+        pre = args.flags or find_flags(args.root)
+        if not pre: exe_note = 'skipped: no tracer .flags file found (--flags PREFIX, COVERAGE_DIR or build/trace/cov)'
+        else:
+            from _common import expanded_lines
+            exe_runs = [(s_, e_) for s_, e_ in raw_executed_runs(expanded_lines(main), load_flags(pre), args.lo, args.hi) if inside(s_) or inside(e_)]
+    except (OSError, ImportError, SystemExit) as ex: exe_note = 'skipped: %s' % ex
+sorted_labels = sorted(label_by)
+def label_before(ad):
+    import bisect
+    k = bisect.bisect_right(sorted_labels, ad) - 1
+    return label_by[sorted_labels[k]] if k >= 0 else '?'
 print('phase', args.phase, 'source', os.path.relpath(main, args.root), ('slice $%04X-$%04X' % RANGE) if RANGE else '(whole source)')
 print(f'  1. raw operands            {raw:5d}   (must be 0)')
 print(f'  2. Ghidra placeholders     {len(found):5d}   (must be 0; {ignored[0]} more in XREF / [ADDR:...] trace comments are allowed)'); [print(f'       {f}:{n}  {name} ({kind})  {t}') for f, n, name, kind, t in found[:15]]
@@ -154,10 +176,14 @@ for ad, x in waived[:6]: print('       waived $%04X %s: %s  (%s:%d)' % (ad, x[2]
 if any(i not in wv_hit and inside(wv[i][0]) for i in range(len(wv))): print('       note: %d `// NOT-POINTERS` marker(s) matched no candidate (a stale waiver does no harm; remove it if the table is not address-like)' % sum(1 for i in range(len(wv)) if i not in wv_hit and inside(wv[i][0])))
 if unlab_targets: print('       targets with NO label (unlabelled table starts that something refers to): ' + ', '.join('$%04X x%d' % (t, c) for t, c in sorted(unlab_targets.items())[:12]))
 print(f'  6. unlabelled data runs    {len(runs):5d}   (review: data rows after code with no label of their own)'); [print(f'       {f}:{n}  {t}') for f, n, t in runs[:6]]
+if exe_runs is None: print('  7. data rows that ran as code  -   (review; %s)' % exe_note)
+else:
+    print(f'  7. data rows that ran as code {len(exe_runs):3d}   (review: `.byte` rows whose bytes the tracer EXECUTED: code that is still data rows, disassemble it; {sum(e - s_ + 1 for s_, e in exe_runs)} bytes)')
+    for s_, e_ in exe_runs[:8]: print('       $%04X-$%04X (%d bytes) after %s' % (s_, e_, e_ - s_ + 1, label_before(s_)))
 print(f'  range content: {n_ins} instruction lines, {n_rows} data rows' + (('   NOTE: no instruction line in this range: checks 1-3 had nothing to see; this slice is judged by checks 5 and 6 and by reading it') if n_ins == 0 else ''))
 hard = raw == 0 and not found and not prov
 ok = hard and (not marked or args.allow_marked)
-review = [('3', imm), ('4', len(words)), ('5', len(pairs)), ('6', len(runs))]; rv = ', '.join('check %s: %d' % (k, v) for k, v in review if v)
+review = [('3', imm), ('4', len(words)), ('5', len(pairs)), ('6', len(runs)), ('7', len(exe_runs or []))]; rv = ', '.join('check %s: %d' % (k, v) for k, v in review if v)
 if not ok: word, detail = 'NOT COMPLETE', 'raw operands %d, placeholders %d, provisional unmarked %d, marked %d' % (raw, len(found), len(prov), len(marked))
 elif RANGE or marked: word, detail = 'SLICE CLEAN', '%s%s' % ('%d marked provisional names remain' % len(marked) if marked else 'no provisional names', '; review items: ' + rv if rv else '')
 else: word, detail = 'COMPLETE', ('review items: ' + rv) if rv else 'no review items'

@@ -148,6 +148,50 @@ for nm, src, want, why in (('scope crossing', ANON_BAD, 1, 'crosses a scope boun
     dd = project(src); r = tool('../anon_labels.py', dd, '--check')
     check('anon --check: ' + nm, (r.returncode != 0) == bool(want) and why in r.stdout, r.stdout + r.stderr)
 
+# ---- 5. bytes_to_code.py ---------------------------------------------------------------------------------------------------------------------------------
+CODE_ROWS = '''
+    Routine:
+      .byte $a2,$03,$ca,$d0,$fd,$8d,$20,$d0,$60 // [0800] ..... .`
+'''
+def conv(src, rng, names=(), locs=(), extra=(), ref=None, write=False):
+    dd = project(src)
+    if ref is not None:
+        open(os.path.join(dd, 'ref.bin'), 'wb').write(bytes(ref)); open(os.path.join(dd, 'project.config'), 'w').write('SRC_MAIN="main.asm"\nREFERENCE_PRG="ref.bin"\nREFERENCE_IS_RAW="true"\nLOAD_ADDRESS="0x0800"\n')
+    a_ = ['--range', rng] + list(extra)
+    if names: a_ += ['--names', tsv(dd, 'n.tsv', names)]
+    if locs: a_ += ['--locals', tsv(dd, 'l.tsv', locs)]
+    if write: a_ += ['--write']
+    return dd, subprocess.run([sys.executable, '-B', os.path.join(HERE, 'bytes_to_code.py')] + a_ + ['--root', dd, '--main', 'main.asm'], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+GOOD = [0xa2, 0x03, 0xca, 0xd0, 0xfd, 0x8d, 0x20, 0xd0, 0x60]
+dd, r = conv(CODE_ROWS, '0800-0808', [('D020', 'VIC.BORDER')], [('0802', 'loop')], ['--scope', 'Routine'], ref=GOOD, write=True); t = text(dd)
+want = ['Routine: {', '  ldx #$03', '// [0800:a2 03    LDX #$03]', 'loop:', '  dex', 'bne loop', '// [0803:d0 fd    BNE $0802]', 'sta VIC.BORDER', '// [0805:8d 20 d0 STA $d020]', '} // Routine']
+check('bytes_to_code: converts to labelled, named instructions', r.returncode == 0 and all(w in t for w in want) and '.byte' not in t, r.stdout + r.stderr + t)
+dd, r = conv(CODE_ROWS, '0800-0806', locs=[('0802', 'loop')], ref=GOOD); check('bytes_to_code: a range that cuts an instruction is refused', r.returncode != 0 and 'cuts the instruction at $0805' in r.stderr, r.stderr)
+dd, r = conv(CODE_ROWS, '0800-0808', ref=GOOD); check('bytes_to_code: an unnamed branch target inside the range is refused', r.returncode != 0 and 'no name' in r.stderr, r.stderr)
+dd, r = conv(CODE_ROWS.replace('$a2,$03', '$02,$03'), '0800-0808', locs=[('0802', 'loop')]); check('bytes_to_code: an undocumented opcode is refused (data, not code)', r.returncode != 0 and 'not a documented' in r.stderr, r.stderr)
+dd, r = conv(CODE_ROWS, '0800-0808', locs=[('0802', 'loop')], ref=GOOD[:2] + [0xea] + GOOD[3:]); check('bytes_to_code: rows that differ from the reference are refused', r.returncode != 0 and 'differ from the reference' in r.stderr, r.stderr)
+dd, r = conv(CODE_ROWS, '0802-0808', locs=[('0802', 'loop')], ref=GOOD, write=True); t = text(dd)
+check('bytes_to_code: a range inside a row splits the row', r.returncode == 0 and '.byte $a2,$03 // [0800]' in t and 'loop:' in t and 'dex' in t, r.stderr + t)
+
+# ---- 6. p1_complete.py check 7: data rows that ran as code ------------------------------------------------------------------------------------------------
+import struct
+RAN = '''
+    Start:
+      .byte $a2,$03,$ca,$d0,$fd,$60 // [0800] ......
+    Table:
+      .byte $01,$02,$03,$04 // [0806] ....
+'''
+def p1(flag_addrs, *extra):
+    dd = project(RAN); os.makedirs(os.path.join(dd, 'build', 'coverage'))
+    fl = [0] * 65536
+    for a_ in flag_addrs: fl[a_] = 1
+    open(os.path.join(dd, 'build', 'coverage', 'run1.flags'), 'wb').write(struct.pack('<65536H', *fl))
+    return subprocess.run([sys.executable, '-B', os.path.join(HERE, '..', 'p1_complete.py'), '--root', dd, '--main', 'main.asm'] + list(extra), capture_output=True, text=True, stdin=subprocess.DEVNULL)
+r = p1(range(0x800, 0x806)); check('p1_complete check 7: executed .byte rows are listed', '7. data rows that ran as code   1' in r.stdout and '$0800-$0805 (6 bytes) after Start' in r.stdout, r.stdout + r.stderr)
+r = p1([]); check('p1_complete check 7: nothing executed = 0', '7. data rows that ran as code   0' in r.stdout, r.stdout + r.stderr)
+r = p1([0x806, 0x807]); check('p1_complete check 7: executed table bytes are reported too', '$0806-$0807' in r.stdout, r.stdout)
+r = p1(range(0x800, 0x806), '--no-flags'); check('p1_complete check 7: --no-flags skips it', 'skipped (--no-flags)' in r.stdout, r.stdout)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall refactor self-tests passed')
