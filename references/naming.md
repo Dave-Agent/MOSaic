@@ -35,6 +35,9 @@ Names are the index of the source: grep must find things, and the case of a name
 - **Per-slot aliases** of one variable (per actor, per player) are `<name>_<slot>` defined from the primary slot (`.label x_red = x+1`: a `+N` in a definition is allowed), after it.
 - **Constants:** a family shares a prefix (`STATE_*`, `MSG_ID_*`, `MODE_*`, `OPC_*`); a stride, count or range the code spells as a number gets one (`ACTOR_SLOT_SIZE`, `ACTOR_SLOTS`).
 
+## Frames of an identified subject: subject plus a number
+Once the subject of a set of pictures is identified (the player, an enemy, an effect), its frames are named `<subject>_<kind>_NN`, counted by position (`player_pose_04`, `player_burn_2`), not one descriptive name per frame. The comment above a frame says which code selects it and under what condition (that is evidence, and is kept); the name does not try to say it. Ask the owner only WHAT the subject is (attach the picture: "what is this animation?"), never to name each frame, and when the code already shows a frame belongs to a numbered run, number it. A frame group an animation steps through is one run: `<subject>_<kind>_1..N`. Use two digits when a run has ten or more frames. (Decided with the user, 2026-10-30.)
+
 ## Names that are not (yet) confirmed
 - A name is **provisional** until it is confirmed against dynamic analysis or by the user. A human-made label from earlier work counts as provisional.
 - Give a provisional item a **descriptive name from what is known** (`data_after_belt_table`, `routine_before_hud_draw`), never an address and never an `unk` prefix, and mark it: `// TODO(name): provisional; known: <facts>`. Tags: `name` = a provisional name awaiting confirmation, `user` = a question only the user can answer (what a sprite, sound or mode is: ask, do not guess), `sound` = needs listening.
