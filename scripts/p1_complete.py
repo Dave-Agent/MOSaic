@@ -13,14 +13,21 @@ Checks (1, 2 and 2b must be 0; the other two list candidates that are reviewed, 
                            `STATUS:  unknown` also count here). Unmarked must be 0 for a slice to be called clean; marked must be 0 for the whole source.
   3. address pairs         `lda #lo`/`lda #hi` built addresses in the image (addr_immediates.py): candidates for `#<label` / `#>label`
   4. address words         `.word $xxxx` literals whose value lies in the image
+  5. address bytes         pointer-table candidates in `.byte` DATA rows (`// [addr]` rows), found by addr_tables.py: words at a fixed stride that climb or all hit labels, a table
+                           of addresses or an address field of a record table (`.byte $79,$9d` at +6 of each 8-byte record): raw pointers that should be `.word label` or
+                           `<label` / `>label`. The targets with no label are listed: UNLABELLED TABLE STARTS that something refers to.
+  6. unlabelled data runs  data rows that follow code (or open the range) with no label of their own: a table nobody named
+  The range summary line says how many instruction lines and data rows the range holds, and warns when it holds NO instruction line (checks 1-3 see only instructions: a
+  slice that is all tables is judged by 5 and 6 and by reading it).
 
 --range LO-HI   (hex) report only the part of the source whose [ADDR:bytes] trace addresses lie in the range, so a slice can be called clean on its own. A line without an address
                 (a label line, a comment block, a `.label` of a label file) belongs to the next line that has one, or to its own `$ADDR` value in a label file.
 --allow-marked  marked provisional names (TODO(name)) do not fail the exit status: the verdict is then `SLICE CLEAN`, with the number of marked names left.
-Exit status 0 only when checks 1, 2 and 2b are clean (2b: no unmarked, and no marked unless --allow-marked)."""
+Exit status 0 only when checks 1, 2 and 2b are clean (2b: no unmarked, and no marked unless --allow-marked); 3-6 are review items and are named in the verdict when not 0.
+The last line is always `VERDICT: <word> (details)` with the word COMPLETE (whole source, nothing provisional left), SLICE CLEAN (a --range, or marked names allowed and left) or NOT COMPLETE."""
 import re, os, sys, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, reachable, config
+from _common import parser, main_file, reachable, config, source_labels, split_comment
 here = os.path.dirname(os.path.abspath(__file__))
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--extra', help='an extra regex for placeholder names'); a.add_argument('--lo', type=lambda x: int(x, 0), default=0x0800); a.add_argument('--hi', type=lambda x: int(x, 0), default=0xFFFF); a.add_argument('--range'); a.add_argument('--allow-marked', action='store_true')
 args = a.parse_args(); main = main_file(args)
@@ -79,6 +86,52 @@ for f in sorted(set(files)):
         code = l.split('//')[0]
         if re.match(r'\s*\.word\b', code):
             if any(args.lo <= int(m.group(1), 16) <= args.hi for m in re.finditer(r'(?<![\w#])\$([0-9a-fA-F]{4})\b', code)): words.append((os.path.relpath(f, args.root), n, l.strip()[:90]))   # one entry per line
+# ---- data rows: instruction lines and rows in the range, address pairs in .byte rows, unlabelled data runs ----------------------------------------------------------
+INS_L = re.compile(r'^\s+(?!\.)[A-Za-z]\w*(?:\.\w+)?\s?.*?//\s*\[([0-9A-Fa-f]{4}):'); ROW_L = re.compile(r'^(\s*)\.(?:byte|word|fill|text|fillword)\b.*?//\s*\[([0-9A-Fa-f]{4})\]')
+BYTE_L = re.compile(r'^\s*\.byte\s+((?:\$[0-9a-fA-F]{2}\s*,?\s*)+)\s*//\s*\[([0-9A-Fa-f]{4})\]')
+LBL = re.compile(r'^\s*([A-Za-z_]\w*):(?!\S)')
+try: label_addrs = set(source_labels(main)[0].values())
+except SystemExit: label_addrs = set()
+n_ins = 0; n_rows = 0; starts = set(); rowlist = []
+for f in sorted(set(reachable(main))):
+    FL = open(f).read().split('\n'); FA = line_addrs(FL); prev = 'code'; labelled = True; pend_label = False
+    for n, l in enumerate(FL, 1):
+        code = split_comment(l)[0]
+        if LBL.match(code) and not code.lstrip().startswith(('.', '!')): pend_label = True
+        mi = INS_L.match(l); mr = ROW_L.match(l)
+        if mi:
+            starts.add(int(mi.group(1), 16))
+            if inside(int(mi.group(1), 16)): n_ins += 1
+            prev = 'code'; pend_label = False
+        elif mr:
+            ad = int(mr.group(2), 16); starts.add(ad)
+            if inside(ad):
+                n_rows += 1; rowlist.append((f, n, ad, l, prev == 'code' and not pend_label or (prev == 'start' and False)))
+            prev = 'data'; pend_label = False
+        elif l.strip() and not l.lstrip().startswith('//') and not code.strip() == '' and not LBL.match(code): pass
+from addr_tables import data_runs, candidates
+label_by = {}
+try:
+    for nm, ad in source_labels(main)[0].items():
+        if '.' not in nm: label_by.setdefault(ad, nm)
+except SystemExit: pass
+pairs = []; unlab_targets = {}
+for ad, stride, cnt_, ws in candidates(data_runs(reachable(main)), set(label_by), args.lo, args.hi):
+    if not inside(ad): continue
+    pairs.append(('table', '$%04X' % ad, 'stride %d, %d words, %d/%d targets labelled: %s%s' % (stride, cnt_, sum(w in label_by for w in ws), cnt_, ' '.join('$%04X' % w for w in ws[:5]), ' ...' if cnt_ > 5 else '')))
+    for w in ws:
+        if w not in label_by: unlab_targets[w] = unlab_targets.get(w, 0) + 1
+# runs: a data row directly after an instruction line (or the first row of a file's range) with no label between them
+runs = []
+for f in sorted(set(reachable(main))):
+    FL = open(f).read().split('\n'); FA = line_addrs(FL); state = 'start'; seen_label = False
+    for n, l in enumerate(FL, 1):
+        code = split_comment(l)[0]
+        if LBL.match(code) and not code.lstrip().startswith(('.', '!')): seen_label = True
+        if INS_L.match(l): state = 'code'; seen_label = False
+        elif ROW_L.match(l):
+            if state in ('code', 'start') and not seen_label and inside(int(ROW_L.match(l).group(2), 16)): runs.append((os.path.relpath(f, args.root), n, l.strip()[:90]))
+            state = 'data'; seen_label = False
 print('phase', args.phase, 'source', os.path.relpath(main, args.root), ('slice $%04X-$%04X' % RANGE) if RANGE else '(whole source)')
 print(f'  1. raw operands            {raw:5d}   (must be 0)')
 print(f'  2. Ghidra placeholders     {len(found):5d}   (must be 0; {ignored[0]} more in XREF / [ADDR:...] trace comments are allowed)'); [print(f'       {f}:{n}  {name} ({kind})  {t}') for f, n, name, kind, t in found[:15]]
@@ -92,7 +145,15 @@ print(f'  2c. provisional, MARKED    {len(marked):5d}   (TODO(name) markers and 
 if marked: print('       by kind:', kinds(marked))
 print(f'  3. address pairs (review)  {imm:5d}   (python3 addr_immediates.py for the list; pairs already written #<label / #>label are not counted)')
 print(f'  4. .word $addr lines       {len(words):5d}   (review: value tables such as note frequencies are data, not addresses)'); [print(f'       {f}:{n}  {t}') for f, n, t in words[:8]]
+print(f'  5. address bytes in rows   {len(pairs):5d}   (review: pointer-table candidates in .byte rows, see addr_tables.py: pointers that should be .word label / <label)'); [print(f'       {k} {f}  {t}') for k, f, t in pairs[:8]]
+if unlab_targets: print('       targets with NO label (unlabelled table starts that something refers to): ' + ', '.join('$%04X x%d' % (t, c) for t, c in sorted(unlab_targets.items())[:12]))
+print(f'  6. unlabelled data runs    {len(runs):5d}   (review: data rows after code with no label of their own)'); [print(f'       {f}:{n}  {t}') for f, n, t in runs[:6]]
+print(f'  range content: {n_ins} instruction lines, {n_rows} data rows' + (('   NOTE: no instruction line in this range: checks 1-3 had nothing to see; this slice is judged by checks 5 and 6 and by reading it') if n_ins == 0 else ''))
 hard = raw == 0 and not found and not prov
 ok = hard and (not marked or args.allow_marked)
-print('COMPLETE' if ok and not marked else ('SLICE CLEAN (%d marked provisional names remain)' % len(marked) if ok else 'NOT COMPLETE'))
+review = [('3', imm), ('4', len(words)), ('5', len(pairs)), ('6', len(runs))]; rv = ', '.join('check %s: %d' % (k, v) for k, v in review if v)
+if not ok: word, detail = 'NOT COMPLETE', 'raw operands %d, placeholders %d, provisional unmarked %d, marked %d' % (raw, len(found), len(prov), len(marked))
+elif RANGE or marked: word, detail = 'SLICE CLEAN', '%s%s' % ('%d marked provisional names remain' % len(marked) if marked else 'no provisional names', '; review items: ' + rv if rv else '')
+else: word, detail = 'COMPLETE', ('review items: ' + rv) if rv else 'no review items'
+print('VERDICT: %s (%s)' % (word, detail))
 sys.exit(0 if ok else 1)

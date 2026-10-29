@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Find pointers built from two immediates: `lda #lo; sta P` ... `lda #hi; sta P+1` (either order, within 3 instructions) where the combined value lies in the image.
 Candidates for `#<label` / `#>label`. Reads the [ADDR:bytes] comments of the source lines. A pair whose operands are no longer `#$` literals (already `#<label` / `#>label`) is
-skipped: it is converted. --range LO-HI (hex) keeps only the pairs whose first instruction lies in that address range (a slice).
+skipped: it is converted. A pair whose value cannot be an address of the image is skipped too: `#$ff`/`#$ff` ($FFFF) and `#$00`/`#$00` ($0000) (a fill value or a flag, not a pointer), and a value that no instruction or data row of the source covers (the count of skipped pairs is printed). --range LO-HI (hex) keeps only the pairs whose first instruction lies in that address range (a slice).
   addr_immediates.py [--phase 1|2 | --main FILE] [--lo 0x0800] [--hi 0xFFFF] [--range LO-HI]"""
 import re, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, expanded_lines
+from _common import parser, main_file, expanded_lines, reachable, find_cover
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--lo', type=lambda x: int(x, 0), default=0x0800); a.add_argument('--hi', type=lambda x: int(x, 0), default=0xFFFF); a.add_argument('--range')
-args = a.parse_args(); L = expanded_lines(main_file(args)); I = []
+args = a.parse_args(); main = main_file(args); L = expanded_lines(main); I = []; skipped = [0]
+files = reachable(main); texts = {p: open(p).read().split('\n') for p in files}
 RANGE = tuple(int(x, 16) for x in args.range.split('-')) if args.range else None
 LIT = re.compile(r'#\$[0-9a-fA-F]')           # an immediate still written as a number
 for i, l in enumerate(L):
@@ -24,7 +25,8 @@ for k, (ln, mn, ad, bs, l) in enumerate(I):
             t2 = I[j + 1][3][1] | (I[j + 1][3][2] << 8 if len(I[j + 1][3]) > 2 else 0)
             if abs(t2 - tgt) == 1:
                 lo, hi = (bs[1], I[j][3][1]) if t2 > tgt else (I[j][3][1], bs[1]); v = lo | hi << 8
+                if v in (0x0000, 0xFFFF) or (args.lo <= v <= args.hi and not find_cover(v, files, texts)): skipped[0] += 1; continue
                 if args.lo <= v <= args.hi: out.append((ln, v, l.split('//')[0].strip(), I[j][4].split('//')[0].strip()))
             break
-print(len(out), 'candidate address pairs')
+print(len(out), 'candidate address pairs' + (' (%d skipped: not an address of the image)' % skipped[0] if skipped[0] else ''))
 for ln, v, x, y in out: print(f'  line {ln}: ${v:04X}   {x}  ...  {y}')
