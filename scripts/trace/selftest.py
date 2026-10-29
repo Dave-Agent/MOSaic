@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Tracer self-test: is the 6510 core in scripts/trace/c64trace.c trustworthy? Builds the tracer and runs
   1. `c64trace --selftest-builtin`: a built-in program with known results (needs nothing from the project);
+  1c. input that changes during a run: `--joy1-at` / `--joy2-at` / `--keymat-at FRAME=...` (a tiny program stores what it reads each pass; the per-frame samples show the frame of each change);
   1b. the keyboard matrix: `--keymat` holds a key for the whole run (the fuzzer leaves it alone), `--keymat-frames N` releases it;
   2. if the project has one, `c64trace --selftest IMAGE REFERENCE ...`: a program of the project that transforms a known image (a depacker, an unscrambler) must reproduce a known
      reference byte for byte. A real program of 2 million instructions agreeing with the reference is the strongest evidence the core is right.
@@ -33,6 +34,29 @@ def key_selftest(exe):
         ok = got == (0xEF, 0xEF, 0xEF, 0xFF)
         return ok, 'keymat: SPACE held 5 / 400 frames -> %s / %s (want ef / ef); released after 10 frames: %s / %s (want ef / ff)' % tuple('%02x' % g for g in got) + (' (PASS)' if ok else ' (FAIL)')
 
+JOY_PROG = bytes([0xA9, 0x00, 0x8D, 0x02, 0xDC, 0x8D, 0x03, 0xDC,                  # DDRA = DDRB = inputs
+                  0xAD, 0x00, 0xDC, 0x8D, 0x00, 0x02, 0xAD, 0x01, 0xDC, 0x8D, 0x01, 0x02,   # loop: $0200 = joystick 2 ($DC00), $0201 = joystick 1 ($DC01)
+                  0x4C, 0x08, 0x08])
+
+def input_at_selftest(exe):
+    """Input events: `--joy2-at 10=fe --joy1-at 20=ef --joy2-at 30=ee ...` change the joysticks from the given frame on (before the first event: nothing pressed), `--keymat-at` the keys.
+    The sample taken at frame N is taken before the events of frame N: the first sample that shows an event of frame N is the one at frame N+1. Returns (ok, text)."""
+    with tempfile.TemporaryDirectory() as d:
+        def run_prog(prog, *opt):
+            ram = bytearray(65536); ram[0x800:0x800 + len(prog)] = prog; img = os.path.join(d, 'i.bin'); open(img, 'wb').write(ram)
+            smp = os.path.join(d, 's.bin')
+            subprocess.run([exe, '--ram', img, '--out', os.path.join(d, 'i'), '--pc', '0800', '--port', '35', '--frames', '40', '--seed', '3', '--sample', smp, '200', '201', *opt], capture_output=True)
+            b = open(smp, 'rb').read(); return [(b[2 * f], b[2 * f + 1]) for f in range(len(b) // 2)]       # index f = the sample of frame f+1
+        at = lambda rows, fr: rows[fr - 1]
+        j = run_prog(JOY_PROG, '--joy2-at', '10=fe', '--joy1-at', '20=ef', '--joy2-at', '30=ee', '--joy1-at', '0=fb')
+        gj = (at(j, 10), at(j, 11), at(j, 20), at(j, 21), at(j, 30), at(j, 31))
+        wj = ((0xFF, 0xFB), (0xFE, 0xFB), (0xFE, 0xFB), (0xFE, 0xEF), (0xFE, 0xEF), (0xEE, 0xEF))
+        k = run_prog(KEY_PROG, '--joy1', 'ff', '--joy2', 'ff', '--keymat-at', '5=0,0,0,0,0,0,0,10', '--keymat-at', '20=0,0,0,0,0,0,0,0')
+        gk = (at(k, 5)[0], at(k, 6)[0], at(k, 20)[0], at(k, 21)[0])      # KEY_PROG stores $DC01 at $0200
+        ok = gj == wj and gk == (0xFF, 0xEF, 0xEF, 0xFF)
+        return ok, 'input events: joy2/joy1 at frames 10,11,20,21,30,31 = %s (want %s); key down from frame 5 to 20: samples %s (want ff ef ef ff)%s' % (
+            ' '.join('%02x/%02x' % g for g in gj), ' '.join('%02x/%02x' % g for g in wj), ' '.join('%02x' % g for g in gk), ' (PASS)' if ok else ' (FAIL)')
+
 def run(env, quiet=False):
     """-> True when every enabled self-test passes (prints the tracer's lines)"""
     exe = env.build_tracer(); ok = True; c = env.cfg
@@ -46,6 +70,9 @@ def run(env, quiet=False):
     kok, ktext = key_selftest(exe)
     if not quiet or not kok: print('[keymat] ' + ktext)
     ok &= kok
+    iok, itext = input_at_selftest(exe)
+    if not quiet or not iok: print('[input-at] ' + itext)
+    ok &= iok
     for name, cmd in steps:
         r = subprocess.run(cmd, capture_output=True, text=True)
         if not quiet or r.returncode: print('[%s] %s' % (name, (r.stdout + r.stderr).strip()))

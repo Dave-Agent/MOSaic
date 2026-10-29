@@ -17,7 +17,7 @@
  *
  * Run:    c64trace --ram IMAGE [--rom-dir DIR] --out PREFIX --pc HEX [--a HEX --x HEX --y HEX --sp HEX --p HEX] [--port HEX (the processor port, $01: pass it when the dump's $01 is not the value you want, a dump taken mid-load may hold junk)]
  *                  [--init FILE] [--frames N] [--seed S] [--chaos N] [--poke F[+P]:ADDR=VAL ...] [--joy1 HEX] [--joy2 HEX]
- *                  [--keymat B0,..,B7 [--keymat-frames N]] [--skew CYCLES]
+ *                  [--keymat B0,..,B7 [--keymat-frames N]] [--joy1-at F=HEX ...] [--joy2-at F=HEX ...] [--keymat-at F=B0,..,B7 ...] [--skew CYCLES]
  *           IMAGE: 64K RAM (a 65538-byte file with a 2-byte load address is accepted); without --rom-dir the ROM areas read $02 (KIL: executing one stops the run); DIR holds kernal-901227-03.bin,
  *           basic-901226-01.bin, chargen-901225-01.bin (override a name with --kernal / --basic / --chargen FILE).
  *           FILE of --init: lines "ADDR VALUE" (hex), I/O writes applied before the run (data-direction registers, VIC setup ...).
@@ -26,6 +26,12 @@
  *           the rows on $DC01 (PRB bit = row, 0 = down). Examples: SPACE is column 7 row 4: --keymat 0,0,0,0,0,0,0,10; RETURN col 0 row 1: --keymat 2.
  *           --keymat-frames N releases them after N video frames (hold a key for N frames, then no key). The joystick in port 1 is ANDed onto $DC01, so a fire bit
  *           (bit 4) from the fuzzer looks like the SPACE key: pass --joy1 ff (and --joy2 ff) to read only the keys. Without --keymat the keys are a seeded fuzzer.
+ * Input that changes during a run: --joy1-at FRAME=HEX, --joy2-at FRAME=HEX and --keymat-at FRAME=B0,..,B7 (hex, as --keymat) are repeatable; each sets that input from
+ *           video frame FRAME on, until a later event of the same option replaces it. Any of them switches the
+ *           matching fuzzer off like the fixed forms do (joysticks: both; keys), and the value before the first event is "nothing pressed" (joysticks ff, keys 0) unless --joy1/--joy2/--keymat
+ *           gave one. Timing is the one of --poke: the sample taken at frame N (--sample/--sample-set) is taken BEFORE the events of frame N are applied, so the first sample that
+ *           shows the program's reaction to an event at frame N is the one at frame N+1. FRAME 0 is applied before the first instruction. Example, joystick 2 up (bit 0 low) from frame 10,
+ *           up+right from frame 46, released at 80:  --joy1 ff --joy2-at 10=fe --joy2-at 46=f6 --joy2-at 80=ff
  * Noise: --raster-entropy [--site-map FILE] [--entropy-pool-read]   answer reads of $D012 that the program uses as noise from a private PRNG
  *           (timing-independent, for traces that must survive a change of cycle timing); see the comments at io_read.
  * Output: --out PREFIX (.flags .hits .edges .writer, accumulated over runs), --iolog FILE, --memlog FILE ADDR_LO ADDR_HI [PC_LO PC_HI] (ONE range per run: a second --memlog replaces the first),
@@ -711,6 +717,16 @@ static int key_fixed;                  /* --keymat given: the key fuzzer leaves 
 static long keymat_frames;             /* --keymat-frames N: release the fixed keys after N frames (0 = hold them for the whole run) */
 static FILE *sample_f; static unsigned sample_lo, sample_hi;   /* --sample FILE LO HI: append ram[LO..HI] once per video frame */
 static unsigned set_lo[64], set_hi[64]; static int nset;      /* --sample-set FILE RANGES: RANGES has one "LO HI" (hex) per line, # starts a comment line; every frame the ranges are appended in order */
+/* --joy1-at / --joy2-at / --keymat-at: input events by frame; ev_done marks an applied event (several events of one frame apply in the order given) */
+static struct { long frame; int kind; u8 val; u8 km[8]; int done; } evs[256];   /* kind 1 = joy1, 2 = joy2, 3 = keymat */
+static int nev, ev_keys;
+static void apply_events(long fr) {
+    for (int i = 0; i < nev; i++)
+        if (!evs[i].done && evs[i].frame <= fr) {
+            evs[i].done = 1;
+            if (evs[i].kind == 1) joy1 = evs[i].val; else if (evs[i].kind == 2) joy2 = evs[i].val; else memcpy(keymat, evs[i].km, 8);
+        }
+}
 static void on_frame(void) {
     if (sample_f && !nset) fwrite(ram + sample_lo, 1, sample_hi - sample_lo + 1, sample_f);
     if (sample_f && nset) for (int i = 0; i < nset; i++) fwrite(ram + set_lo[i], 1, set_hi[i] - set_lo[i] + 1, sample_f);
@@ -728,7 +744,8 @@ static void on_frame(void) {
         joy2 = j;
         if (rnd() % 4 == 0) joy1 = (u8)(0xFF & ~(rnd() & 0x1F)); else joy1 = 0xFF;
     }
-    if (key_fixed) { if (keymat_frames && frame >= keymat_frames) memset(keymat, 0, sizeof keymat); }
+    apply_events(frame);
+    if (key_fixed) { if (keymat_frames && frame >= keymat_frames && !ev_keys) memset(keymat, 0, sizeof keymat); }
     else if (hold_frames > 0) { if (--hold_frames == 0) memset(keymat, 0, sizeof keymat); }
     else if (rnd() % 40 == 0) {
         memset(keymat, 0, sizeof keymat);
@@ -801,6 +818,18 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--seed") && i + 1 < argc) seed = (u32)atol(argv[++i]);
         else if (!strcmp(argv[i], "--keymat") && i + 1 < argc) { const char *k = argv[++i]; for (int c = 0; c < 8 && *k; c++) { keymat[c] = (u8)strtoul(k, (char **)&k, 16); if (*k == ',') k++; } key_fixed = 1; }   /* --keymat B0,..,B7 (hex): keys held for the whole run (or --keymat-frames N frames), keymat[col] bit r = row r */
         else if (!strcmp(argv[i], "--keymat-frames") && i + 1 < argc) keymat_frames = atol(argv[++i]);
+        else if (!strcmp(argv[i], "--joy1-at") || !strcmp(argv[i], "--joy2-at")) {
+            int k = argv[i][5] == '1' ? 1 : 2; long f; unsigned v;
+            if (i + 1 >= argc || nev >= 256 || sscanf(argv[i + 1], "%ld=%x", &f, &v) != 2) { fprintf(stderr, "bad %s (want FRAME=HEX)\n", argv[i]); return 2; }
+            i++; evs[nev].frame = f; evs[nev].kind = k; evs[nev].val = (u8)v; nev++; joy_fixed = 1;
+        }
+        else if (!strcmp(argv[i], "--keymat-at")) {
+            long f; int n = 0; const char *k;
+            if (i + 1 >= argc || nev >= 256 || sscanf(argv[i + 1], "%ld=%n", &f, &n) < 1 || n == 0) { fprintf(stderr, "bad --keymat-at (want FRAME=B0,..,B7)\n"); return 2; }
+            k = argv[++i] + n; evs[nev].frame = f; evs[nev].kind = 3; memset(evs[nev].km, 0, 8);
+            for (int c = 0; c < 8 && *k; c++) { evs[nev].km[c] = (u8)strtoul(k, (char **)&k, 16); if (*k == ',') k++; }
+            nev++; key_fixed = 1; ev_keys = 1;
+        }
         else if (!strcmp(argv[i], "--raster-entropy")) raster_entropy = 1;
         else if (!strcmp(argv[i], "--site-map") && i + 1 < argc) { FILE *f = fopen(argv[++i], "r"); unsigned a_, k_; while (f && nsite_map < 4096 && fscanf(f, "%x %x", &a_, &k_) == 2) { site_map[nsite_map].addr = (u16)a_; site_map[nsite_map].key = k_; nsite_map++; } if (f) fclose(f); }
         else if (!strcmp(argv[i], "--skew") && i + 1 < argc) skew = atoi(argv[++i]);
@@ -848,6 +877,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--selftest") && i + 2 < argc) { selftest_packed = argv[++i]; selftest_ref = argv[++i]; }
         else { fprintf(stderr, "unknown or incomplete option: %s\n", argv[i]); return 2; }
     }
+    apply_events(0);                    /* events of frame 0 apply before the first instruction */
     char rp[512];
     if (!rom_dir) { memset(kernal, 0x02, sizeof kernal); memset(basic, 0x02, sizeof basic); }      /* no ROMs: executing one stops the run (KIL), reading it gives $02 */
     else {

@@ -193,3 +193,38 @@ def write_changed(changed, write):
     """changed = {path: new text}; writes them when `write`."""
     if write:
         for p, t in changed.items(): open(p, 'w').write(t)
+
+# ---- label lookup shared by uses.py, sample_report.py, todo_list.py -------------------------------------------------------------------------------------
+
+def source_labels(main):
+    """{name: original address} of every label of the source: `.label NAME = $ADDR` lines of the label files and the code files, and in-stream `NAME:` labels (scope openers
+    `Name: {` included), whose address is that of the next `// [ADDR...]` trace comment. A scoped local is also given as `Scope.local`. Returns (names, stream_names)."""
+    L = expanded_lines(main)
+    for f in code_files(main):                                    # the label files are not expanded into the stream
+        if os.path.basename(f) in LABEL_FILES: L = L + open(f).read().split('\n')
+    sym = {}
+    for l in L:
+        m = re.match(r'^\s*\.label\s+([\w.]+)\s*=\s*\$([0-9A-Fa-f]+)\s*(?://|$)', l)
+        if m: sym[m.group(1)] = int(m.group(2), 16)
+    stream = {}; pend = []; scope = []
+    for l in L:
+        code = split_comment(l)[0]
+        m = re.match(r'^(?:\s*\.namespace)?\s*([A-Za-z_]\w*):(?!\S)\s*(\{)?', code)
+        if m and not code.lstrip().startswith('.'): pend.append((m.group(1), '.'.join(scope)))
+        t = re.search(r'// \[([0-9A-Fa-f]{4})[:\]]', l)
+        if t and pend:
+            for n, sc in pend:
+                stream.setdefault(n, int(t.group(1), 16))
+                if sc and '?' not in sc: stream.setdefault(sc + '.' + n, int(t.group(1), 16))
+            pend = []
+        if m and m.group(2): scope.append(m.group(1))
+        elif code.count('{') or code.count('}'):
+            for _ in range(code.count('}')):
+                if scope: scope.pop()
+            for _ in range(code.count('{')): scope.append('?')
+    return {**stream, **sym}, stream
+
+def parse_addr(s):
+    """'$12AB' / '0x12ab' -> int; None when s is not written as an address"""
+    m = re.match(r'^(?:\$|0x)([0-9A-Fa-f]{1,4})$', s)
+    return int(m.group(1), 16) if m else None
