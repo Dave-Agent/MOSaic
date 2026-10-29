@@ -7,17 +7,22 @@ XREF or `[ADDR:bytes]` trace comments). Text before `//` in a TSV cell is litera
 
 | tool | map | what it does |
 |---|---|---|
-| `rename.py MAP` | `OLD<TAB>NEW[<TAB>description]` | rename labels everywhere; refuses a NEW that already exists; a description becomes a wrapped `// NEW: ...` block above the definition |
+| `rename.py MAP` | `OLD<TAB>NEW[<TAB>description[<TAB>TODO(tag): text]]` | rename labels everywhere; refuses a NEW that already exists; a description becomes a wrapped `// NEW: ...` block above the definition; the fourth column is written as its own `// TODO(tag):` line(s) below it; `--comments` also renames prose mentions and LISTS every comment line it changed |
 | `drop_labels.py MAP` | `OLD<TAB>EXPR` | delete `.label OLD = ...` (and its XREF continuation lines) and write EXPR (`tbl+1`, `Scope.name`) at every use: a variable that is really a byte of another label |
 | `replace_raw.py MAP` | `HEXADDR<TAB>EXPR` | raw `$ADDR` code operands to a label (`--words`: also `.word $ADDR`); the targets come from `raw_refs.py -v` |
 | `replace_imm.py MAP` | `INSTRADDR<TAB>EXPR` | the immediate of the instruction at that original address becomes `#<label` / `#>label` (address pairs listed by `addr_immediates.py`) |
 | `move_img.py MAP` | `OLD<TAB>NEW[<TAB>description]` | an image-resident variable `.label OLD = $ADDR` becomes an in-stream label `NEW:` at that address (instruction or `.byte` row split), carries its XREF text and description, renames the uses. An address inside an instruction becomes the SMC operand form `NEW:operand` + `SMC` marker |
 | `scopeify.py SPEC` | `ROUTINE<TAB>summary<TAB>old=new;old=!;...[<TAB>inner;labels]` | wrap routines as `Name: {` ... `} // Name`, name the local labels, turn the `=!` ones into anonymous labels (`!+`, `!-` counted), qualify outside uses as `Name.local` |
-| `set_comment.py LABEL TEXT` / `MAP` | `LABEL<TAB>text[<TAB>summary]` | set or replace the block comment above a label (above its XREF lines), wrapped at 124; `--summary` sets the label-line summary |
-| `uses.py NAME\|$ADDR ...` | | read-only: every reader and writer of a variable (R/W/RW, enclosing routine, original address): the input of the variable-role protocol |
+| `set_comment.py LABEL TEXT` / `MAP` | `LABEL<TAB>text[<TAB>summary[<TAB>TODO(tag): text]]` | set or replace the block comment above a label (above its XREF lines), wrapped at 124; `--summary` sets the label-line summary (an empty cell leaves it, `-` clears it); the fourth column / `--todo` is written as its own `// TODO(tag):` line(s) after the text. A `TODO(tag):` in the middle of a paragraph is split off the same way (rules.md: a TODO has its own line), so `p1_complete.py` and `todo_list.py` see it |
+| `uses.py NAME\|$ADDR ...` | | read-only: every reader and writer of a variable (R/W/RW, original address, the enclosing ROUTINE, the nearest label as a second column): the input of the variable-role protocol. The routine is the scope, or the nearest label above that is a `jsr` target, a `jmp` target from another routine (or, with `--flags PREFIX`, anything the tracer saw called or interrupted to), so before the scopes exist the uses are not all "in `LAB_xxxx`" |
+| `bitskip.py MAP` / `--scan` | `ADDR<TAB>NAME[<TAB>OLD_LABEL]` | the BIT-skip trick (rules.md): `.byte $2C` (or `$24` / a NOP skip opcode) plus the hidden instruction on its own labelled line, both trace comments kept, the old `LAB_xxxx_1` renamed and its `.label` dropped, the BIT's unused operand label dropped. `--scan` lists the sites (a skip opcode whose operand bytes a branch enters). It prints both readings and the branch that reaches the hidden instruction with the condition it proves, and WARNS when the name may describe the wrong side |
+| `table_words.py SPEC` | `ADDR<TAB>word\|field\|lo\|hi<TAB>COUNT<TAB>LAYOUT[<TAB>NAMES]` | raw pointer bytes to names: `.word label` rows, the address word of every record of a record table (`8+6` = stride 8, word at +6; the bytes around it stay `.byte` rows), the `<(base+n)` / `>(base+n)` byte tables of a split pointer table. NAMES: a list, `base:STEP`, or `auto` (the label at the address the bytes already point to). Every entry is checked against the bytes in the table, so the conversion cannot change one |
 
-`scripts/add_label.py ADDR NAME [COMMENT]` (one in-stream label; the comment may be several wrapped paragraphs) and the analysis tools `raw_refs.py`, `addr_immediates.py`, `anon_labels.py`,
-`comment_check.py`, `p1_complete.py` (`--range LO-HI` reports one slice) belong to the same loop.
+`scripts/add_label.py ADDR NAME [COMMENT]` (one in-stream label; the comment may be several wrapped paragraphs; `--map FILE` with lines `ADDR<TAB>NAME[<TAB>comment]` adds many in one call, `--group TEXT`
+puts the description of the whole group on the first label) and the analysis tools `raw_refs.py`, `addr_immediates.py`, `addr_tables.py` (pointer-table candidates in `.byte` rows, with their targets and
+the label there), `anon_labels.py`, `comment_check.py`, `todo_list.py` (the `TODO(user)` / `TODO(name)` / `TODO(block)` markers with the label and routine they sit on, grouped by tag, `--range`; for the log
+and for the questions to the user), `p1_complete.py` (`--range LO-HI` reports one slice; it also reads the data rows: pointer-table candidates, unlabelled data runs, and says when a range holds no
+instruction at all) belong to the same loop.
 
 ## The pass order that kept the gate green
 
@@ -34,3 +39,16 @@ Each step: run the tool, `just verify` (byte-identical), commit. The order matte
 
 Rules of thumb: dry-run first and read the per-name counts (a name with 0 uses is a typo in the map); never rename two names to one; a label used from another routine stays global
 (`scopeify.py` rewrites such a use as a path, and refuses to make it anonymous); keep every `[ADDR:bytes MNEMONIC]` comment. Work in a scratch copy when a map is new.
+
+## Cases that come up (expected treatment)
+
+- **A routine whose code is physically split** (a ramp-down or brake tail that sits after another routine's code, reached by a jump) cannot be one scope: a scope is one contiguous
+  range. Each piece is its own scope with its own global name, and a comment on each says which routine it continues. That is the expected treatment, not a gap in the tool.
+- **The INNER column of `scopeify.py`** lists labels that sit inside the routine's range but are not branch targets of it: the label of a hidden instruction (the BIT-skip trick, `bitskip.py`),
+  a string or table label inside the code, an SMC operand label. Without it the routine would end at such a label (it ends at the next label that is neither a local nor inner). Whenever a
+  scope stops short of its `RTS`, look for an inner label.
+- **The BIT-skip trick** (`bitskip.py`): the hidden instruction's label already has its final name from `bitskip.py` (run it first: it renames the old `LAB_xxxx_1`); `scopeify.py` then needs it in INNER, because it
+  is a label inside the routine that is not a branch target to rename (the branch that reaches it is in the same routine, so the name resolves in the scope). Name the label for the case the BRANCH-TAKEN condition proves; the tool prints that condition.
+- **Rows left behind by `move_img.py` / `add_label.py` / `table_words.py`**: splitting a `.byte` row at a label leaves short rows (a 1-byte `.byte $00 // [2188]` between two labels) and the
+  blank-line rule wants a blank line before each new top-level label. Both are cosmetic and byte-neutral; `just align` (`align_comments.py`) tidies the blank lines, and nothing needs the rows
+  joined again.
