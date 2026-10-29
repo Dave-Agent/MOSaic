@@ -1,6 +1,6 @@
 ---
 name: c64-decomp
-description: Process, rules and decisions for Commodore 64 decompilation projects (turning a game's disk image into byte-identical, commented, relocatable Kick Assembler source). Use when working in such a repo, starting a new game from its original media, running a refactor across the source (labels, namespaces, symbols files), or when a convention question comes up (naming, SMC, locals, zero page, phases, gates). Read before changing label or file structure.
+description: Process, rules and decisions for Commodore 64 decompilation projects (turning a game's disk or tape image into byte-identical, commented, relocatable Kick Assembler source; MOSaic). Use when working in such a repo (a project folder with project.config and framework/), starting a new game from its original media, when the user says to continue, move to the next stage or asks what comes next in such a project, running a refactor across the source (labels, namespaces, symbols files), or when a convention question comes up (naming, SMC, locals, zero page, phases, gates). Read before changing label or file structure.
 ---
 
 # C64 decompilation: the shared process
@@ -17,6 +17,10 @@ Run `scripts/check_env.py` from the project root (add `--role run|disk|trace|ghi
 2. **Phase 2** has no byte gate; its gate is the project's `check` (build, raw-address check, alignment, `scripts/sim/run_tests.py`, `scripts/golden/golden.py check-t`); phase 1 runs the same tests with `--phase 1` and the exact `golden.py check`. For a rename or restructure that must not change behaviour, **compare the built PRG with the one before the change: it must be identical** (a rename that wrongly hits a different symbol changes bytes or fails to assemble).
 3. Commit after each step. **Push only when the user says to.** Never discard uncommitted work (`git checkout/reset/restore/clean`).
 4. A decision made together goes in `references/decisions.md` (date, what, why) and, if it is a rule, in `references/rules.md`.
+
+## At every stage boundary: report and ask
+
+When a stage finishes (research, extraction and the boot chain, the clean reference, the Ghidra export, the first byte-identical build, phase 1, each phase 2 step), the session that is talking to the user does three things before anything else: run `python3 <skill>/scripts/status.py` (`just status` in a project), tell the user in a few sentences what was just done and what the next stage is and roughly what it involves, and **ask whether to continue** (offer: continue, continue after I have looked, stop here). It does not start the next stage unasked and does not stop without offering. A user who has said "carry on" or "go through to <stage>" has answered for the stages up to there. Background workers (a slice's agent) never ask: they report to the session that started them. This is what lets a newcomer use the skill without knowing the stage list. When the user says "move to the next stage", "continue", "what next" or similar in a project, run `status.py`, say what the next stage is and what it involves, ask, and then do it.
 
 ## Phases
 

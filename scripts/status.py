@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Where is this project in the MOSaic process, and what comes next? Reads the project (cheap file checks; `--verify` also runs the gate and the phase 1 completeness report).
+
+  status.py [--root DIR] [--verify]
+
+Prints each stage as done / not done with the evidence it looked at, then `NEXT:` with the stage to do, what it consists of and the document that describes it. An agent working with a user runs this at the end of every stage,
+tells the user what was done and what comes next, and ASKS whether to continue (SKILL.md, "At every stage boundary"). The stage signals are heuristics from files and commands the process leaves behind: they say where to look,
+they are not proofs."""
+import glob, os, re, subprocess, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _common import parser, config
+a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--verify', action='store_true'); args = a.parse_args()
+root = os.path.abspath(args.root); cfg = config(root); P = lambda *x: os.path.join(root, *x)
+def size(*x): return os.path.getsize(P(*x)) if os.path.exists(P(*x)) else 0
+def files(pat): return glob.glob(P(pat), recursive=True)
+def run(cmd): return subprocess.run(cmd, cwd=root, capture_output=True, text=True)
+SK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+main1 = cfg.get('SRC_MAIN', ''); main1p = P(main1) if main1 else ''
+st = []                                                      # (name, done, evidence, what comes next if this is the first undone stage, document)
+media = [f for f in files('originals/*') if os.path.isfile(f)]
+st.append(('Project scaffolded', os.path.exists(P('project.config')) and os.path.isdir(P('framework')), 'project.config, framework/', 'Make the project with new_project.py (README, Getting started).', 'README.md'))
+st.append(('Original medium in originals/', bool(media) and os.path.exists(P('originals.sha256')), '%d file(s), originals.sha256 %s' % (len(media), 'present' if os.path.exists(P('originals.sha256')) else 'missing'), 'Put the disk or tape image in originals/ (new_project.py --media) so its SHA-256 is recorded.', 'references/layout.md'))
+res = size('docs', 'gameplay.md') > 900 or size('docs', 'background.md') > 900
+st.append(('Research (stage 0b)', res, 'docs/gameplay.md, docs/background.md filled' if res else 'docs still templates', 'Research the game: manual, release facts, POKE lists; write docs/gameplay.md and docs/background.md.', 'references/research.md'))
+bootdoc = size('docs', 'boot_analysis.md') > 1500 and bool(files('extracted/*'))
+st.append(('Files extracted, boot chain analysed (stage 2)', bootdoc, 'extracted/ and docs/boot_analysis.md', 'Extract the files (disk: c1541 / extract_files.py, tape: tap_extract.py), disassemble the boot stub, work out the boot chain.', 'references/new_game.md, stage 2'))
+ref = (cfg.get('REFERENCE_PRG') and os.path.exists(P(cfg['REFERENCE_PRG']))) or bool(files('reference/*.bin'))
+st.append(('Clean reference derived (stage 3)', ref and os.path.exists(P('reference.sha256')), 'reference image + reference.sha256', 'Find the hand-off, dump RAM from a scratch copy, derive the game-only reference (tools/reference.spec, just derive).', 'references/new_game.md, stages 2-3'))
+gh = bool(files('ghidra/*.asm'))
+st.append(('Ghidra export (stage 5)', gh, 'ghidra/*.asm' if gh else 'no export', 'Seed and export: just seeds, just ghidra.', 'references/new_game.md, stage 5'))
+src1 = bool(main1) and os.path.exists(main1p) and 'DAT_' in open(main1p, errors='replace').read(400000) or (bool(main1) and os.path.exists(main1p) and size(main1) > 0)
+ver = None
+if args.verify and src1:
+    r = run(['just', 'verify', '1']); ver = r.returncode == 0 and 'PASS' in r.stdout
+st.append(('First byte-identical build (phase 1 source)', src1 and (ver is not False), ('phase 1 main file present' + ('' if ver is None else ', just verify ' + ('PASS' if ver else 'FAIL'))) if src1 else 'no phase 1 source', 'Copy the export into phase1/src, set SRC_MAIN, get just verify byte-identical, fix the first diffs.', 'references/new_game.md, stage 5'))
+libs = src1 and bool(re.search(r'\b(VIC|CIA|SID)\.\w+', open(main1p, errors='replace').read(600000)))
+st.append(('Hardware registers named (libs applied)', libs, 'VIC./CIA./SID. names in the source' if libs else 'raw register addresses', 'just libs-apply, then just anon-apply (anonymous labels); verify after each.', 'references/new_game.md, stage 6; rules.md'))
+smoke = os.path.exists(P('tools', 'smoke_ref.png'))
+st.append(('Game starts (smoke reference)', smoke, 'tools/smoke_ref.png' if smoke else 'no smoke reference', 'just smoke (the first run creates the reference picture: look at it), just launch.', 'references/new_game.md, stage 4'))
+p1 = None
+if src1:
+    r = run([sys.executable, '-B', os.path.join(SK, 'scripts', 'p1_complete.py'), '--root', root, '--phase', '1']); v = [l for l in r.stdout.split('\n') if l.startswith('VERDICT')]
+    p1 = v[0] if v else None
+done_p1 = bool(p1) and p1.startswith('VERDICT: COMPLETE')
+st.append(('Phase 1 complete (every routine understood, no raw operands or placeholders)', done_p1, p1 or 'p1_complete.py gave no verdict', 'Phase 1: work in slices (slice.py start / check / merge), ask the owner only what a thing IS after code and a tracer run, report progress.', 'references/phase1_method.md'))
+p2 = os.path.isdir(P('phase2', 'src'))
+st.append(('Phase 2 safety net (tests, golden traces)', p2 and bool(files('tools/tests/test_*.py')) and bool(files('tools/golden/scenarios.txt')), 'tools/tests, tools/golden', 'Phase 2 step 1: routine tests and golden traces; docs/phase2_plan.md; docs/platform_layer.md.', 'references/phase2_split.md, steps 1-2'))
+nfiles = len([f for f in files('phase2/src/**/*.asm') if '/libs/' not in f])
+st.append(('Phase 2 source split into files', p2 and nfiles > 5, '%d files in phase2/src' % nfiles, 'Phase 2 step 3: split_all.py / cut_section.py, byte-identical, just verify 2 after every move.', 'references/phase2_split.md, step 3'))
+iface = os.path.exists(P('docs', 'porting.md'))
+st.append(('Platform interface and port contracts', iface, 'docs/porting.md' if iface else 'no docs/porting.md', 'Phase 2 step 4: namespaces and contracts for Input, Time, Sound, Gfx, Storage, Boot.', 'references/phase2_split.md, step 4; phase2_port.md'))
+reloc = os.path.exists(P('docs', 'relocation_hazards.md'))
+st.append(('Relocatable (hazards resolved, sweep run)', reloc, 'docs/relocation_hazards.md' if reloc else 'not started', 'Phase 2 step 5: just reloc 2, asserts, the layout sweep with a control variant.', 'references/phase2_split.md, step 5; testing.md'))
+rem = os.path.exists(P('docs', 'phase2_removals.md'))
+st.append(('Byte-changing removals (masked gate)', rem, 'docs/phase2_removals.md' if rem else 'not started', 'Phase 2 step 6: remove the owner-approved dead blocks without moving anything (PHASE2_ALLOWED_DIFF).', 'references/phase2_split.md, step 6'))
+hi = max([i for i, x in enumerate(st) if x[1]], default=-1)       # a stage whose evidence is missing but a LATER stage is done is not what comes next (extracted/ and dumps/ are regenerable and git-ignored)
+nxt = None
+for i, (n, d, ev, w, doc) in enumerate(st):
+    mark = 'done' if d else ('skip' if i < hi else '    ')
+    print('%s  %s%s' % (mark, n, '' if not ev else '   (' + ev + ')'))
+    if not d and i > hi and nxt is None: nxt = (n, w, doc)
+print()
+if nxt: print('NEXT: %s\n  what: %s\n  see:  %s' % nxt)
+else: print('NEXT: every stage this tool knows is done. Optional: compact the layout into the freed holes, or start another game.')
+print('(skip = no evidence found for that stage, but a later stage is done: its files may be regenerable and git-ignored)\nAsk the user whether to continue with it (SKILL.md, "At every stage boundary"); do not start the next stage unasked.')

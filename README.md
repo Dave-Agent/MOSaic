@@ -48,7 +48,7 @@ MOSaic creates a local git repository in the project and commits after each step
 
 The agent researches the game, extracts the files, finds the point where the game is fully loaded, derives a clean reference image, exports the disassembly from Ghidra, and builds it back byte for byte. A disk takes tens of minutes and a tape longer. VICE opens windows while it dumps memory; don't type in them.
 
-**5. Tell it to continue when it stops.** The agent finishes the task it was given and stops at each stage boundary, so you choose the next step. Paste the next prompt:
+**5. Tell it to continue when it stops.** The agent finishes the task it was given and stops at each stage boundary. It runs `just status`, tells you what was done and what the next stage is, and asks whether to continue. You can also just say "move to the next stage" (or "what's next?"), and it works out the stage from the project. The prompts below are what each stage amounts to, for when you want to be specific:
 
 | When the agent says… | Ask |
 |---|---|

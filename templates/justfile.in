@@ -196,3 +196,7 @@ check phase=active_phase:
     fi
     just test {{phase}}
     just golden {{phase}}
+
+# Where the project is in the MOSaic process and what comes next (--verify also runs the gate and the phase 1 completeness report). An agent runs this at every stage boundary and asks the user whether to continue.
+status *args:
+    python3 -B {{skill}}/scripts/status.py --root . {{args}}
