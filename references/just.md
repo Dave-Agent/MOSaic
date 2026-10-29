@@ -35,7 +35,7 @@ The skill and its agents refer to recipes by **role**, because projects do not a
 | align comments | `align`, `align-check` | `scripts/align_comments.py` |
 | run / smoke test | `launch`, `smoke` | start the emulator by hand with the symbol file |
 | Ghidra sync state | `sync-state`, `synced` | skip, but never edit Ghidra and the source in both directions |
-Optional roles seen in practice (add where useful): `comment-check` (comment rules), `anon-check` (anonymous-label limits), `rawops` (the raw-address check; the skill's `raw_refs.py` does the same), `progress` (how much is classified). Docs-site recipes stay out of the skill.
+Shipped in `templates/justfile.in` (role `launch`, `smoke`): `launch` (builds, then `scripts/launcher/run_game.py`) and `smoke` (builds, then `scripts/launcher/smoke.py`); both are read from `project.config` (`LAUNCH_MODE`, `SMOKE_CYCLES`, `JUDGE_CROP` ...). Optional roles seen in practice (add where useful): `comment-check` (comment rules), `anon-check` (anonymous-label limits), `rawops` (the raw-address check; the skill's `raw_refs.py` does the same), `progress` (how much is classified). Docs-site recipes stay out of the skill.
 A project that lacks a role-recipe the loop needs should add it (named as above) rather than rely on the fallback.
 
 ## The standard recipe set

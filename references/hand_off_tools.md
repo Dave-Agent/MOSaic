@@ -5,6 +5,8 @@ Generic scripts, all in `scripts/`, all taking `--root` (the project root, defau
 | Script | Stage | What it does |
 |---|---|---|
 | `vice/vice_handoff.py` | 2 | Boots MEDIA in VICE (headless-capable, warp, true drive), patches key waits, runs to HANDOFF, dumps the 64 KB RAM. Also tests a removal (`--after`) and takes a screenshot. |
+| `launcher/run_game.py` | 2 | Starts the game in VICE (sys or inject mode), interactive or headless with `--shot` |
+| `launcher/smoke.py` | 2 | Unattended start test: cheap blank/READY check plus a reference-screenshot judge |
 | `vice/vice_monitor.py` | 2-4 | The text-monitor client (`Monitor` class and a one-shot CLI). The other VICE scripts use it. |
 | `vice/vice_symbols.py` | 4+ | Kick symbol file to VICE monitor labels with the full namespace path, plus breakpoints and watches. |
 | `vice/judge_screenshot.py` | 4, 6 | Scores a screenshot against a reference picture (whole or a crop). |
