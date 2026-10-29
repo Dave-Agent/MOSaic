@@ -50,12 +50,7 @@ The original game file was copied into the project's `originals/` folder with it
 
 The agent researches the game, extracts the files, finds the point where the game is fully loaded, derives a clean reference image, exports the disassembly from Ghidra, and builds it back byte for byte. A disk takes tens of minutes and a tape longer. VICE opens windows while it dumps memory; don't type in them.
 
-**(e) After the run, it asks whether to go on.** Steps 2 to 8 are one job, so the agent works through all of them, telling you each step as it starts, and stops early only if it needs something from you. When the game starts, it reports and asks whether to begin phase 1. From then on you can just say "move to the next stage" (or "what's next?"): it works out the stage from the project, tells you which step it is starting and what it will do, and gets on with it without asking again. The prompts below are what each later stage amounts to, for when you want to be specific:
-
-| When the agent says… | Ask |
-|---|---|
-| the game starts and the first build passes | "Start phase 1 following `references/phase1_method.md`: work in slices, ask me what a thing is only after trying the code and a tracer run, and report progress." |
-| phase 1 is complete | "Start phase 2 following `references/phase2_split.md`." |
+**(e) The agent asks you at four points only.** The work is three runs and a decision: research to a game that starts (steps 2 to 8), phase 1 (step 9), the phase 2 refactoring (steps 10 to 13) and the dead-code removals (step 14). Inside a run it just works, telling you each step as it starts, and stops early only if it needs something from you. When a run ends it says what you now have, how to launch it and which file to read, and asks whether to go on, for example: *"Raw disassembly complete: it assembles byte for byte to the original and starts. Launch it with `just launch 1`; the source is `phase1/src/<name>.asm`. Start phase 1?"* Answer "yes", or say "move to the next stage" at any time and it works out where the project is.
 
 **(f) Check where you are** with `just --list` for the commands, `python3 ~/.claude/skills/mosaic/scripts/p1_complete.py --root . --phase 1` for how much of phase 1 remains, and `docs/` in the project for the research, the boot analysis and the answers recorded from you.
 

@@ -7,6 +7,8 @@
 
 Pick a side for each step; you can mix them. `just status` in the project always tells you which step you are on.
 
+The agent asks you a question at four points only, when a run ends: after **step 8** ("Raw disassembly complete: start phase 1?"), after **step 9** ("Named monolith complete: start phase 2?"), after **step 13** ("Refactoring done: review the dead-code list?") and after **step 14** ("Phase 2 complete: play it"). Each message says how to launch what you have and which file to read. In between it just works, telling you each step as it starts, and asks earlier only if it needs something from you.
+
 **Words used below.**
 **Reference:** a memory image of the game alone (no loader, no crack), made in step 4; every build is checked against it. **Hand-off:** the moment the game is fully loaded and about to start. **Byte-identical:** the source assembles to exactly the same bytes as the reference. **Slice:** one region of the source worked on in a scratch copy, merged back when its checks pass. **Agent:** the Claude session doing the work, in Claude Code inside the project folder.
 **Phase 1** turns the game into one fully commented source file that is byte-identical to the original. **Phase 2** splits it into files, separates the game from the C64 hardware, and makes it relocatable.
@@ -158,9 +160,11 @@ The steps below say what happens in each, and the commands if you want to run an
 
 ---
 
-## Phase 2: a source ready for a port
+## Steps 10 to 13: phase 2 is one run
 
-Phase 2 works on a copy of phase 1. After this, every command takes the phase: `just verify 2`, `just check 2`, `just launch 2`. Read `references/phase2_split.md` and `references/phase2_port.md` first.
+Phase 2 works on a copy of phase 1. These four steps need nothing from you, so ask for them once and the agent works through them, telling you each step as it starts. It stops before step 14, where the dead-code list needs your decision. After this, every command takes the phase: `just verify 2`, `just check 2`, `just launch 2`. Read `references/phase2_split.md` and `references/phase2_port.md` first.
+
+**To start the run, say:** "Use the MOSaic skill. Refactor this game for phase 2: work through HOWTO steps 10 to 13 without stopping between them, and stop before the removals."
 
 ## Step 10. Build the safety net
 
@@ -168,7 +172,7 @@ Phase 2 works on a copy of phase 1. After this, every command takes the phase: `
 
 | Guided | Manual |
 |---|---|
-| Say "Start phase 2: the copy, then the safety net and the hardware catalogue."<br><br>The agent writes routine tests (code run in a simulator against Python models), golden traces (the game's state per frame under scripted input), `docs/platform_layer.md` and `docs/phase2_plan.md`. | `rsync -a --exclude build --exclude '*.sym' phase1/src/ phase2/src/`<br>In `project.config`: `PHASE2_MAIN="phase2/src/<name>.asm"` and `ACTIVE_PHASE="2"`.<br>Write tests in `tools/tests/` and scenarios in `tools/golden/`, then:<br>`just test 1`<br>`just golden-record`<br>`just golden 1` |
+| Give the phase 2 run prompt above (this step is where the run starts).<br><br>The agent writes routine tests (code run in a simulator against Python models), golden traces (the game's state per frame under scripted input), `docs/platform_layer.md` and `docs/phase2_plan.md`. | `rsync -a --exclude build --exclude '*.sym' phase1/src/ phase2/src/`<br>In `project.config`: `PHASE2_MAIN="phase2/src/<name>.asm"` and `ACTIVE_PHASE="2"`.<br>Write tests in `tools/tests/` and scenarios in `tools/golden/`, then:<br>`just test 1`<br>`just golden-record`<br>`just golden 1` |
 
 **Done when:** `just check 1` passes.
 
@@ -178,7 +182,7 @@ Phase 2 works on a copy of phase 1. After this, every command takes the phase: `
 
 | Guided | Manual |
 |---|---|
-| Say "move to the next stage".<br><br>The agent moves each section into its own file and runs the gate after every move. | Write a plan file (one line per file: `DIR` tab `SECTION` tab `NAME`), then:<br>`python3 ~/.claude/skills/mosaic/scripts/split_all.py PLAN`<br>Cut inside a section: `scripts/cut_section.py`.<br>`just verify 2` after every move. |
+| Part of the run you started in step 10; nothing to say.<br><br>The agent moves each section into its own file and runs the gate after every move. | Write a plan file (one line per file: `DIR` tab `SECTION` tab `NAME`), then:<br>`python3 ~/.claude/skills/mosaic/scripts/split_all.py PLAN`<br>Cut inside a section: `scripts/cut_section.py`.<br>`just verify 2` after every move. |
 
 **Done when:** the phase 2 main file is only imports and `just verify 2` is byte-identical.
 
@@ -188,7 +192,7 @@ Phase 2 works on a copy of phase 1. After this, every command takes the phase: `
 
 | Guided | Manual |
 |---|---|
-| Say "move to the next stage".<br><br>The agent does it one subsystem at a time, byte-identical. Where a wrapper would cost bytes or cycles in a full image it leaves the access alone, tags it `TODO(port)` and says why. | Move the routines into namespaces, write each contract in `docs/porting.md` (inputs, outputs, what is preserved, interrupt safety), then:<br>`just check 2` |
+| Part of the run you started in step 10; nothing to say.<br><br>The agent does it one subsystem at a time, byte-identical. Where a wrapper would cost bytes or cycles in a full image it leaves the access alone, tags it `TODO(port)` and says why. | Move the routines into namespaces, write each contract in `docs/porting.md` (inputs, outputs, what is preserved, interrupt safety), then:<br>`just check 2` |
 
 **Done when:** `docs/porting.md` exists and `just check 2` passes.
 
@@ -198,7 +202,7 @@ Phase 2 works on a copy of phase 1. After this, every command takes the phase: `
 
 | Guided | Manual |
 |---|---|
-| Say "move to the next stage".<br><br>The agent resolves each relocation hazard, turns layout assumptions into `.assert`s, and runs the layout sweep with a control variant that changes no address. Findings go in `docs/relocation_hazards.md`. | `just reloc 2`<br>`just fuzz-layout ...` (options in `references/testing.md`, "Moving the layout")<br>Always include a control variant. |
+| Part of the run you started in step 10; nothing to say.<br><br>The agent resolves each relocation hazard, turns layout assumptions into `.assert`s, and runs the layout sweep with a control variant that changes no address. Findings go in `docs/relocation_hazards.md`. | `just reloc 2`<br>`just fuzz-layout ...` (options in `references/testing.md`, "Moving the layout")<br>Always include a control variant. |
 
 **Done when:** every hazard is resolved or documented and the sweep shows no address dependency.
 
@@ -208,7 +212,7 @@ Phase 2 works on a copy of phase 1. After this, every command takes the phase: `
 
 | Guided | Manual |
 |---|---|
-| Say "move to the next stage".<br><br>The agent lists every dead block with its size. **You decide which may go**; it records your answer in `docs/user_answers.md`. It removes each approved block leaving a hole, so nothing else moves, and records any bugs of the original it finds (kept, not fixed). | List the removed address ranges in `tools/removals.txt` (one `LO-HI` hex range per line) and set `PHASE2_ALLOWED_DIFF="tools/removals.txt"` in `project.config`. Then:<br>`just verify 2`<br>`just check 2`<br>`just smoke 2`<br>`just launch 2` |
+| Say "yes" to the review question, or "move to the next stage".<br><br>The agent lists every dead block with its size. **You decide which may go**; it records your answer in `docs/user_answers.md`. It removes each approved block leaving a hole, so nothing else moves, and records any bugs of the original it finds (kept, not fixed). | List the removed address ranges in `tools/removals.txt` (one `LO-HI` hex range per line) and set `PHASE2_ALLOWED_DIFF="tools/removals.txt"` in `project.config`. Then:<br>`just verify 2`<br>`just check 2`<br>`just smoke 2`<br>`just launch 2` |
 
 `just verify 2` now passes only when every changed byte is inside the listed ranges.
 

@@ -26,7 +26,16 @@ Two cases, and they are different.
 
 **You finish a stage on your own** (the work you were asked to do is done). Run `status.py`, tell the user in a few sentences what was just done and which step is next and roughly what it involves, and **ask whether to continue** (offer: continue, continue after I have looked, stop here). Do not start the next stage unasked and do not stop without offering.
 
-**Steps 2 to 8 are one run.** From research to a game that starts (HOWTO.md steps 2 to 8) there is no point at which a user wants to stop: it is one job. When the next step is anywhere in 2 to 8, work through all of them without asking at the boundaries, writing one line to the user as each step starts ("Step 5 of 8: exporting the disassembly from Ghidra") and finishing with the report of step 8. Stop earlier only for something that needs the user (a decision only they can make, a medium that needs a choice, a failure you cannot resolve, a tool that is missing). When the run finishes, report what was done and ask whether to start phase 1. From step 9 on, each stage is announced when it starts and reported with a question when it ends, as above.
+**The work is three runs and a decision, and the user is asked at four points only.**
+
+| Run | HOWTO steps | Ends when | The question you ask (fill in the launch command and source file that `status.py` prints) |
+|---|---|---|---|
+| Acquire | 2 to 8 | the build is byte-identical and the game starts | "Raw disassembly complete: it assembles byte for byte to the original and starts. Launch it with `just launch 1`; the source is `<phase 1 main file>` (still the exporter's names). Start phase 1, naming every routine?" |
+| Phase 1 | 9 | the completeness report says COMPLETE | "Named monolith complete. Launch it with `just launch 1`; read it at `<phase 1 main file>`. Start phase 2, the refactoring into files with a port interface?" |
+| Phase 2 | 10 to 13 | the source is split, namespaced, relocatable and byte-identical | "Phase 2 refactoring is done up to the removals. Launch it with `just launch 2`; the source is `<phase 2 main file>`. Step 14 removes dead code and needs your decision: here is the list of blocks with their sizes. Review it?" |
+| Removals | 14 | the owner-approved blocks are removed and the gate passes | "Phase 2 complete. Play it with `just launch 2` and tell me what you see." |
+
+Inside a run there is no point at which a user wants to stop, so work through all its steps without asking at the boundaries, writing one line to the user as each step starts ("Step 5 of 8: exporting the disassembly from Ghidra"). Stop early only for something that needs the user: a decision only they can make (above all, what a thing IS to a player in phase 1, and which dead blocks may go in step 14), a medium that needs a choice, a failure you cannot resolve, a tool that is missing. When a run ends, give the closing message of its row, in plain words and with the real command and file, and wait for the answer. A user who answers "yes" or tells you to go on has started the next run.
 
 Background workers (a slice's agent) never ask and never announce to the user: they report to the session that started them. Together the two cases mean a newcomer never needs to know the stage list: they are always told which step is running and what comes after it.
 

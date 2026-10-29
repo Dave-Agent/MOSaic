@@ -65,4 +65,7 @@ for i, (n, d, ev, w, doc) in enumerate(st):
 print()
 if nxt: print('NEXT: step %s: %s\n  what: %s\n  see:  %s' % nxt)
 else: print('NEXT: every step in HOWTO.md is done. Optional: compact the layout into the freed holes, or start another game.')
-print('(skip = no evidence found for that stage, but a later stage is done: its files may be regenerable and git-ignored)\nIf the user told you to go on, announce this step and start it; steps 2 to 8 are one run. If you have just finished a stage on your own, report and ask whether to continue (SKILL.md, "Stages").')
+src1 = cfg.get('SRC_MAIN', ''); src2 = cfg.get('PHASE2_MAIN', '')
+if smoke and src1: print('Launch phase 1:  just launch 1      source: %s' % src1)
+if p2 and src2 and os.path.exists(P(src2)): print('Launch phase 2:  just launch 2      source: %s' % src2)
+print('(skip = no evidence found for that stage, but a later stage is done: its files may be regenerable and git-ignored)\nIf the user told you to go on, announce this step and start it; the work is runs (steps 2-8, 9, 10-13, 14): do not ask inside a run. If you have just finished a stage on your own, report and ask whether to continue (SKILL.md, "Stages").')
