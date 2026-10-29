@@ -27,6 +27,12 @@ cd "$PROJECT_ROOT"
 # shellcheck disable=SC1091
 source ./project.config
 
+# Phase 2 (C64_PHASE=2, set by `just verify-p2`): the same gate on the split source: PHASE2_MAIN assembled into $BUILD_DIR/p2/game.prg.
+if [ "${C64_PHASE:-1}" = "2" ]; then
+    [ -n "${PHASE2_MAIN:-}" ] && [ -f "$PHASE2_MAIN" ] || { echo "!! C64_PHASE=2 but PHASE2_MAIN is not set or not a file" >&2; exit 2; }
+    SRC_MAIN="$PHASE2_MAIN"; BUILD_DIR="$BUILD_DIR/p2"; OUTPUT_PRG="$BUILD_DIR/game.prg"
+fi
+
 sha256_of() {
     if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1
     else shasum -a 256 "$1" | cut -d' ' -f1; fi

@@ -141,6 +141,10 @@ build-phase2:
     if grep -q "asserts.*FAILED" <<<"$out"; then echo "$out" | grep -i assert >&2; exit 1; fi
     echo "built $BUILD_DIR/p2/game.prg"
 
+# Step 3 of phase 2 (split into files) is byte-identical: the same gate as `verify`, on the phase 2 source (PHASE2_MAIN -> build/p2/game.prg).
+verify-p2:
+    C64_PHASE=2 bash framework/scripts/verify.sh
+
 # Routine tests: call routines in the 6510 simulator and compare with Python models (tools/tests/). `test-p1` runs them on the phase 1 build.
 test:
     python3 -B {{skill}}/scripts/sim/run_tests.py --root . --phase 2
