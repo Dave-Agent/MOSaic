@@ -5,7 +5,7 @@ keeps BOTH trace comments, renames the old label of the entry (`LAB_xxxx_1`) to 
 Names only: the bytes stay identical (run the build comparison).
 
   bitskip.py --scan [--range LO-HI] [--phase 1|2 | --main FILE]      list the candidate sites: a skip opcode whose operand bytes are the target of a branch / jmp / jsr
-  bitskip.py MAP.tsv [--phase 1|2 | --main FILE] [--write]            MAP.tsv: ADDR<TAB>NAME[<TAB>OLD_LABEL]
+  bitskip.py MAP.tsv [--phase 1|2 | --main FILE] [--write] [--accept NAME[,NAME...]]     MAP.tsv: ADDR<TAB>NAME[<TAB>OLD_LABEL[<TAB>accept]]
 
 ADDR    the original address of the skip opcode (the `[ADDR:2c ..]` trace comment); the address of the hidden instruction (ADDR+1) is accepted too.
 NAME    the new label of the hidden instruction. OLD_LABEL is only needed when the old name cannot be found (a `.label X = $hidden` in the label files).
@@ -13,12 +13,14 @@ Per site it prints BOTH readings (`BIT $00a9` in sequence, `LDA #$00` entered), 
 before the branch), and WARNINGS when NAME cannot be checked mechanically: the name has a negation or a side word (`not_`, `left`, `zero`, ...) so it may describe the wrong side, no
 branch reaches the entry (an indirect or table entry), several branches with different conditions reach it, or the flag the branch tests is not set by the instruction above it.
 Rule for the name (rules.md): name the label for the value or case the BRANCH-TAKEN condition proves, and say which branch reaches it; the tool writes that sentence above the `.byte`.
+ACCEPT  a warning that you have reviewed and that does not apply (a side word such as `zero` that IS the branch-taken case) is acknowledged with `--accept NAME[,NAME...]` or the word `accept` in
+        column 4 of the map row: the warnings of that name are then not printed one by one; one quiet line at the end lists the accepted ones with the reason. Names that were not reviewed still warn.
 Without --write it prints what it would change."""
 import os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, os.path.dirname(HERE))
 from _common import parser, main_file, reachable, code_files, read_tsv, map_code, split_comment, block_flags, wrap_comment, write_changed, LABEL_FILES
 from optable import OPS, decode
-a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('map', nargs='?'); a.add_argument('--scan', action='store_true'); a.add_argument('--range')
+a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('map', nargs='?'); a.add_argument('--scan', action='store_true'); a.add_argument('--range'); a.add_argument('--accept', default='', help='comma-separated NAMEs whose warnings you have reviewed (listed once, quietly)')
 args = a.parse_args(); main = main_file(args)
 if not args.scan and not args.map: a.error('give a MAP.tsv, or --scan')
 RANGE = tuple(int(x, 16) for x in args.range.split('-')) if args.range else None
@@ -90,6 +92,7 @@ if args.scan:
     print('%d candidate sites (a skip opcode whose operand bytes are a branch / jmp / jsr target); fill the NAMEs and run bitskip.py MAP' % n)
     sys.exit(0)
 
+accept = {x.strip() for x in args.accept.split(',') if x.strip()}; accepted = []
 rows = read_tsv(args.map); warnings = 0; jobs = []; ren = {}; dropped = []; operand_names = []
 lab_def = re.compile(r'^\s*\.label\s+(\w+)\s*=\s*\$([0-9A-Fa-f]+)')
 for p in rows:
@@ -113,6 +116,8 @@ for p in rows:
     words = set(re.split(r'_+', name.lower()))
     if words & SIDE_WORDS and conds:
         warn.append('the name %r contains %s: it must describe the BRANCH-TAKEN case (%s), not the fall-through (%s)' % (name, ', '.join(sorted(words & SIDE_WORDS)), conds[0][1], conds[0][2] or 'the sequence reading'))
+    if warn and (name in accept or (len(p) > 3 and p[3].strip().lower() == 'accept')):
+        accepted.append((ad, name, [w.split(':')[0][:60] for w in warn])); warn = []
     for w in warn: print('  WARNING: ' + w)
     warnings += len(warn)
     # the old label(s) of the entry
@@ -177,5 +182,6 @@ for nm in dict.fromkeys(operand_names):
     f, k = defs[0]; L = alltext[f]; del L[k]
     while k < len(L) and re.match(r'^\s+//', L[k]): del L[k]
     changed[f] = '\n'.join(L); print('  BIT operand label %s dropped (no other use)' % nm)
+if accepted: print('accepted after review: ' + '; '.join('%s ($%04X: %s)' % (n, a_, ' / '.join(w)) for a_, n, w in accepted))
 print('%d site(s), %d warning(s) %s' % (len(rows), warnings, '(written)' if args.write else '(dry run; --write applies)'))
 write_changed(changed, args.write)

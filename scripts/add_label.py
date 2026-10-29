@@ -18,7 +18,7 @@ a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('addr', nargs='?'
 a.add_argument('--map'); a.add_argument('--group')
 args = a.parse_args(); main = main_file(args); files = reachable(main)
 if args.map:
-    rows = [(int(p[0].replace('$', ''), 16), p[1].strip(), p[2] if len(p) > 2 else '') for p in read_tsv(args.map) if len(p) >= 2]
+    rows = [(int(p[0].replace('$', ''), 16), p[1].strip(), p[2] if len(p) > 2 else '') for p in read_tsv(args.map)]
     first = min(rows)[0] if rows else None; done = 0
     existing = set(source_labels(main)[0])
     for ad, name, cm in sorted(rows, key=lambda r: r[0]):

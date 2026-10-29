@@ -96,9 +96,19 @@ def rewrite_code(files, fn, skip_label_lines=True):
 
 WRAP = 124                  # comment text is wrapped here (rules.md: wrap at 128, nothing past 150; 124 leaves room for the indent)
 
-def read_tsv(path):
-    """Rows of a TSV map: blank lines and lines starting with '#' skipped, cells stripped of the trailing newline only."""
-    return [l.rstrip('\n').split('\t') for l in open(path) if l.strip() and not l.lstrip().startswith('#')]
+def read_tsv(path, min_cols=2):
+    """Rows of a TSV map: blank lines and lines starting with '#' skipped, cells stripped of the trailing newline only. Exits with a clear message naming file:line when a row has fewer than
+    min_cols cells or its first cell contains a space: that is what a REAL newline inside a cell does (the cell text after it becomes a row of its own). A cell holds a line break as the two
+    characters backslash-n (`\\n`), never a real newline."""
+    rows = []
+    for n, l in enumerate(open(path), 1):
+        if not l.strip() or l.lstrip().startswith('#'): continue
+        p = l.rstrip('\n').split('\t')
+        if len(p) < min_cols or re.search(r'\s', p[0].strip()):
+            sys.exit('%s:%d: bad map row (%s): %r\n  a real newline inside a cell breaks the row: write a line break in a cell as the two characters \\n (backslash, n); rows are OLD<TAB>NEW<TAB>text...'
+                     % (path, n, 'only %d cell(s)' % len(p) if len(p) < min_cols else 'the first cell contains a space', l.rstrip('\n')[:70]))
+        rows.append(p)
+    return rows
 
 def wrap_comment(text, indent='', width=WRAP):
     """Wrap text into `//` comment lines. Paragraphs are separated by a real newline or a literal backslash-n; a paragraph that starts with `TODO(tag):` gets its
@@ -148,11 +158,31 @@ XREF_LINE = re.compile(r'^\s*//\s*(?:Ghidra\s+)?XREF\b|^\s+//\s+[\w.:]+\([RWcjpd
 
 TRACE_COMMENT = re.compile(r'//\s*\[[0-9A-Fa-f]{4}[:\]]')
 
-def set_block(L, j, text, indent=None, width=WRAP, keep=False):
+MAX_REPLACE = 8              # a block longer than this above a label is never replaced silently (set_block): it is more likely notes than the description a tool wrote
+_BANNER = re.compile(r'^\s*//\s*(?:(?:SECTION|RANGE|STATUS|SUMMARY)\b|[=\-*#~]{4,})')
+_XREFISH = re.compile(r'\bXREF\b|\b[0-9a-fA-F]{4}\([RWcjpdo]+\)|\w\([RW]{1,2}\)')
+_HEADER = re.compile(r'^\s*//\s*([A-Za-z_][\w.]*):(?:\s|$)')
+
+def block_shape(old, name, max_replace=MAX_REPLACE):
+    """Is the own-line comment block `old` (lines above a label's XREF lines) one that rename.py / set_comment.py may replace? Returns (True, '') or (False, reason). Replaceable: a plain
+    description of at most max_replace lines (rename.py writes `// NAME: text`, set_comment.py plain text). Never replaceable: a section banner (`SECTION:` / `RANGE:` / `STATUS:` / `SUMMARY:` or a
+    rule line), anything that reads like XREF / register-access notes (`1a2b(R)`, `name(W)`), a block that opens `// OTHER: ...` for another symbol, a block of more than max_replace lines."""
+    base = name.split('.')[-1]
+    for l in old:
+        if _BANNER.match(l): return False, 'a section banner'
+        if _XREFISH.search(l): return False, 'XREF / access notes'
+    m = _HEADER.match(old[0]) if old else None
+    if m and m.group(1).split('.')[-1] != base and not m.group(1).startswith(('TODO', 'SMC', 'In', 'Out', 'Clobbers', 'NOT-POINTERS')): return False, 'a note for another symbol (%s)' % m.group(1)
+    if len(old) > max_replace: return False, '%d lines, more than %d' % (len(old), max_replace)
+    return True, ''
+
+def set_block(L, j, text, indent=None, width=WRAP, keep=False, notes=None, max_replace=MAX_REPLACE):
     """The ONE place that decides where a label's description block goes (rename.py and set_comment.py both call it): ABOVE the label's XREF lines, which stay directly above the label
-    line L[j]. An existing plain comment block there (own-line `//` lines that are neither XREF nor trace comments, up to the first blank line or code) is replaced; the XREF lines and
-    the trace comments are kept. Without --indent the block takes the indent of the block it replaces, else column 0 for a `.label` line or a scope opener (`Name: {`), else two
-    spaces (an in-stream data label). keep=True leaves the old block and adds the text after it (still above the XREF lines). Mutates L; returns (number of lines written, the replaced old lines, the new index of the label line)."""
+    line L[j]. An existing plain comment block there (own-line `//` lines that are neither XREF nor trace comments, up to the first blank line or code) is replaced ONLY when block_shape()
+    says it is a description a tool wrote (short, no banner, no XREF / access notes, not another symbol's note). Otherwise it is KEPT, the new text is added after it, and a line
+    is appended to `notes` (a list; the callers print it) saying why: nothing is ever swallowed. The XREF lines and the trace comments are always kept. Without `indent` the block takes
+    the indent of the block it replaces, else column 0 for a `.label` line or a scope opener (`Name: {`), else two spaces (an in-stream data label). keep=True always keeps the old block.
+    Writing the same text twice is a no-op. Mutates L; returns (number of lines written, the replaced old lines, the new index of the label line)."""
     k = j
     while k > 0 and XREF_LINE.match(L[k - 1]): k -= 1                        # the XREF lines directly above the label
     top = k
@@ -161,8 +191,26 @@ def set_block(L, j, text, indent=None, width=WRAP, keep=False):
     elif top < k: ind = re.match(r'^\s*', L[top]).group(0)                  # keep the indent of the block being replaced
     else: ind = '' if re.match(r'^\s*\.label\b', L[j]) or '{' in L[j] else '  '
     new = wrap_comment(text, ind, width) if text else []
+    if new and k - top >= len(new) and L[k - len(new):k] == new: return 0, [], j        # already there
+    if not keep and top < k:
+        nm = re.match(r'^\s*(?:\.label\s+([\w.]+)|([A-Za-z_]\w*):)', L[j]); name = (nm.group(1) or nm.group(2)) if nm else ''
+        ok, why = block_shape(L[top:k], name, max_replace)
+        if not ok:
+            keep = True
+            if notes is not None: notes.append('kept the existing %d-line comment block above %s (%s); the new text was added after it, merge by hand: %s' % (k - top, name, why, L[top].strip()[:70]))
     if keep: L[k:k] = new; return len(new), [], j + len(new)
     old = L[top:k]
+    keep_todo = []; i = 0                                                    # a TODO paragraph of the old block is not description: it survives unless the new text carries it
+    while i < len(old):
+        if re.match(r'^\s*//\s*TODO\(', old[i]):
+            e = i + 1
+            while e < len(old) and re.match(r'^\s*//   \S', old[e]): e += 1
+            para = old[i:e]
+            flat = lambda ls: re.sub(r'\s+', ' ', ' '.join(x.strip() for x in ls))
+            if flat(para) not in flat(new): keep_todo += para
+            i = e
+        else: i += 1
+    new = new + keep_todo
     L[top:k] = new
     return len(new), old, j + len(new) - len(old)
 

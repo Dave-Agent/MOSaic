@@ -2,7 +2,12 @@
 """List (and with --write convert) the named local labels that may be anonymous under the anonymous-label rules of references/rules.md, and check the anonymous labels that exist.
 
   anon_labels.py [--root DIR] [--phase 1|2 | --main FILE] [--window N] [--max-steps N] [--strict] [--allow-comments] [--write]
-  anon_labels.py --check [--window N] [--max-steps N]        fail on an anonymous reference more than --max-steps labels or --window lines away (`!+++`, `!---`)
+  anon_labels.py --check [--window N] [--max-steps N]        fail on an anonymous reference more than --max-steps labels or --window lines away (`!+++`, `!---`), and on one that
+                                                             CROSSES A ROUTINE BOUNDARY (see below)
+
+--check also fails on an anonymous reference whose target is in another routine: the reference and the target sit in different named scopes (`Name: { ... }`), or, in unscoped code,
+a scope or a called entry label (a `jsr` target, a label used from another file or as data) lies between them. Such a `beq !-` whose target is the last label of the PREVIOUS routine
+only works while that routine's label is a plain global; scoping or renaming it later breaks the reference. Give the target a name and reach it by its path, or restructure.
 
 A named local label becomes a candidate when ALL hold (rules.md "Anonymous labels", the general regime):
   1. the label and every reference to it are in the same routine: inside one scope (`Name: { ... }`), or, in unscoped code, with no entry label between them (an entry label is one that
@@ -92,6 +97,22 @@ def resolve(anons, line, marks):
 def steps(anons, line, target):
     lo, hi = sorted((line, target))
     return sum(1 for p in anons if lo < p <= hi) if target > line else sum(1 for p in anons if lo <= p < hi)
+def crossing(f, o, i, t):
+    """None, or why the anonymous reference at line i to the label at line t leaves its routine: another named scope, or (unscoped code) a scope / called entry label in between."""
+    si, st = o.inner[i], o.inner[t]
+    if si != st:
+        nm = lambda k: o.scopes[k][2] if k is not None else '(no scope)'
+        return 'crosses a scope boundary: the reference is in %s, its target in %s' % (nm(si), nm(st))
+    lo, hi = min(i, t), max(i, t)
+    if si is not None: return None
+    for (s0, e0, n0) in o.scopes:
+        if lo < s0 and e0 < hi and o.inner[s0] is None: return 'crosses a scope boundary: the whole routine %s lies between the reference and its target' % n0
+    for (d, name, head) in o.defs:
+        if lo < d <= hi and not head and o.inner[d] is None and name not in called_cache:
+            called_cache[name] = any(rr[0] != f or rr[2] == 'jsr' or rr[3] for rr in refs_of(name, f, d, None))
+        if lo < d <= hi and not head and o.inner[d] is None and called_cache[name]: return 'crosses the global label %s (a called routine entry) between the reference and its target' % name
+    return None
+called_cache = {}
 # ---- check mode --------------------------------------------------------------------------------------------------------------------
 if args.check:
     bad = 0; n = 0
@@ -103,6 +124,7 @@ if args.check:
             if t is None: msg = 'no anonymous label to resolve to'
             elif len(marks) > MAXS: msg = 'reaches %d anonymous labels (limit %d)' % (len(marks), MAXS)
             elif abs(t - i) > WINDOW: msg = 'target is %d lines away (limit %d)' % (abs(t - i), WINDOW)
+            else: msg = crossing(f, o, i, t)
             if msg: bad += 1; print('%s:%d  !%s  %s' % (os.path.relpath(f, args.root), i + 1, marks, msg))
     print('anon-check: %d anonymous references, %d violations%s' % (n, bad, ' FAIL' if bad else ''))
     sys.exit(1 if bad else 0)
