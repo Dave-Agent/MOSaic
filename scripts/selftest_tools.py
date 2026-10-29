@@ -134,6 +134,20 @@ check('port_scan: an untagged hardware spin is reported, a tagged one is not', '
 SRC = "Go:\n" + "".join("  lda #$80                           // [%04X:a9 80    LDA #$80]\n  sta state                           // [%04X:8d 00 04 STA $0400]\n  lda #$ff                            // [%04X:a9 ff    LDA #$ff]\n  sta state                           // [%04X:8d 00 04 STA $0400]\n" % (0x900 + 10 * i, 0x902 + 10 * i, 0x905 + 10 * i, 0x907 + 10 * i) for i in range(2))
 r = tool('magic_scan.py', project(SRC))
 check('magic_scan: a variable stored with two raw state values is reported', '1 variable(s)' in r.stdout and 'state: stored $80 $FF' in r.stdout, r.stdout + r.stderr)
+RH = """Go:
+  lda #$00                            // [0900:a9 00    LDA #$00]
+  sta ptr                             // [0902:85 02    STA $02]
+  lda #>buf                           // [0904:a9 10    LDA #$10]
+  sta ptr_hi                          // [0906:85 03    STA $03]
+  lda #$f8                            // [0908:a9 f8    LDA #$f8]
+  sta sprite_ptr_shadow               // [090A:8d f8 07 STA $07f8]
+  lda zp_ptr_hi                       // [090D:a5 04    LDA $04]
+  cmp #$20                            // [090F:c9 20    CMP #$20]
+buf2:
+  .byte 1 // [2000]
+"""
+r = tool('reloc_hazards.py', project(RH))
+check('reloc_hazards: aligned base, raw sprite pointer and an end guard on a page-aligned label are reported', 'aligned-base 1' in r.stdout and 'sprite-ptr 1' in r.stdout and 'end-guard 1' in r.stdout, r.stdout + r.stderr)
 
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)

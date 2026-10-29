@@ -16,6 +16,7 @@ check   every gate a slice must pass, one verdict (exit 1 when any gate fails):
           table_counts   hints only (a comment states a table size one off from its data: table_counts.py)
           port_scan      hints only (routines that depend on the machine and carry no TODO(port): spin-waits, code read as data, ROM calls, CPU port writes: port_scan.py)
           magic_scan     hints only (variables stored or compared with raw state values, immediates repeated with no constant: magic_scan.py)
+          reloc_hazards  hints only (what reloc_scan misses: page-aligned base assumed, end-of-buffer guards, raw sprite pointer numbers, reads past a small table, KERNAL SAVE/LOAD of an image label)
           sentinel_scan  hints only (a list with a missing or misplaced end marker): reported, never fails
         A slice is not done until `check` passes in the scratch copy and again after the merge.
 start   copies the project (git repo included, `originals/` skipped, `build/` skipped except `build/trace/`, the tracer) to $SLICE_SCRATCH/NAME/project (default /tmp/c64-slices) and records the base commit. The agent works there
@@ -51,6 +52,7 @@ def check(root_):
     t = run([sys.executable, '-B', os.path.join(HERE, 'table_counts.py')] + ph, root_); res.append(('table_counts', True, (t.stdout.strip().split('\n') or [''])[0], True))
     t = run([sys.executable, '-B', os.path.join(HERE, 'port_scan.py')] + ph, root_); res.append(('port_scan', True, (t.stdout.strip().split('\n') or ['', ''])[1] if len(t.stdout.strip().split('\n')) > 1 else '', True))
     t = run([sys.executable, '-B', os.path.join(HERE, 'magic_scan.py')] + ph, root_); res.append(('magic_scan', True, (t.stdout.strip().split('\n') or [''])[0], True))
+    t = run([sys.executable, '-B', os.path.join(HERE, 'reloc_hazards.py')] + ph, root_); res.append(('reloc_hazards', True, (t.stdout.strip().split('\n') or [''])[0], True))
     root = old; w = max(len(n) for n, *_ in res)
     for n, good, msg, hint in res: print('%s  %-*s  %s' % ('hint' if hint else ('PASS' if good else 'FAIL'), w, n, msg))
     ok = all(g for _, g, _, h in res if not h); print('slice check: %s' % ('PASS' if ok else 'FAIL')); return ok

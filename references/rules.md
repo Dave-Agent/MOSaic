@@ -102,3 +102,6 @@ A stream of variable-length events (music, scripts, animation) is written one ev
 
 ## Name the values
 A variable that holds one of a few states (a flag with `$00 / $80 / $FF`, a mode number) and the numbers a routine repeats (row stride, column count, table length) get constants, named from what the code does in that state; the raw value is written once, in the definition. `magic_scan.py` lists the candidates (a `slice.py check` hint). Constants for owner-visible meanings (what a mode IS to a player) follow the evidence ladder like any name.
+
+## Make the assumption checkable
+Where code or data relies on a layout (a buffer on a page boundary, a page count, two tables adjacent, a block at a VIC-bank offset, a loop that must not cross a page, a file that bakes in a load address), write the assumption as an `.assert` next to it, and write bank-relative numbers (sprite pointers, character screen offsets) as expressions of the labels (`SpritePointer(label)`), never as numbers. `reloc_hazards.py` lists what is still a raw number or an unchecked assumption (a `slice.py check` hint); `reloc_scan.py` covers pointers, SMC and indirect jumps.
