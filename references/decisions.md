@@ -41,3 +41,4 @@ One line per decision: **date: what** (who decided) Why. Rule: where it lives. N
 
 ## Open questions (waiting for the user)
 - Add `TODO(port)` to the TODO tag set? A project used it for each place a hardware-ism is left on purpose (phase 2 step 4).
+- 2026-10-29: **Read-only originals are optional.** The user accepts possible writes to the media as part of the process (some games need writes); `check_layout.py` no longer warns on a writable original, still fails on a hash mismatch, and emulators still run on a scratch copy by default.

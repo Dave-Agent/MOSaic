@@ -48,7 +48,6 @@ for d in ('originals', 'original'):
     for f in sorted(os.listdir(dd)):
         p = os.path.join(dd, f)
         if not os.path.isfile(p): continue
-        if os.access(p, os.W_OK): warn.append(f'{d}/{f} is writable: chmod a-w it, and never give it to an emulator directly (run on a copy)')
         if f in sums:
             h = hashlib.sha256(open(p, 'rb').read()).hexdigest()
             if h != sums[f]: fail.append(f'{d}/{f} DOES NOT MATCH its recorded SHA-256: the original has been changed; restore it from the source')
