@@ -19,3 +19,6 @@ When a game's character codes are not PETSCII or screen codes (a space is 0, let
 ```
 - **`.encoding` is global from the point of the directive to the end of the assembly** (or the next `.encoding`), so it also changes every later `.text`. Keep it in one file (`text.asm`), imported once, and write strings only through the macros; add a raw variant (no terminator) for strings that continue with a control code.
 - The encoding is **inferred** from the decoded words: write what you know in the header comment and a `TODO(user)` that the glyphs really are those letters (the character set itself may not have been read yet). Check by assembling and comparing the bytes: the gate does this for free.
+
+## Asserts that state a layout assumption
+A failed `.assert` fails `just verify` (build.sh checks Kick's `Made N asserts , M FAILED!` line). Idioms: a table's size `.assert "size", tbl_end - tbl, SIZE`; adjacency `.assert "B follows A", B - A, A_SIZE`; alignment `.assert "aligned", buf & $ff, 0`; a loop that must stay on one page `.assert "one page", (* - 5) >> 8, * >> 8` after the loop; where the current instruction ends `.assert "entry+2", *, Entry + 2`; a bank-relative number `SpritePointer(label)` against a stated value. Put the assert next to the thing it guards, and keep the description short (the comment width rule applies).

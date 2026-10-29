@@ -32,17 +32,20 @@ ASM_CMD=( "$JAVA" -jar "$KICKASS_JAR"
           -vicesymbols
           -debugdump )
 
-if [ "$QUIET" = "--quiet" ]; then
-    LOG="$(mktemp)"; trap 'rm -f "$LOG"' EXIT
-    if ! "${ASM_CMD[@]}" >"$LOG" 2>&1; then
-        # quiet mode must not hide WHY the assembly failed: show Kick's error lines
-        echo "!! the assembler failed on $SRC_MAIN:" >&2
-        { grep -E -B1 -A4 "Error" "$LOG" | head -30; } >&2 || tail -20 "$LOG" >&2
-        exit 1
-    fi
-else
-    echo ">> assembling $SRC_MAIN -> $OUTPUT_PRG"
-    "${ASM_CMD[@]}"
+LOG="$(mktemp)"; trap 'rm -f "$LOG"' EXIT
+[ "$QUIET" = "--quiet" ] || echo ">> assembling $SRC_MAIN -> $OUTPUT_PRG"
+if ! "${ASM_CMD[@]}" >"$LOG" 2>&1; then
+    # quiet mode must not hide WHY the assembly failed: show Kick's error lines
+    echo "!! the assembler failed on $SRC_MAIN:" >&2
+    { grep -E -B1 -A4 "Error" "$LOG" | head -30; } >&2 || tail -20 "$LOG" >&2
+    exit 1
+fi
+[ "$QUIET" = "--quiet" ] || cat "$LOG"
+# Kick exits 0 and still writes the PRG when an .assert fails (it only prints "Made N asserts , M FAILED!"): an assert nobody enforces guards nothing, so a failed one fails the build
+if grep -q "asserts.*FAILED" "$LOG"; then
+    echo "!! assertion(s) FAILED in $SRC_MAIN:" >&2
+    grep -iE "assert" "$LOG" | head -20 >&2
+    exit 1
 fi
 
 if [ ! -f "$OUTPUT_PRG" ]; then

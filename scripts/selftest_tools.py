@@ -148,6 +148,16 @@ buf2:
 """
 r = tool('reloc_hazards.py', project(RH))
 check('reloc_hazards: aligned base, raw sprite pointer and an end guard on a page-aligned label are reported', 'aligned-base 1' in r.stdout and 'sprite-ptr 1' in r.stdout and 'end-guard 1' in r.stdout, r.stdout + r.stderr)
+# ---- layout_fuzz.py --label / --take (needs Java and Kick Assembler; skipped without them) ------------------------------------------------------------------------
+_jar = os.path.expanduser(os.environ.get('KICKASS_JAR') or '~/tools/KickAss.jar')
+if os.path.exists(_jar) and subprocess.run(['java', '-version'], capture_output=True).returncode == 0:
+    d = project('.pc = $0800 "RAM"\npad:\n  .byte 0,0,0,0,0,0,0,0 // [0800]\nA:\n  lda #1 // [0808:a9 01    LDA #$01]\n  rts // [080a:60       RTS]\ntail:\n  .byte 5,6 // [080b]\n')
+    open(os.path.join(d, 'project.config'), 'a').write('KICKASS_JAR="%s"\n' % _jar)
+    ok = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_fuzz.py'), '--root', d, '--main', 'main.asm', '--label', 'A', '--take', 'pad', '--fill', 'ea', '--variant', 'A:3', '--cmd', 'test $(stat -c %s "$FUZZ_PRG") -eq 15'], capture_output=True, text=True)
+    check('layout_fuzz: --label with --take keeps the total size (3 bytes inserted before A, 3 taken from the pad: 15 bytes with the load address)', ok.returncode == 0 and '0 failed' in ok.stdout, ok.stdout + ok.stderr)
+    bad = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_fuzz.py'), '--root', d, '--main', 'main.asm', '--label', 'A', '--take', 'pad', '--variant', 'A:9', '--cmd', 'true'], capture_output=True, text=True)
+    check('layout_fuzz: --take of more bytes than the pad has fails the variant', bad.returncode == 1 and 'has 8 bytes' in bad.stdout, bad.stdout + bad.stderr)
+else: print('SKIP layout_fuzz: no Java / Kick Assembler')
 
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
