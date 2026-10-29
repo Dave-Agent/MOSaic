@@ -29,6 +29,7 @@ Applies to: every project, except where a bullet says otherwise.
 ## Comment rules
 Applies to: projects that adopt them (decided with the user 2026-10-29 in one project; others adopt them when they choose).
 Enforced by `scripts/comment_check.py` (`just comment-check`; every threshold is an option; `--list` shows offenders; an optional `tools/comment_baseline.tsv` makes it a ratchet for a source that is not yet clean, and `--write` only ever lowers the baseline).
+- **No echo:** a comment says something the line does not. A data row keeps `// [addr]` and nothing that repeats it: no list of the operand names after a `.word` row, no ASCII dump after a `.byte` row (an exporter writes both; `comment_check.py --fix` strips them, rule `echo`). The same goes for a comment that only restates an instruction.
 - **Width:** wrap comment text at 128 columns; nothing passes 150. A long note is several `//` lines. A data row is as wide as its bytes, so only its comment is limited (100 columns).
 - **Label line** (`Name:  // ...`): a one-line summary, at most 80 characters (ideally under 60). The detail is a block comment **above** the label, wrapped at 128, above the `XREF` lines if the project keeps them.
 - **Routine:** the block above the label says what it does and why; add `In:` / `Out:` / `Clobbers:` lines when they are not obvious.

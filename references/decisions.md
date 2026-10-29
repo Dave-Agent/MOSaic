@@ -38,6 +38,8 @@ One line per decision: **date: what** (who decided) Why. Rule: where it lives. N
 - 2026-10-29: **The skill's `platform_deps.py` is canonical** over any project copy: it tracks open scopes with a stack, so a namespace closed without a `// Name` comment no longer corrupts later routine paths. `check_layout.py` is advisory: findings are warnings, `--strict` exits 2.
 - 2026-10-29: **The skill is a git repository**, symlinked into the user's skills directory; push-only-when-told applies to project repos.
 - 2026-10-29: **The skill holds no game- or project-specific information** (user): no game names, addresses, file names or hashes; examples use placeholders. Project-specific notes live in the project. The clean-room test (a fresh agent with only the skill and the original media) checks it.
+- 2026-10-29: **No echo comments** (user: 'no point having comments match the contents of the lines'). A data row keeps `// [addr]` only; operand-name lists and ASCII dumps are stripped by `comment_check.py --fix` (rule `echo`).
+- 2026-10-29: **Check the end markers of a family of lists** (`sentinel_scan.py`): a list whose terminator is missing or has other data after it was found by the owner reading the source; the scan now hints at it.
 
 ## Open questions (waiting for the user)
 - 2026-10-29: **`TODO(port)` is its own tag, separate from `TODO(phase2)`** (user: easier to tick off). It marks each place a hardware dependency is left on purpose for a port to replace; not a phase 1 blocker.

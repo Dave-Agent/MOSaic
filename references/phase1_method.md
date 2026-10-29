@@ -60,3 +60,6 @@ The list of answers (`docs/user_answers.md`) is part of the project: it is what 
 - Treating a document's POKE address as proof.
 - Descending into a subsystem before its callers are understood: stop, give it a provisional name and a `TODO(name)`.
 - Changing a byte while renaming: names may change, bytes may not.
+
+### Lists and their end markers
+A family of lists reached through a pointer table (`name_01`, `name_02` ...) ends each list in the same terminator (a `$FF`, a `$00`, a count). Run `scripts/sentinel_scan.py` when such a family is labelled: it names a list that has a terminator in the middle (the bytes after it are another table, a text or code that the list label swallowed: label them and give the list its end), or that does not end in the terminator (its end marker is missing or the list runs into what follows). It is a hint: read the routine that walks the list, which says where it stops (rung 1), before moving a label.

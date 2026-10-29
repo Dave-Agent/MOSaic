@@ -8,11 +8,13 @@ Rules (every .asm of the main file's directory except libs/; label files include
          --comment (default 100) columns.
   hard   a line longer than --hard (default 150) columns (a data row: --comment + 22): never allowed.
   label  a label line (`Name:  // summary`) whose summary is longer than --summary (default 80) characters: the detail is a block comment above the label.
+  echo   a data row whose trailing comment only repeats the row: the operand names of a `.word` row, or the ASCII dump of a `.byte` row (`// [addr] ....a.`), whole or cut short as an exporter does. A comment must say something the line does
+         not; the `// [addr]` stays. `--fix` strips the echo.
   todo   a `TODO(tag):` marker with no text after it (the headline must be a sentence, so `just todo` lists something useful).
 Exit status 1 when a count is above the baseline. The baseline is `tools/comment_baseline.tsv` (project.config COMMENT_BASELINE, or --baseline): `file<TAB>kind<TAB>count`, the most
 violations allowed per file and kind. Without one every count must be 0; with one the check is a ratchet for a source that is not yet clean (counts may fall, never rise).
 --list    also list the offending lines, worst first.
---fix     re-wrap the own-line `//` comments longer than --wrap (the `wide` violations that are plain comment lines): the line is re-wrapped at --wrap-to (default 124) columns, its indent and hang
+--fix     strip the `echo` comments, and re-wrap the own-line `//` comments longer than --wrap (the `wide` violations that are plain comment lines): the line is re-wrapped at --wrap-to (default 124) columns, its indent and hang
           (`//   text`, `// TODO(tag):` continuation) kept; trace comments, XREF lines, block comments and code lines are left alone. Writes the files (comments only: the build cannot change);
           the remaining violations are reported as usual. Run `just align` (align_comments.py) first or last: it re-aligns end-of-line comments and can make lines wide again.
 --write   write the baseline (or lower it: it never raises one) from the current counts. Without --write the check only reports."""
@@ -25,7 +27,18 @@ a.add_argument('--wrap', type=int, default=128); a.add_argument('--hard', type=i
 args = a.parse_args(); main = main_file(args); cfg = config(args.root)
 BASE = os.path.join(args.root, args.baseline or cfg.get('COMMENT_BASELINE') or 'tools/comment_baseline.tsv')
 DATA = re.compile(r'^\s+\.(byte|word|text|fill|fillword|dword)\b'); DATA_LABEL = re.compile(r'^[A-Za-z_][\w.]*:\s+\.(byte|word|text|fill|fillword|dword)\b')
-KINDS = ('wide', 'hard', 'label', 'todo')
+KINDS = ('wide', 'hard', 'label', 'todo', 'echo')
+ECHO = re.compile(r'^(?P<code>\s*(?:[A-Za-z_][\w.]*:\s+)?\.(?P<dir>byte|word)\s+(?P<ops>[^/]*?))\s*//\s*(?P<addr>\[[0-9a-fA-F]{4}\])\s+(?P<rest>\S.*?)\s*$')
+def echo_of(l):
+    """(code, addr) when the trailing comment of a data row only repeats the row: the operand names of a `.word` row, or the ASCII dump (`.` for a non-printable byte) of a `.byte` row; else None"""
+    m = ECHO.match(l)
+    if not m: return None
+    ops = [o.strip() for o in m.group('ops').split(',')]; rest = m.group('rest')
+    if m.group('dir') == 'word' and ' '.join(ops).startswith(rest): return m.group('code'), m.group('addr')
+    if m.group('dir') == 'byte' and all(re.fullmatch(r'\$[0-9a-fA-F]{1,2}', o) for o in ops):
+        dump = ''.join(chr(v) if 32 <= v < 127 else '.' for v in (int(o[1:], 16) for o in ops)).lstrip()       # an exporter may show more bytes as '.' than this, and may cut the dump short
+        if len(rest) <= len(dump) and all(c in ('.', d) for c, d in zip(rest, dump)): return m.group('code'), m.group('addr')
+    return None
 def scan(path):
     out = {k: [] for k in KINDS}; inblock = False
     for n, l in enumerate(open(path).read().split('\n'), 1):
@@ -36,6 +49,7 @@ def scan(path):
         m = re.match(r'^([A-Za-z_][\w.]*):(\s*\{)?(\s+)//\s?(.*)$', l)
         if m and len(m.group(4)) > args.summary: out['label'].append((n, len(m.group(4)), l))
         if re.search(r'//\s*TODO\(\w+\):\s*$', l): out['todo'].append((n, len(l), l))
+        if echo_of(l): out['echo'].append((n, len(l), l))
     return out
 files = code_files(main)
 def rewrap(path):
@@ -53,6 +67,15 @@ def rewrap(path):
         else: out.append(l)
     if n: open(path, 'w').write('\n'.join(out))
     return n
+def unecho(path):
+    """drop the echo from the data rows (keeps `// [addr]`); returns the number of rows changed"""
+    L = open(path).read().split('\n'); n = 0
+    for i, l in enumerate(L):
+        e = echo_of(l)
+        if e: L[i] = e[0].rstrip() + ' // ' + e[1]; n += 1
+    if n: open(path, 'w').write('\n'.join(L))
+    return n
+if args.fix: print('comment-check --fix: %d data rows lost a trailing comment that only repeated the row' % sum(unecho(p) for p in files))
 if args.fix: print('comment-check --fix: %d own-line comment lines re-wrapped' % sum(rewrap(p) for p in files))
 found = {os.path.relpath(p, args.root): scan(p) for p in files}
 counts = {(p, k): len(v) for p, d in found.items() for k, v in d.items()}
