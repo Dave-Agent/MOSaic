@@ -17,7 +17,7 @@ VAR       a label (the label files, in-stream labels and `Scope.local` of the so
 --from N --to M   only the frames N..M.   --table   one row per frame in which anything changed (all VARs side by side) instead of one line per variable.   --max-runs N   runs per variable (default 60).
 Frame numbers are the tracer's frame counter: the sample of frame N is taken at the start of frame N, BEFORE the input events and pokes of frame N are applied (so an input set
 with `--joy2-at 10=fe` first shows in the sample of frame 11). Example:
-  sample_report.py facing walk_phase --run -- --ram dumps/handoff.bin --pc 084f --sp fc --p 34 --port 35 --frames 120 --joy1 ff --joy2-at 5=ef --joy2-at 41=e7 --joy2-at 80=ef
+  sample_report.py VAR_A VAR_B --run -- --ram dumps/handoff.bin --pc ENTRY_HEX --sp fc --p 34 --port 35 --frames 120 --joy1 ff --joy2-at 5=ef --joy2-at 41=e7 --joy2-at 80=ef
 Read-only for the source; --run writes the sample file (default build/trace/sample.smp) and a scratch coverage prefix under build/trace."""
 import os, re, shlex, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, os.path.dirname(HERE)); sys.path.insert(0, HERE)
