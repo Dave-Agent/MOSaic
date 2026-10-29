@@ -2,6 +2,7 @@
 """Tracer self-test: is the 6510 core in scripts/trace/c64trace.c trustworthy? Builds the tracer and runs
   1. `c64trace --selftest-builtin`: a built-in program with known results (needs nothing from the project);
   1c. input that changes during a run: `--joy1-at` / `--joy2-at` / `--keymat-at FRAME=...` (a tiny program stores what it reads each pass; the per-frame samples show the frame of each change);
+  1d. a key option from a hand-off image with CIA 1 DDRA = 0: no `--init dc02 ff` needed, joystick 2 still reads, a WARNING when no column is ever selected;
   1b. the keyboard matrix: `--keymat` holds a key for the whole run (the fuzzer leaves it alone), `--keymat-frames N` releases it;
   2. if the project has one, `c64trace --selftest IMAGE REFERENCE ...`: a program of the project that transforms a known image (a depacker, an unscrambler) must reproduce a known
      reference byte for byte. A real program of 2 million instructions agreeing with the reference is the strongest evidence the core is right.
@@ -33,6 +34,25 @@ def key_selftest(exe):
         got = (seen(5, *hold), seen(400, *hold), seen(5, *hold, '--keymat-frames', '10'), seen(400, *hold, '--keymat-frames', '10'))
         ok = got == (0xEF, 0xEF, 0xEF, 0xFF)
         return ok, 'keymat: SPACE held 5 / 400 frames -> %s / %s (want ef / ef); released after 10 frames: %s / %s (want ef / ff)' % tuple('%02x' % g for g in got) + (' (PASS)' if ok else ' (FAIL)')
+
+DDRA_PROG = bytes([0xA9, 0x7F, 0x8D, 0x00, 0xDC,                                      # select column 7 only; DDRA is NOT written (the hand-off state)
+                   0xAD, 0x01, 0xDC, 0x8D, 0x00, 0x02,                                 # loop: $0200 = $DC01 (keys), $0201 = $DC00 (joystick 2 + selected column), $0202 = DDRA
+                   0xAD, 0x00, 0xDC, 0x8D, 0x01, 0x02, 0xAD, 0x02, 0xDC, 0x8D, 0x02, 0x02, 0x4C, 0x05, 0x08])
+
+def ddra_selftest(exe):
+    """A key option works from a hand-off image whose CIA 1 DDRA is 0 (no --init with `dc02 ff`): the tracer starts with DDRA = $FF then, joystick 2 still reads through port A,
+    an explicit `dc02 00` init is respected and produces a WARNING (the keys can never be seen), and without a key option nothing changes (DDRA stays 0). Returns (ok, text)."""
+    with tempfile.TemporaryDirectory() as d:
+        ram = bytearray(65536); ram[0x800:0x800 + len(DDRA_PROG)] = DDRA_PROG; img = os.path.join(d, 'd.bin'); open(img, 'wb').write(ram)
+        init0 = os.path.join(d, 'i0.txt'); open(init0, 'w').write('dc02 00\n')
+        def run_it(*opt):
+            r = subprocess.run([exe, '--ram', img, '--out', os.path.join(d, 'd'), '--pc', '0800', '--port', '35', '--frames', '5', '--seed', '3', '--dump', os.path.join(d, 'x.bin'), *opt], capture_output=True, text=True)
+            return tuple(open(os.path.join(d, 'x.bin'), 'rb').read()[0x200:0x203]), r.stderr
+        key = ['--keymat', '0,0,0,0,0,0,0,10', '--joy1', 'ff', '--joy2', 'ef']
+        a, ea = run_it(*key); b, eb = run_it(*key, '--init', init0); c, ec = run_it('--joy1', 'ff', '--joy2', 'ef')
+        ok = a == (0xEF, 0x6F, 0xFF) and b[0] == 0xFF and 'WARNING' in eb and 'WARNING' not in ea and c == (0xFF, 0xEF, 0x00) and 'WARNING' not in ec
+        return ok, 'keymat without DDRA init: keys/joy2/DDRA = %s (want ef 6f ff); explicit dc02 00: keys %02x + WARNING %s (want ff, yes); no key option: %s (want ff ef 00)%s' % (
+            ' '.join('%02x' % g for g in a), b[0], 'yes' if 'WARNING' in eb else 'no', ' '.join('%02x' % g for g in c), ' (PASS)' if ok else ' (FAIL)')
 
 JOY_PROG = bytes([0xA9, 0x00, 0x8D, 0x02, 0xDC, 0x8D, 0x03, 0xDC,                  # DDRA = DDRB = inputs
                   0xAD, 0x00, 0xDC, 0x8D, 0x00, 0x02, 0xAD, 0x01, 0xDC, 0x8D, 0x01, 0x02,   # loop: $0200 = joystick 2 ($DC00), $0201 = joystick 1 ($DC01)
@@ -70,6 +90,9 @@ def run(env, quiet=False):
     kok, ktext = key_selftest(exe)
     if not quiet or not kok: print('[keymat] ' + ktext)
     ok &= kok
+    dok, dtext = ddra_selftest(exe)
+    if not quiet or not dok: print('[keymat-ddra] ' + dtext)
+    ok &= dok
     iok, itext = input_at_selftest(exe)
     if not quiet or not iok: print('[input-at] ' + itext)
     ok &= iok

@@ -26,6 +26,10 @@
  *           the rows on $DC01 (PRB bit = row, 0 = down). Examples: SPACE is column 7 row 4: --keymat 0,0,0,0,0,0,0,10; RETURN col 0 row 1: --keymat 2.
  *           --keymat-frames N releases them after N video frames (hold a key for N frames, then no key). The joystick in port 1 is ANDed onto $DC01, so a fire bit
  *           (bit 4) from the fuzzer looks like the SPACE key: pass --joy1 ff (and --joy2 ff) to read only the keys. Without --keymat the keys are a seeded fuzzer.
+ *           A column is selected only by an OUTPUT pin of CIA 1 port A driven low (DDRA bit 1, PRA bit 0), as on the machine. A hand-off image does not carry the CIA registers, so a
+ *           run starts with DDRA = 0 (power-on state) and no column could be selected: when --keymat / --keymat-at is given and no --init line writes $DC02, the tracer therefore starts
+ *           with DDRA = $FF and PRA = $FF (what the KERNAL's reset leaves; a note is printed). Joystick 2 still reads then: the port read is (PRA | ~DDRA) & joystick, a closed
+ *           switch pulls its line low whatever the direction. If the program itself leaves no column selected, a WARNING at the end says the keys were never seen.
  * Input that changes during a run: --joy1-at FRAME=HEX, --joy2-at FRAME=HEX and --keymat-at FRAME=B0,..,B7 (hex, as --keymat) are repeatable; each sets that input from
  *           video frame FRAME on, until a later event of the same option replaces it. Any of them switches the
  *           matching fuzzer off like the fixed forms do (joysticks: both; keys), and the value before the first event is "nothing pressed" (joysticks ff, keys 0) unless --joy1/--joy2/--keymat
@@ -144,6 +148,7 @@ typedef struct {
     u8 tod[4];
 } cia_t;
 static cia_t cia[2];
+static u64 kbd_unsel, kbd_sel;     /* reads of $DC01 with no keyboard column / at least one column selected (to warn when --keymat can never be seen) */
 static u32 chaos;                  /* if non-zero, 1 in N reads of $D01E/$D01F returns random bits */
 static u8 keymat[8];               /* keymat[col] bit r set = key down */
 static u8 joy1 = 0xFF, joy2 = 0xFF; /* active low, bits 0-4 */
@@ -208,15 +213,16 @@ static u8 io_read(u16 a) {
         cia_t *c = &cia[n];
         switch (r) {
         case 0: {
-            if (n == 0) return (c->pra & c->ddra) | (~c->ddra & joy2);
+            if (n == 0) return (u8)((c->pra | ~c->ddra) & joy2);     /* the pins: an input pin is pulled up, an output pin drives its level, and a closed joystick switch pulls a line low either way (so a joystick still reads with DDRA = $FF, as after the KERNAL's reset) */
             return (c->pra & c->ddra) | (~c->ddra & 0xFF);
         }
         case 1: {
             if (n == 0) {
-                u8 rows = 0xFF, sel = (u8)(c->pra | ~c->ddra);
+                u8 rows = 0xFF, sel = (u8)(c->pra | ~c->ddra);          /* a column is selected by an OUTPUT pin driven low; an input pin (DDRA bit 0) does not select it */
                 for (int col = 0; col < 8; col++)
                     if (!((sel >> col) & 1)) rows &= ~keymat[col];
-                return (c->prb & c->ddrb) | (~c->ddrb & rows & joy1);
+                if (sel == 0xFF) kbd_unsel++; else kbd_sel++;
+                return (u8)((c->prb | ~c->ddrb) & rows & joy1);
             }
             return (c->prb & c->ddrb) | (~c->ddrb & 0xFF);
         }
@@ -806,7 +812,7 @@ int main(int argc, char **argv) {
     const char *ram_path = NULL, *rom_dir = NULL, *out = NULL, *init = NULL;
     const char *selftest_packed = NULL, *selftest_ref = NULL, *dump_path = NULL, *iolog_path = NULL, *memlog_path = NULL;
     unsigned selftest_base = 0x0800, selftest_pc = 0, selftest_sp = 0xFF, selftest_done = 0x10000, selftest_p = 0x34; unsigned long long selftest_cycles = 400000000ull; int selftest_builtin = 0;
-    long frames = 3000; u32 seed = 1; int skew = 0;
+    long frames = 3000; u32 seed = 1; int skew = 0, init_ddra = 0;
     unsigned pc = 0x10000, a = 0, x = 0, y = 0, sp = 0xFF, p = 0x34;      /* --pc is required for a run */
     const char *kernal_name = "kernal-901227-03.bin", *basic_name = "basic-901226-01.bin", *chargen_name = "chargen-901225-01.bin";
     for (int i = 1; i < argc; i++) {
@@ -959,8 +965,12 @@ int main(int argc, char **argv) {
     if (init) {
         FILE *f = fopen(init, "r"); unsigned ad, v;
         if (!f) { fprintf(stderr, "cannot open %s\n", init); return 2; }
-        while (fscanf(f, "%x %x", &ad, &v) == 2) io_write((u16)ad, (u8)v);
+        while (fscanf(f, "%x %x", &ad, &v) == 2) { io_write((u16)ad, (u8)v); if (ad == 0xDC02) init_ddra = 1; }
         fclose(f);
+    }
+    if (key_fixed && !init_ddra && !cia[0].ddra) {      /* a hand-off image has the power-on CIA state (DDRA = 0: no column can be selected); the KERNAL's reset leaves DDRA = $FF, PRA = $7F-ish, which a game relies on */
+        cia[0].ddra = 0xFF; if (!cia[0].pra) cia[0].pra = 0xFF;
+        fprintf(stderr, "note: --keymat / --keymat-at: CIA 1 DDRA set to $FF and PRA to $FF at the start (the KERNAL's state; an --init line for $DC02 overrides it)\n");
     }
     if (skew) advance(skew);                           /* --skew: start the clock late, to test that a trace does not depend on cycle timing */
     u64 limit = (u64)frames * LINES * CYCLES_PER_LINE;
@@ -974,6 +984,7 @@ int main(int argc, char **argv) {
         instr_count++;
         advance(c);
     }
+    if (key_fixed && kbd_unsel && !kbd_sel) fprintf(stderr, "WARNING: --keymat / --keymat-at given, but no keyboard column was ever selected when $DC01 was read (CIA 1 DDRA = $%02X, PRA = $%02X at the end): the keys were never visible to the program\n", cia[0].ddra, cia[0].pra);
     save_all(out);
     if (dump_path) {                    /* RAM, VIC registers, colour RAM: for rendering the final screen */
         FILE *f = fopen(dump_path, "wb");
