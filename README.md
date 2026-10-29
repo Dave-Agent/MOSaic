@@ -26,6 +26,8 @@ MOSaic is a Claude Code skill: a process, its rules, and the scripts that check 
 
 ## Getting started
 
+The full step-by-step, from adding the game's image to a finished phase 2, is in [HOWTO.md](HOWTO.md). The short version:
+
 **1. Install the tools.** Python 3, Java 17+, [Kick Assembler](http://theweb.dk/KickAssembler/) (the jar in `~/tools/KickAss.jar`, or set `KICKASS_JAR` in `project.config`), git, [`just`](https://github.com/casey/just), VICE (`x64sc`) with its C64 ROMs, Ghidra 11+ (set `GHIDRA_HOME` if it isn't under `~/ghidra*`) and a C compiler. The Ghidra exporter script is fetched automatically on first use. Pillow is needed for pictures. Developed on Linux; macOS should work; on Windows use WSL.
 
 **2. Install the skill and check the tools.**
