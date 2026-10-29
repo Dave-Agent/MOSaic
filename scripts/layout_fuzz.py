@@ -13,7 +13,7 @@ Full image (nothing free to grow into): `--label NAME` makes a point at the line
      filler byte (default 00; use ea (NOP) when a point can be reached by falling through code, zeros are BRK).
      --phase 1 uses the phase 1 main file (SRC_MAIN).
 project.config keys (used when the option is absent): KICKASS_JAR, JAVA, PHASE2_MAIN, FUZZ_POINTS (`A=line;;B=line`), FUZZ_CMDS (commands separated by `;;`).
-Exit 1 if any variant fails to assemble or a command fails."""
+A label (and the --take block) is looked up in EVERY .asm below the source directory, so a source split into files works; the environment of --cmd also has FUZZ_VARIANT (the variant spec, for a per-scenario matrix a wrapper builds). Exit 1 if any variant fails to assemble or a command fails."""
 import os, re, shutil, subprocess, sys, tempfile
 from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -30,31 +30,43 @@ srcdir = os.path.dirname(os.path.join(root, main_rel)); mainname = os.path.basen
 def variant(spec):
     name, n = spec.split(':'); n = int(n); tmp = tempfile.mkdtemp(prefix='fuzz_', dir=os.environ.get('LAYOUT_FUZZ_TMP', tempfile.gettempdir()))
     src = os.path.join(tmp, 'src'); shutil.copytree(srcdir, src, ignore=shutil.ignore_patterns('build', '*.sym'))
-    f = os.path.join(src, mainname); lines = open(f).read().split('\n'); at = next((i for i, l in enumerate(lines) if (re.match(r'^%s:' % re.escape(points[name][7:]), l) if points[name].startswith('@label:') else l.strip() == points[name].strip())), None)
+    f = os.path.join(src, mainname); texts = {}
+    def load(p):
+        if p not in texts: texts[p] = open(p).read().split('\n')
+        return texts[p]
+    def find(pat):                                          # (path, line index) of the first line matching, in import order (main file first)
+        order = [f] + sorted(os.path.join(d, x) for d, _, fs in os.walk(src) for x in fs if x.endswith('.asm') and os.path.join(d, x) != f)
+        for p in order:
+            for i, l in enumerate(load(p)):
+                if pat(l): return p, i
+        return None, None
+    if points[name].startswith('@label:'): lab = points[name][7:]; p, at = find(lambda l: re.match(r'^%s:' % re.escape(lab), l))
+    else: p, at = find(lambda l: l.strip() == points[name].strip())
     if at is None: return spec, False, f'point {name}: line not found: {points[name]}', tmp
-    lines[at:at] = [f'  .fill {n}, ${args.fill}   // layout_fuzz']
+    lines = load(p); lines[at:at] = [f'  .fill {n}, ${args.fill}   // layout_fuzz']
     if args.take:
-        tk = next((i for i, l in enumerate(lines) if re.match(r'^%s:' % re.escape(args.take), l)), None)
+        tp, tk = find(lambda l: re.match(r'^%s:' % re.escape(args.take), l))
         if tk is None: return spec, False, f'--take: label {args.take} not found', tmp
-        j = tk + 1; vals = []                                    # the block: .byte / .fill rows below the label (all zero)
+        lines = load(tp); j = tk + 1; vals = []
         while j < len(lines):
-            if 'layout_fuzz' in lines[j]: break                   # the filler just inserted is not part of the block
+            if 'layout_fuzz' in lines[j]: break
             c = lines[j].split('//')[0]; mb = re.match(r'\s*\.byte\s+(.*)', c); mf = re.match(r'\s*\.fill\s+(\d+)\s*,\s*(\S+)', c)
             if mb: vals += [x.strip() for x in mb.group(1).split(',') if x.strip()]
             elif mf: vals += [mf.group(2)] * int(mf.group(1))
+            elif lines[j].strip() == '' or lines[j].strip().startswith('//'): pass          # blank / comment lines inside the block are skipped
             else: break
             j += 1
         if n > len(vals) or (not args.take_nonzero and any(v.lower() not in ('0', '$0', '$00', '0x00') for v in vals[len(vals) - n:])): return spec, False, f'--take: {args.take} has {len(vals)} bytes and its last {n} are not all zero', tmp
-        keep = vals[:len(vals) - n]; new = ['  .byte ' + ','.join(keep[q:q + 16]) for q in range(0, len(keep), 16)]
+        keep = vals[:len(vals) - n]; new = ['  .byte ' + ','.join(keep[q:q + 16]) + ('   // layout_fuzz take' if False else '') for q in range(0, len(keep), 16)]
         lines[tk + 1:j] = new
-    open(f, 'w').write('\n'.join(lines))
+    for pp, ll in texts.items(): open(pp, 'w').write('\n'.join(ll))
     out = os.path.join(tmp, 'out'); os.makedirs(out)
     r = subprocess.run([java, '-jar', os.path.expanduser(jar), f, '-o', os.path.join(out, 'game.prg'), '-odir', out, '-symbolfile'], capture_output=True, text=True, cwd=root)
     prg = os.path.join(out, 'game.prg')
-    if re.search(r'asserts.*FAILED', r.stdout + r.stderr): return spec, False, 'assert failed: ' + (r.stdout + r.stderr)[-300:], tmp   # a layout that breaks a stated assumption
-    if r.returncode or not os.path.exists(prg): return spec, False, 'assemble failed: ' + (r.stdout + r.stderr)[-300:], tmp
+    if re.search(r'asserts.*FAILED', r.stdout + r.stderr): return spec, False, 'assert failed: ' + (r.stdout + r.stderr)[-3000:], tmp   # a layout that breaks a stated assumption
+    if r.returncode or not os.path.exists(prg): return spec, False, 'assemble failed: ' + (r.stdout + r.stderr)[-3000:], tmp
     sym = next((os.path.join(out, x) for x in os.listdir(out) if x.endswith('.sym')), '')
-    env = dict(os.environ, FUZZ_PRG=prg, FUZZ_SYM=sym, FUZZ_SRC=f)
+    env = dict(os.environ, FUZZ_PRG=prg, FUZZ_SYM=sym, FUZZ_SRC=f, FUZZ_VARIANT=spec)
     for c in cmds:
         t = subprocess.run(c, shell=True, capture_output=True, text=True, cwd=root, env=env)
         if t.returncode: return spec, False, f'command failed ({c}):\n' + (t.stdout + t.stderr)[-500:], tmp

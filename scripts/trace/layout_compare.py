@@ -130,6 +130,6 @@ if args.state_frames:
                 if cd: why.append('colour RAM %d cell(s) from $D8%02X' % (len(cd), cd[0] & 255) if cd[0] < 256 else 'colour RAM %d cell(s), first offset %d' % (len(cd), cd[0]))
                 if A[66624] != B[66624]: why.append('$DD00 %02X/%02X (VIC bank)' % (A[66624], B[66624]))
                 for (a0, a1), (b0, b1), spec in zip(RB, RV, args.range):
-                    if A[a0:a1 + 1] != B[b0:b1 + 1]: why.append('range %s differs' % spec)
+                    if any(A[a0 + k] != B[b0 + k] and not any(lo <= a0 + k <= hi for lo, hi in ign) for k in range(a1 - a0 + 1)): why.append('range %s differs' % spec)        # --ignore applies here too
                 print('%-12s state@%-5d %s' % (name, fr, ('same' if not lg else 'same (variant read %d frames later)' % lg) if not why else 'DIFF: ' + '; '.join(why[:4]))); bad += 1 if why else 0
 print('layout_compare: %d scenario(s), %d different' % (len(args.scenario), bad)); sys.exit(1 if bad else 0)
