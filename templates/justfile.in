@@ -98,3 +98,7 @@ comment-check:
 # Stage 5b: import the reference into Ghidra, seed it, export Kick Assembler source into ghidra/ (the landing zone: never phase1/src).
 ghidra:
     bash {{skill}}/scripts/ghidra/run.sh .
+
+# Per-frame samples of variables under a scripted input (rung 3 evidence): just trace-run 'NAME_A NAME_B' '--joy2-at 5=ef' 300
+trace-run vars inputs="" frames="300":
+    . ./project.config; python3 {{skill}}/scripts/trace/sample_report.py --root . --phase 1 {{vars}} --run -- --ram dumps/handoff.bin --rom-dir {{rom_dir}} --pc "$HANDOFF_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port 35 --frames {{frames}} --seed 1 --chaos 6 --joy1 ff {{inputs}}
