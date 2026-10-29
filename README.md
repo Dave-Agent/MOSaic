@@ -23,7 +23,6 @@ MOSaic is a Claude Code skill: a process, its rules, and the scripts that check 
 7. **Rules are enforced by scripts.** About twenty checks cover raw addresses, placeholders, echo comments, list end markers, one record per row, banners that tile the image, table sizes, hardware-dependency tags and unreferenced blocks. A source is complete only when the report says so.
 8. **Phase 2 begins with a safety net.** Routine tests run the original code in a simulator against Python models. Golden traces record the game's state per frame under scripted input, with a timing-tolerant set for when bytes change.
 9. **Then it refactors in small, gated steps.** The source is split into files, a platform interface is defined with written contracts, layout assumptions become asserts and a relocation sweep, and approved dead blocks are removed without moving live code. The gate then accepts a difference only inside the approved ranges.
-10. **Every real run feeds back.** Agents report friction without naming the game, and the fixes become tools, rules and decisions in the skill.
 
 ## See results
 
