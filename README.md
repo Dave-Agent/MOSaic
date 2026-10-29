@@ -24,6 +24,40 @@ MOSaic is a Claude Code skill: a process, its rules, and the scripts that check 
 8. **Phase 2 begins with a safety net.** Routine tests run the original code in a simulator against Python models. Golden traces record the game's state per frame under scripted input, with a timing-tolerant set for when bytes change.
 9. **Then it refactors in small, gated steps.** The source is split into files, a platform interface is defined with written contracts, layout assumptions become asserts and a relocation sweep, and approved dead blocks are removed without moving live code. The gate then accepts a difference only inside the approved ranges.
 
+## Getting started
+
+**1. Install the tools.** Python 3, Java 17+, [Kick Assembler](http://theweb.dk/KickAssembler/) (the jar in `~/tools/KickAss.jar`, or set `KICKASS_JAR` in `project.config`), git, [`just`](https://github.com/casey/just), VICE (`x64sc`) with its C64 ROMs, Ghidra 11+ (set `GHIDRA_HOME` if it isn't under `~/ghidra*`) and a C compiler. The Ghidra exporter script is fetched automatically on first use. Pillow is needed for pictures. Developed on Linux; macOS should work; on Windows use WSL.
+
+**2. Install the skill and check the tools.**
+```
+git clone https://github.com/Dave-Agent/MOSaic.git
+ln -s "$PWD/MOSaic" ~/.claude/skills/c64-decomp
+python3 ~/.claude/skills/c64-decomp/scripts/check_env.py --role run --role trace --role ghidra
+```
+
+**3. Make a project for the game.** You need the game's disk (`.d64`, `.g64`) or tape (`.tap`) image, preferably one with the copy protection removed. The original is copied into the project's `originals/` and its SHA-256 recorded. It is never modified and never attached to an emulator directly; VICE only runs scratch copies.
+```
+python3 ~/.claude/skills/c64-decomp/scripts/new_project.py --root ~/C64Projects/MyGame --name "My Game" --media /path/to/game.d64
+cd ~/C64Projects/MyGame
+just env
+```
+MOSaic creates a local git repository in the project and commits after each step. It never pushes.
+
+**4. Open Claude Code in the project folder and ask for the first stage.**
+> Use the MOSaic skill. Follow `references/new_game.md` from the research step through the first byte-identical build of this game, and don't push.
+
+The agent researches the game, extracts the files, finds the point where the game is fully loaded, derives a clean reference image, exports the disassembly from Ghidra, and builds it back byte for byte. A disk takes tens of minutes and a tape longer. VICE opens windows while it dumps memory; don't type in them.
+
+**5. Tell it to continue when it stops.** The agent finishes the task it was given and stops at each stage boundary, so you choose the next step. Paste the next prompt:
+
+| When the agent says… | Ask |
+|---|---|
+| the Ghidra export is done | "Continue from stage 5 of `new_game.md`: copy the export into `phase1/src/`, set `SRC_MAIN`, get `just verify` byte-identical, run `just libs-apply` and `just anon-apply`, check the game starts with `just smoke`, and report the `p1_complete` backlog." |
+| the first build passes | "Start phase 1 following `references/phase1_method.md`: work in slices, ask me what a thing is only after trying the code and a tracer run, and report progress." |
+| phase 1 is complete | "Start phase 2 following `references/phase2_split.md`." |
+
+**6. Check where you are** with `just --list` for the commands, `python3 ~/.claude/skills/c64-decomp/scripts/p1_complete.py --root . --phase 1` for how much of phase 1 remains, and `docs/` in the project for the research, the boot analysis and the answers recorded from you.
+
 ## See results
 
 In a project made with MOSaic (`new_project.py`), every command takes the phase: `1` is the frozen, byte-identical reconstruction, `2` is the split, refactored source. With no argument it uses `ACTIVE_PHASE` from `project.config`.
@@ -38,20 +72,6 @@ just --list        # every command with its description
 ```
 
 `docs/` in the project holds the pictures the process produces (`docs/gfx/`), the answers recorded from the game's owner, and for phase 2 the file map (`docs/phase2_files.md`).
-
-## Use
-
-Link it as a skill, then scaffold a project:
-
-```
-ln -s "$PWD" ~/.claude/skills/c64-decomp
-python3 scripts/check_env.py
-python3 scripts/new_project.py --help
-```
-
-Needs Python 3, Java 17+, Kick Assembler, git and [`just`](https://github.com/casey/just). VICE, Ghidra, a C compiler, and Pillow are needed for some steps; `check_env.py` reports what each role requires. Developed on Linux; macOS should work; on Windows use WSL.
-
-MOSaic creates a local git repository in each project and commits after each step. It never pushes.
 
 ## Known limitations
 
