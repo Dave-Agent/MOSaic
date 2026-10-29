@@ -84,3 +84,6 @@ Applies to: every project.
 - `framework/` is generic; no project value inside it (`project.config` carries them).
 - Never edit `reference/`, `originals/` or a mirror directly; one-way flows only.
 - Emulator tests must run unattended (judge by screenshot, not by a PC sample).
+
+## Pictures live in one place
+Every generated picture (sprites, characters, screens, tracer-state renders, record sheets) is written under `gfx/` (git-ignored), never `build/`, `dumps/`, `/tmp` or the project root; a state render defaults to `gfx/<state name>/`. A picture that backs a name or an owner answer is copied to `docs/` with a descriptive name and committed. Do not invent a second folder: when a tool asks for `--out`, it is a subfolder of `gfx/`.

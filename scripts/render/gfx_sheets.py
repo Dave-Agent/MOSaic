@@ -645,7 +645,7 @@ def write_index(out, st, idx, root, cmd):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--root', default='.', help='project root (default: current directory)')
-    ap.add_argument('--out', default='gfx', help='output folder, relative to --root (default gfx)')
+    ap.add_argument('--out', default=None, help='output folder, relative to --root (default gfx; with --state: gfx/<state file name>, so a picture of a tracer state never lands outside gfx/ or overwrites the hand-off render)')
     ap.add_argument('--ram', help='64 KB RAM image (default dumps/handoff.bin)')
     ap.add_argument('--state', help='state file: RAM + 64 VIC registers + 1024 colour RAM + $DD00 (default dumps/handoff_state.bin when present)')
     ap.add_argument('--sym', help='symbol file for label arguments (default: the build\'s newest .sym, as the other tools)')
@@ -692,6 +692,7 @@ def main():
     root = os.path.abspath(args.root); args.root = root
     cfg = _common.config(root); load_syms(args)
     st = State(args, cfg, root)
+    if args.out is None: args.out = 'gfx/' + os.path.splitext(os.path.basename(args.state))[0] if args.state else 'gfx'
     out = os.path.join(root, args.out); idx = Index(out)
     custom = bool(args.sprites or args.chars or args.char_anim or args.records)
     nbad = None

@@ -11,6 +11,9 @@ python3 -B scripts/render/gfx_sheets.py --help             # the full option lis
 ```
 Pillow is required. At the end the tool prints the folder and the first file names; `gfx/index.md` lists every picture, what it shows, the addresses used and **how its colours and modes were derived**.
 
+## One place for pictures
+Every generated picture goes under `gfx/` (git-ignored), never `build/`, `dumps/`, `/tmp` or the project root. The hand-off render is `gfx/`; a render of a tracer state (`--state FILE`) goes to `gfx/<state file name>/` by default. A picture worth keeping as evidence (it backs a name, an owner answer) is COPIED to `docs/` under a descriptive name and committed; `gfx/` stays regenerable.
+
 ## Default render (`gfx/`)
 | file | shows |
 |---|---|
