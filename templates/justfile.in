@@ -1,5 +1,6 @@
 # justfile: thin. Generic recipes come from framework/recipes.just; the c64-decomp skill's scripts are called through `skill`.
 set allow-duplicate-recipes := true
+set shell := ["bash", "-euo", "pipefail", "-c"]      # the recipes use bash arrays: on Windows run just from Git Bash or WSL
 skill := env_var_or_default("C64_DECOMP", home_directory() / ".claude/skills/c64-decomp")
 rom_dir := env_var_or_default("VICE_ROM_DIR", home_directory() / ".local/share/vice/C64")
 import 'framework/recipes.just'

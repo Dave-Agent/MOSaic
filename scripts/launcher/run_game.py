@@ -18,7 +18,7 @@ and writes a screenshot (sys mode: -exitscreenshot, deterministic; inject mode: 
 project.config keys: VICE_BIN, OUTPUT_PRG, VICE_SYMBOLS, HANDOFF_PC (hex) and LAUNCH_MODE (sys|inject); inject only: HANDOFF_SP (default fc), HANDOFF_P (34), LAUNCH_PORT (37: $01
 at entry), LAUNCH_LOW ("0002-07ff": the low RAM range restored from the dump), LAUNCH_POKES ("d020=0e d021=06 dc0d=7f": hex ADDR=BYTES written with I/O visible, after the state file),
 LAUNCH_PORT_PORT_DDR ($00, default 2f). Never passes -default (the 1541 ROM would not resolve); no disk drive is needed. Port for the monitor: VICE_MONITOR_PORT + 1 (inject only)."""
-import os, subprocess, sys, tempfile, time
+import os, shutil, subprocess, sys, tempfile, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'vice'))
 from _common import parser, config
@@ -68,7 +68,7 @@ def main():
     if not os.path.exists(prg): sys.exit('no %s: build first (just experiment)' % prg)
     pc = cfg.get('HANDOFF_PC') or sys.exit('set HANDOFF_PC in project.config')
     cfg['HANDOFF_PC'] = pc
-    vice = [cfg.get('VICE_BIN', '/usr/bin/x64sc'), '+confirmonexit', '-jamaction', '5']     # 5 = continue after a JAM (the game may jam on purpose or by a bug: the screenshot decides)
+    vice = [cfg.get('VICE_BIN') or shutil.which('x64sc') or 'x64sc', '+confirmonexit', '-jamaction', '5']     # 5 = continue after a JAM (the game may jam on purpose or by a bug: the screenshot decides)
     sym = os.path.join(root, cfg.get('VICE_SYMBOLS', ''))
     if not args.no_symbols and cfg.get('VICE_SYMBOLS') and os.path.exists(sym): vice += ['-moncommands', sym]
     assert '-default' not in vice

@@ -28,7 +28,10 @@ quit. Exit status 0 means the break was reached.
 """
 import argparse
 import os
-import pty
+try:
+    import pty
+except ImportError:                       # Windows: no pseudo-terminals; run this under WSL or Git Bash with a Unix Python
+    raise SystemExit('vice_snapshot_launch.py needs pty (Unix only): use WSL on Windows')
 import re
 import select
 import subprocess

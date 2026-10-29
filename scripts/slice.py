@@ -22,13 +22,13 @@ start   copies the project (git repo included, `originals/` skipped, `build/` sk
         and commits there; it never touches the real project.
 merge   `git format-patch` of the scratch repo since the base commit, `git am` into the real project (the real tree must have no uncommitted changes to tracked files: untracked
         files are fine), then `check`. A failed `am` is aborted (`git am --abort`), nothing is left half applied."""
-import argparse, os, shutil, subprocess, sys
+import argparse, os, shutil, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 p.add_argument('cmd', choices=('check', 'start', 'merge')); p.add_argument('name', nargs='?'); p.add_argument('--root', default='.'); p.add_argument('--phase', type=int, default=1)
 p.add_argument('--range'); p.add_argument('--allow-marked', action='store_true')
 args = p.parse_args(); root = os.path.abspath(args.root)
-SCRATCH = os.environ.get('SLICE_SCRATCH', '/tmp/c64-slices')
+SCRATCH = os.environ.get('SLICE_SCRATCH', os.path.join(tempfile.gettempdir(), 'c64-slices'))
 def run(cmd, cwd=None): return subprocess.run(cmd, cwd=cwd or root, capture_output=True, text=True)
 def check(root_):
     global root
