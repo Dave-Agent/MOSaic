@@ -112,5 +112,5 @@ fi
 say "Done. Next:"
 echo "  1. cd \"$ROOT\""
 echo "  2. Open Claude Code there and say:"
-echo "       Use the MOSaic skill. Research this game, then continue to the first byte-identical build."
+echo "       Use the MOSaic skill. Acquire this game: work through HOWTO steps 2 to 8, from research to a game that starts, without stopping between them."
 echo "  3. Afterwards, \"move to the next stage\" does the next step. The full guide is $HERE/HOWTO.md"

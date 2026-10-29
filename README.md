@@ -46,16 +46,15 @@ just status
 The original game file was copied into the project's `originals/` folder with its SHA-256. It is never modified and never attached to an emulator directly; VICE only runs scratch copies. MOSaic creates a local git repository in the project and commits after each step. It never pushes.
 
 **(d) Open Claude Code in the project folder and ask for the first stage.**
-> Use the MOSaic skill. Research this game, then continue to the first byte-identical build.
+> Use the MOSaic skill. Acquire this game: work through HOWTO steps 2 to 8, from research to a game that starts, without stopping between them.
 
 The agent researches the game, extracts the files, finds the point where the game is fully loaded, derives a clean reference image, exports the disassembly from Ghidra, and builds it back byte for byte. A disk takes tens of minutes and a tape longer. VICE opens windows while it dumps memory; don't type in them.
 
-**(e) Tell it to continue when it stops.** The agent finishes the task it was given and stops at each stage boundary. It runs `just status`, tells you what was done and what the next stage is, and asks whether to continue. You can also just say "move to the next stage" (or "what's next?"): it works out the stage from the project, tells you which step it is starting and what it will do, and gets on with it without asking again. The prompts below are what each stage amounts to, for when you want to be specific:
+**(e) After the run, it asks whether to go on.** Steps 2 to 8 are one job, so the agent works through all of them, telling you each step as it starts, and stops early only if it needs something from you. When the game starts, it reports and asks whether to begin phase 1. From then on you can just say "move to the next stage" (or "what's next?"): it works out the stage from the project, tells you which step it is starting and what it will do, and gets on with it without asking again. The prompts below are what each later stage amounts to, for when you want to be specific:
 
 | When the agent says… | Ask |
 |---|---|
-| the Ghidra export is done | "Continue from stage 5 of `new_game.md`: copy the export into `phase1/src/`, set `SRC_MAIN`, get `just verify` byte-identical, run `just libs-apply` and `just anon-apply`, check the game starts with `just smoke`, and report the `p1_complete` backlog." |
-| the first build passes | "Start phase 1 following `references/phase1_method.md`: work in slices, ask me what a thing is only after trying the code and a tracer run, and report progress." |
+| the game starts and the first build passes | "Start phase 1 following `references/phase1_method.md`: work in slices, ask me what a thing is only after trying the code and a tracer run, and report progress." |
 | phase 1 is complete | "Start phase 2 following `references/phase2_split.md`." |
 
 **(f) Check where you are** with `just --list` for the commands, `python3 ~/.claude/skills/mosaic/scripts/p1_complete.py --root . --phase 1` for how much of phase 1 remains, and `docs/` in the project for the research, the boot analysis and the answers recorded from you.

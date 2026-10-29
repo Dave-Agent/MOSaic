@@ -26,6 +26,8 @@ Two cases, and they are different.
 
 **You finish a stage on your own** (the work you were asked to do is done). Run `status.py`, tell the user in a few sentences what was just done and which step is next and roughly what it involves, and **ask whether to continue** (offer: continue, continue after I have looked, stop here). Do not start the next stage unasked and do not stop without offering.
 
+**Steps 2 to 8 are one run.** From research to a game that starts (HOWTO.md steps 2 to 8) there is no point at which a user wants to stop: it is one job. When the next step is anywhere in 2 to 8, work through all of them without asking at the boundaries, writing one line to the user as each step starts ("Step 5 of 8: exporting the disassembly from Ghidra") and finishing with the report of step 8. Stop earlier only for something that needs the user (a decision only they can make, a medium that needs a choice, a failure you cannot resolve, a tool that is missing). When the run finishes, report what was done and ask whether to start phase 1. From step 9 on, each stage is announced when it starts and reported with a question when it ends, as above.
+
 Background workers (a slice's agent) never ask and never announce to the user: they report to the session that started them. Together the two cases mean a newcomer never needs to know the stage list: they are always told which step is running and what comes after it.
 
 ## Phases

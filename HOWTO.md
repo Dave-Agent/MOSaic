@@ -50,13 +50,25 @@ Your file is copied into the project's `originals/` folder and its SHA-256 recor
 
 ---
 
+## Steps 2 to 8: one run, from research to a game that starts
+
+These seven steps are one continuous job and there is no point at which you would want to stop. Ask for them once and the agent works through all of them, telling you each step as it starts. It stops early only if it needs something from you: a decision, a missing tool, or a failure it cannot resolve.
+
+**To start the whole run, say:** "Use the MOSaic skill. Acquire this game: work through HOWTO steps 2 to 8, from research to a game that starts, without stopping between them."
+
+**Do not type in the VICE window** while it dumps memory (step 4). A disk takes minutes; a tape longer. When it finishes you have a build that is byte-identical to the original and that you have seen start, and the agent asks whether to begin phase 1.
+
+The steps below say what happens in each, and the commands if you want to run any of them yourself.
+
+---
+
 ## Step 2. Research the game
 
 **Goal:** the game's documented behaviour written down as unconfirmed leads.
 
 | Guided | Manual |
 |---|---|
-| Open Claude Code in the project folder and say:<br>"Use the MOSaic skill. Research this game before reading any code."<br><br>The agent reads the manual, release databases, wikis, reviews and POKE lists, and writes the two files. Nothing from the web goes into the code until the code confirms it. | Write `docs/gameplay.md` (one row per documented fact: what the documents say, the source, status) and `docs/background.md` (history, releases) yourself.<br><br>Method: `references/research.md`. For a scanned manual: `scripts/research/pdf_pages.py FILE.pdf --out DIR`. |
+| Open Claude Code in the project folder and give the run prompt above (this step is where the run starts).<br><br>The agent reads the manual, release databases, wikis, reviews and POKE lists, and writes the two files. Nothing from the web goes into the code until the code confirms it. | Write `docs/gameplay.md` (one row per documented fact: what the documents say, the source, status) and `docs/background.md` (history, releases) yourself.<br><br>Method: `references/research.md`. For a scanned manual: `scripts/research/pdf_pages.py FILE.pdf --out DIR`. |
 
 **Done when:** both files are filled in.
 
@@ -68,7 +80,7 @@ Your file is copied into the project's `originals/` folder and its SHA-256 recor
 
 | Guided | Manual |
 |---|---|
-| Say "move to the next stage".<br><br>The agent extracts the files, disassembles the boot stub, works out what loads what, and writes `docs/boot_analysis.md`. A tape with a turbo loader needs a decoder written for that loader; the agent will say so. | Disk:<br>`python3 ~/.claude/skills/mosaic/scripts/disk/extract_files.py originals/game.d64 --out extracted/`<br>Tape:<br>`python3 ~/.claude/skills/mosaic/scripts/tape/tap_extract.py originals/game.tap --out extracted/`<br>Then read the boot stub with `scripts/disasm/dis6502.py` (see `--help`) and write `docs/boot_analysis.md`. |
+| Part of the run you started in step 2; nothing to say.<br><br>The agent extracts the files, disassembles the boot stub, works out what loads what, and writes `docs/boot_analysis.md`. A tape with a turbo loader needs a decoder written for that loader; the agent will say so. | Disk:<br>`python3 ~/.claude/skills/mosaic/scripts/disk/extract_files.py originals/game.d64 --out extracted/`<br>Tape:<br>`python3 ~/.claude/skills/mosaic/scripts/tape/tap_extract.py originals/game.tap --out extracted/`<br>Then read the boot stub with `scripts/disasm/dis6502.py` (see `--help`) and write `docs/boot_analysis.md`. |
 
 **Done when:** `docs/boot_analysis.md` names the boot chain and the address where the game starts (the hand-off).
 
@@ -80,7 +92,7 @@ Your file is copied into the project's `originals/` folder and its SHA-256 recor
 
 | Guided | Manual |
 |---|---|
-| Say "move to the next stage".<br><br>The agent runs the game in VICE (a scratch copy), dumps RAM at the hand-off several times, votes out emulator noise, and zeroes loader and crack bytes only where the tracer proves the game never touches them.<br><br>**Do not type in the VICE window while it runs.** A disk takes minutes; a tape longer. | In `project.config` set `DUMP_PC`, `HANDOFF_PC` and `REF_KEEP` (the hand-off address and the memory range to keep), list what to zero in `tools/reference.spec`, then:<br>`just derive`<br><br>(`just dumps`, `just vote`, `just decrunch`, `just reference` are its parts.) |
+| Part of the run you started in step 2; nothing to say.<br><br>The agent runs the game in VICE (a scratch copy), dumps RAM at the hand-off several times, votes out emulator noise, and zeroes loader and crack bytes only where the tracer proves the game never touches them.<br><br>**Do not type in the VICE window while it runs.** | In `project.config` set `DUMP_PC`, `HANDOFF_PC` and `REF_KEEP` (the hand-off address and the memory range to keep), list what to zero in `tools/reference.spec`, then:<br>`just derive`<br><br>(`just dumps`, `just vote`, `just decrunch`, `just reference` are its parts.) |
 
 **Done when:** `reference.sha256` exists and `docs/` says where the reference came from.
 
@@ -92,7 +104,7 @@ Your file is copied into the project's `originals/` folder and its SHA-256 recor
 
 | Guided | Manual |
 |---|---|
-| Say "move to the next stage".<br><br>The tracer runs the game and records which addresses execute; Ghidra follows the code from those addresses and the exporter writes the source. The exporter script downloads itself the first time. | `just seeds`<br>`just ghidra`<br><br>The result lands in `ghidra/`; it is not yet your source. |
+| Part of the run you started in step 2; nothing to say.<br><br>The tracer runs the game and records which addresses execute; Ghidra follows the code from those addresses and the exporter writes the source. The exporter script downloads itself the first time. | `just seeds`<br>`just ghidra`<br><br>The result lands in `ghidra/`; it is not yet your source. |
 
 **Done when:** `ghidra/<name>.asm` and `ghidra/<name>_Symbols.asm` exist.
 
@@ -104,7 +116,7 @@ Your file is copied into the project's `originals/` folder and its SHA-256 recor
 
 | Guided | Manual |
 |---|---|
-| Say "move to the next stage".<br><br>The agent copies the export into `phase1/src/`, points the project at it and runs the gate. If it fails it works through the usual first differences in `references/new_game.md`. | `cp ghidra/<name>.asm phase1/src/<name>.asm`<br>`cp ghidra/<name>_Symbols.asm phase1/src/symbols.asm`<br>Fix the `#import` line at the top of the main file to say `symbols.asm`, set `SRC_MAIN="phase1/src/<name>.asm"` in `project.config`, then:<br>`just verify` |
+| Part of the run you started in step 2; nothing to say.<br><br>The agent copies the export into `phase1/src/`, points the project at it and runs the gate. If it fails it works through the usual first differences in `references/new_game.md`. | `cp ghidra/<name>.asm phase1/src/<name>.asm`<br>`cp ghidra/<name>_Symbols.asm phase1/src/symbols.asm`<br>Fix the `#import` line at the top of the main file to say `symbols.asm`, set `SRC_MAIN="phase1/src/<name>.asm"` in `project.config`, then:<br>`just verify` |
 
 **Done when:** `just verify` prints `PASS: built image is byte-identical`. From now on it is the gate: it must pass before every commit.
 
@@ -116,7 +128,7 @@ Your file is copied into the project's `originals/` folder and its SHA-256 recor
 
 | Guided | Manual |
 |---|---|
-| Say "move to the next stage".<br><br>The agent runs both conversions and verifies after each. | `just libs-apply`<br>`just verify`<br>`just anon-apply`<br>`just verify` |
+| Part of the run you started in step 2; nothing to say.<br><br>The agent runs both conversions and verifies after each. | `just libs-apply`<br>`just verify`<br>`just anon-apply`<br>`just verify` |
 
 **Done when:** `just verify` still passes and `just status` shows step 7 done.
 
@@ -128,7 +140,7 @@ Your file is copied into the project's `originals/` folder and its SHA-256 recor
 
 | Guided | Manual |
 |---|---|
-| Say "move to the next stage".<br><br>The agent boots the build headless in VICE, takes a screenshot (the first run creates `tools/smoke_ref.png`) and looks at it to confirm it is the game and not a blank or BASIC screen. | `just smoke`<br>`just launch`<br><br>`just launch` runs it in VICE at real speed. Some games jam on a fraction of starts; if the original does, keep it and set `SMOKE_RETRIES` in `project.config` (the agent records it in `docs/gameplay.md`). |
+| Part of the run you started in step 2; nothing to say.<br><br>The agent boots the build headless in VICE, takes a screenshot (the first run creates `tools/smoke_ref.png`) and looks at it to confirm it is the game and not a blank or BASIC screen. | `just smoke`<br>`just launch`<br><br>`just launch` runs it in VICE at real speed. Some games jam on a fraction of starts; if the original does, keep it and set `SMOKE_RETRIES` in `project.config` (the agent records it in `docs/gameplay.md`). |
 
 **Done when:** `just smoke` passes and you have watched the game start.
 
