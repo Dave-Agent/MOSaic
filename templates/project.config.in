@@ -65,3 +65,6 @@ PHASE2_ALLOWED_DIFF=""
 
 # Unattended VICE runs (dumps, hand-off, smoke test) must not take the desktop focus: minimized (default) | xvfb (a virtual display through xvfb-run: no window at all; apt install xvfb) | normal (a plain window, to watch a run). `just launch` is interactive and always a normal window.
 VICE_DISPLAY="minimized"
+
+# Unattended start test: how many times `just smoke` tries before it fails (1 = once). A program whose ORIGINAL start is flaky (a race, or state a loader left in low RAM that the program reads) needs more than 1; a pass after failed attempts says so and is not hidden.
+SMOKE_RETRIES="1"

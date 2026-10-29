@@ -24,24 +24,38 @@ def cheap(path, max_fill):
 
 def main():
     a = parser('Unattended game start test', write=False)
-    a.add_argument('--prg'); a.add_argument('--mode'); a.add_argument('--cycles'); a.add_argument('--update-ref', action='store_true')
+    a.add_argument('--prg'); a.add_argument('--mode'); a.add_argument('--cycles'); a.add_argument('--update-ref', action='store_true'); a.add_argument('--retries', type=int)
     args = a.parse_args(); root = os.path.abspath(args.root); cfg = config(root)
     shot = os.path.join(root, cfg.get('SMOKE_SHOT', 'build/smoke.png')); os.makedirs(os.path.dirname(shot), exist_ok=True)
     cmd = [sys.executable, '-I', os.path.join(here, 'run_game.py'), '--root', root, '--shot', shot, '--no-symbols']
     for k in ('prg', 'mode', 'cycles'):
         if getattr(args, k): cmd += ['--' + k, getattr(args, k)]
-    r = subprocess.run(cmd)
-    if r.returncode or not os.path.exists(shot): print('smoke: FAIL (VICE did not run or took no screenshot)'); sys.exit(1)
-    ok, why = cheap(shot, float(cfg.get('SMOKE_MAX_FILL', 0.97)))
-    print('smoke: cheap check %s (%s)' % ('PASS' if ok else 'FAIL: blank or BASIC screen, the game did not start', why))
-    if not ok: sys.exit(1)
     ref = os.path.join(root, cfg.get('JUDGE_REF') or 'tools/smoke_ref.png')
-    if args.update_ref or not os.path.exists(ref):
-        os.makedirs(os.path.dirname(ref), exist_ok=True); shutil.copy(shot, ref)
-        print('smoke: reference %s %s from this screenshot: LOOK at it once to confirm it is the screen you want, then commit it' % (ref, 'updated' if args.update_ref else 'CREATED'))
-        sys.exit(0)
-    j = [sys.executable, '-I', os.path.join(here, '..', 'vice', 'judge_screenshot.py'), '--root', root, '--ref', ref]
-    if cfg.get('JUDGE_CROP'): j += ['--crop', cfg['JUDGE_CROP']]
-    sys.exit(1 if subprocess.run(j + [shot]).returncode else print('smoke: PASS') or 0)
+    n = max(1, args.retries or int(cfg.get('SMOKE_RETRIES', 1) or 1))
+    def attempt():
+        """-> None when the start passed, else the reason it did not"""
+        if os.path.exists(shot): os.remove(shot)
+        r = subprocess.run(cmd)
+        if r.returncode or not os.path.exists(shot): return 'VICE did not run or took no screenshot'
+        ok, why = cheap(shot, float(cfg.get('SMOKE_MAX_FILL', 0.97)))
+        print('smoke: cheap check %s (%s)' % ('PASS' if ok else 'FAIL: blank or BASIC screen, the game did not start', why))
+        if not ok: return 'blank or BASIC screen (%s)' % why
+        if args.update_ref or not os.path.exists(ref):
+            os.makedirs(os.path.dirname(ref), exist_ok=True); shutil.copy(shot, ref)
+            print('smoke: reference %s %s from this screenshot: LOOK at it once to confirm it is the screen you want, then commit it' % (ref, 'updated' if args.update_ref else 'CREATED'))
+            return None
+        j = [sys.executable, '-I', os.path.join(here, '..', 'vice', 'judge_screenshot.py'), '--root', root, '--ref', ref]
+        if cfg.get('JUDGE_CROP'): j += ['--crop', cfg['JUDGE_CROP']]
+        return None if subprocess.run(j + [shot]).returncode == 0 else 'the picture differs from the reference'
+    fails = []
+    for k in range(1, n + 1):
+        res = attempt()
+        if res is None:
+            if fails: print('smoke: PASS on attempt %d of %d (%d earlier start(s) failed: %s). The start is FLAKY: if the original program does this (a race, or state a loader left in low RAM), record it as known behaviour in docs/; if it is new, it is a bug in the build.' % (k, n, len(fails), '; '.join(fails)))
+            else: print('smoke: PASS')
+            sys.exit(0)
+        fails.append(res)
+        if k < n: print('smoke: attempt %d of %d failed (%s): trying again' % (k, n, res))
+    print('smoke: FAIL (%s)' % ('; '.join(fails) if n > 1 else fails[0])); sys.exit(1)
 
 main()

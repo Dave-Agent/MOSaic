@@ -113,3 +113,6 @@ Where code or data relies on a layout (a buffer on a page boundary, a page count
 
 ## Anchor the hardware-fixed base with an absolute assert
 In a free-layout source an assert written relative to an in-stream label (`charset == CHARSET_BASE`) proves nothing once the whole VIC bank can move: the constant follows the label. Give the hardware-fixed base ONE absolute constant (`VIC_BANK_BASE = $C000`) and assert every anchored block against it (character generator at the bank base, screen at bank + `$0800`), and derive the VIC memory-setup register value from the labels (`VicMemorySetup(SCREEN_RAM, CHARSET_BASE)`) so the register and the layout cannot disagree.
+
+## Bugs of the original are kept
+A source that is byte-identical reproduces the original's bugs (a wild store on some starts, an unreachable entry, a missing clear). Each one found is recorded in `docs/gameplay.md` (what, how often, the cause, the evidence) and tagged in the code `TODO(phase2): original bug: <headline>` (and `TODO(port)` when a port must not reproduce it). It is never fixed in phase 1. Whether a phase 2 step 6 change fixes it is the owner's decision, with the masked gate listing the changed bytes.
