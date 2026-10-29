@@ -1,6 +1,6 @@
 # MOSaic
 
-## MOS AI deCompiler
+*MOS AI deCompiler*
 
 Turn a Commodore 64 game's disk or tape image into byte-identical, fully commented, relocatable [Kick Assembler](http://theweb.dk/KickAssembler/) source, one piece of evidence at a time.
 
