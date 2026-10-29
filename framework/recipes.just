@@ -57,4 +57,4 @@ commit $msg:
 
 # Align the // comment columns of the phase 1 source (whitespace only; run verify after).
 align:
-    python3 {{env_var_or_default("C64_DECOMP", home_directory() / ".claude/skills/c64-decomp")}}/scripts/align_comments.py --root . --phase 1 --write
+    python3 -B {{env_var_or_default("C64_DECOMP", home_directory() / ".claude/skills/c64-decomp")}}/scripts/align_comments.py --root . --phase 1 --write

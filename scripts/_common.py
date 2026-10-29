@@ -177,13 +177,13 @@ def block_shape(old, name, max_replace=MAX_REPLACE):
     if len(old) > max_replace: return False, '%d lines, more than %d' % (len(old), max_replace)
     return True, ''
 
-def set_block(L, j, text, indent=None, width=WRAP, keep=False, notes=None, max_replace=MAX_REPLACE):
+def set_block(L, j, text, indent=None, width=WRAP, keep=False, notes=None, max_replace=MAX_REPLACE, drop_todo=False):
     """The ONE place that decides where a label's description block goes (rename.py and set_comment.py both call it): ABOVE the label's XREF lines, which stay directly above the label
     line L[j]. An existing plain comment block there (own-line `//` lines that are neither XREF nor trace comments, up to the first blank line or code) is replaced ONLY when block_shape()
     says it is a description a tool wrote (short, no banner, no XREF / access notes, not another symbol's note). Otherwise it is KEPT, the new text is added after it, and a line
     is appended to `notes` (a list; the callers print it) saying why: nothing is ever swallowed. The XREF lines and the trace comments are always kept. Without `indent` the block takes
     the indent of the block it replaces, else column 0 for a `.label` line or a scope opener (`Name: {`), else two spaces (an in-stream data label). keep=True always keeps the old block.
-    Writing the same text twice is a no-op. Mutates L; returns (number of lines written, the replaced old lines, the new index of the label line)."""
+    drop_todo=True also drops the TODO paragraph(s) of the block being replaced (the question is answered). Writing the same text twice is a no-op. Mutates L; returns (number of lines written, the replaced old lines, the new index of the label line)."""
     k = j
     while k > 0 and XREF_LINE.match(L[k - 1]): k -= 1                        # the XREF lines directly above the label
     top = k
@@ -208,7 +208,7 @@ def set_block(L, j, text, indent=None, width=WRAP, keep=False, notes=None, max_r
             while e < len(old) and re.match(r'^\s*//   \S', old[e]): e += 1
             para = old[i:e]
             flat = lambda ls: re.sub(r'\s+', ' ', ' '.join(x.strip() for x in ls))
-            if flat(para) not in flat(new): keep_todo += para
+            if not drop_todo and flat(para) not in flat(new): keep_todo += para
             i = e
         else: i += 1
     new = new + keep_todo

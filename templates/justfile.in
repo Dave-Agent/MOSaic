@@ -9,11 +9,11 @@ default:
 
 # Check the tools this project needs are installed (run first on a new machine).
 env:
-    python3 {{skill}}/scripts/check_env.py --role run --role disk --role trace --role ghidra
+    python3 -B {{skill}}/scripts/check_env.py --role run --role disk --role trace --role ghidra
 
 # Check the layout rules: no game binaries tracked, originals read-only with a recorded hash.
 layout:
-    python3 {{skill}}/scripts/check_layout.py --root .
+    python3 -B {{skill}}/scripts/check_layout.py --root .
 
 # Stage 2: DUMP_COUNT RAM dumps at DUMP_PC, real speed, from a read-only scratch copy of the medium. Each takes about a minute (five: ~6 minutes): run it in the background.
 # project.config: HANDOFF_MEDIA, DUMP_PC, DUMP_COUNT, and for a title/menu that waits for a key or fire: DUMP_STEPS ("ADDR=> ADDR EA EA;;ADDR=CMD" patches run in order at each address, `;;` between steps) and DUMP_FEED.
@@ -30,12 +30,12 @@ dumps:
     fi
     [ -n "${DUMP_FEED:-}" ] && args+=(--feed "$DUMP_FEED")
     for i in $(seq 1 "${DUMP_COUNT:-5}"); do
-        python3 {{skill}}/scripts/vice/vice_handoff.py --root . --media "$HANDOFF_MEDIA" --handoff "$DUMP_PC" --no-warp "${args[@]}" --out dumps/at_dump_$i.bin --timeout 400
+        python3 -B {{skill}}/scripts/vice/vice_handoff.py --root . --media "$HANDOFF_MEDIA" --handoff "$DUMP_PC" --no-warp "${args[@]}" --out dumps/at_dump_$i.bin --timeout 400
     done
 
 # A timing-critical loader leaves single-bit noise that differs per run in VICE: keep the value most dumps agree on.
 vote:
-    python3 {{skill}}/scripts/reference/vote_dumps.py --root . --out dumps/voted.bin dumps/at_dump_*.bin || true
+    python3 -B {{skill}}/scripts/reference/vote_dumps.py --root . --out dumps/voted.bin dumps/at_dump_*.bin || true
 
 # Run the depacker in the skill's tracer from the voted image to HANDOFF_PC and dump RAM there (dumps/handoff.bin is the 64 KB RAM; handoff_state.bin adds VIC registers, colour RAM, $DD00).
 # If nothing needs depacking, DUMP_PC and HANDOFF_PC are the same address: this recipe then just copies the voted image.
@@ -53,7 +53,7 @@ decrunch:
 
 # Derive the reference: the RAM range REF_KEEP at the hand-off, patched by tools/reference.spec, with its SHA-256.
 reference:
-    python3 {{skill}}/scripts/reference/make_reference.py --root . --in dumps/handoff.bin --write
+    python3 -B {{skill}}/scripts/reference/make_reference.py --root . --in dumps/handoff.bin --write
 
 # The whole derivation from the medium to the reference.
 derive: dumps vote decrunch reference
@@ -70,30 +70,30 @@ seeds:
     for s in $(seq 1 "${SEED_RUNS:-6}"); do
         build/trace/c64trace --ram dumps/handoff.bin --rom-dir {{rom_dir}} --out build/trace/cov --pc "$HANDOFF_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port 35 --frames "${SEED_FRAMES:-6000}" --seed $s --chaos 6 --joy1 "${SEED_JOY1:-ff}" --joy2 "${SEED_JOY2:-ff}" | tail -1 || true
     done
-    python3 {{skill}}/scripts/ghidra/make_seeds.py --root . --reference "$REFERENCE_PRG" --base "${LOAD_ADDRESS#0x}" --out tools/ghidra/seeds.txt --entry "$HANDOFF_PC:hand-off" --vectors dumps/handoff.bin --edges build/trace/cov.edges --executed build/trace/cov.flags
+    python3 -B {{skill}}/scripts/ghidra/make_seeds.py --root . --reference "$REFERENCE_PRG" --base "${LOAD_ADDRESS#0x}" --out tools/ghidra/seeds.txt --entry "$HANDOFF_PC:hand-off" --vectors dumps/handoff.bin --edges build/trace/cov.edges --executed build/trace/cov.flags
 
 # First conversion step after the first byte-identical build: name the hardware registers with the libs (names only; the gate must stay green).
 libs:
-    python3 {{skill}}/scripts/apply_libs.py --root . --phase 1
+    python3 -B {{skill}}/scripts/apply_libs.py --root . --phase 1
     @echo "dry run above: apply with  just libs-apply  (it re-runs verify)"
 
 libs-apply:
-    python3 {{skill}}/scripts/apply_libs.py --root . --phase 1 --write
+    python3 -B {{skill}}/scripts/apply_libs.py --root . --phase 1 --write
     just verify
 
 # The anonymous-label limits (rules.md): fails on !+++ / !--- or a reference over the limits. `anon_labels.py` alone lists the candidates.
 anon-check:
-    python3 {{skill}}/scripts/anon_labels.py --root . --phase 1 --check
+    python3 -B {{skill}}/scripts/anon_labels.py --root . --phase 1 --check
 
 # Second conversion step (after libs-apply, before any slice): convert the local labels that qualify to anonymous ones; the gate must stay green.
 anon-apply:
-    python3 {{skill}}/scripts/anon_labels.py --root . --phase 1 --write
+    python3 -B {{skill}}/scripts/anon_labels.py --root . --phase 1 --write
     just verify
     just anon-check
 
 # The comment rules (rules.md): width, label-line summary, data-row comments. A tools/comment_baseline.tsv makes it a ratchet.
 comment-check:
-    python3 {{skill}}/scripts/comment_check.py --root . --phase 1
+    python3 -B {{skill}}/scripts/comment_check.py --root . --phase 1
 
 # Stage 5b: import the reference into Ghidra, seed it, export Kick Assembler source into ghidra/ (the landing zone: never phase1/src).
 ghidra:
@@ -101,15 +101,15 @@ ghidra:
 
 # Per-frame samples of variables under a scripted input (rung 3 evidence): just trace-run 'NAME_A NAME_B' '--joy2-at 5=ef' 300
 trace-run vars inputs="" frames="300":
-    . ./project.config; python3 {{skill}}/scripts/trace/sample_report.py --root . --phase 1 {{vars}} --run -- --ram dumps/handoff.bin --rom-dir {{rom_dir}} --pc "$HANDOFF_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port 35 --frames {{frames}} --seed 1 --chaos 6 --joy1 ff {{inputs}}
+    . ./project.config; python3 -B {{skill}}/scripts/trace/sample_report.py --root . --phase 1 {{vars}} --run -- --ram dumps/handoff.bin --rom-dir {{rom_dir}} --pc "$HANDOFF_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port 35 --frames {{frames}} --seed 1 --chaos 6 --joy1 ff {{inputs}}
 
 # Build, then start the game in VICE at real speed with symbols, as the original hand-off left it (project.config LAUNCH_MODE: sys = `sys HANDOFF_PC` on the bare PRG, inject = restore the dumped low RAM and registers through the monitor).
 launch: experiment
-    python3 {{skill}}/scripts/launcher/run_game.py --root .
+    python3 -B {{skill}}/scripts/launcher/run_game.py --root .
 
 # Unattended start test (about 20 s): build, boot headless in VICE (warp), screenshot after SMOKE_CYCLES, fail when the game did not start. The first run creates the reference screenshot (JUDGE_REF): look at it once and commit it.
 smoke: experiment
-    python3 {{skill}}/scripts/launcher/smoke.py --root .
+    python3 -B {{skill}}/scripts/launcher/smoke.py --root .
 
 # Render the game's graphics (character set, every sprite block of the VIC bank, the screen) as PNGs into gfx/ with gfx/index.md; extra options pass through, e.g. just gfx --sprites 30:57:3 --columns 0,1,2 --label player (scripts/render/README.md). Look at the pictures; attach one to a naming question.
 gfx *args:
@@ -117,12 +117,12 @@ gfx *args:
 
 # Every gate a slice must pass (verify, comment-check, anon-check, unreferenced, p1_complete, sentinel hints): just slice-check [--range LO-HI] [--allow-marked]
 slice-check *args:
-    python3 {{skill}}/scripts/slice.py check --root . {{args}}
+    python3 -B {{skill}}/scripts/slice.py check --root . {{args}}
 
 # Scratch copy of the project for a slice (an agent works there): just slice-start NAME
 slice-start name:
-    python3 {{skill}}/scripts/slice.py start {{name}} --root .
+    python3 -B {{skill}}/scripts/slice.py start {{name}} --root .
 
 # Take the scratch repo's commits into this project (git am), then run the checks here: just slice-merge NAME
 slice-merge name:
-    python3 {{skill}}/scripts/slice.py merge {{name}} --root .
+    python3 -B {{skill}}/scripts/slice.py merge {{name}} --root .

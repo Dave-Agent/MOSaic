@@ -3,6 +3,7 @@
   1. `c64trace --selftest-builtin`: a built-in program with known results (needs nothing from the project);
   1c. input that changes during a run: `--joy1-at` / `--joy2-at` / `--keymat-at FRAME=...` (a tiny program stores what it reads each pass; the per-frame samples show the frame of each change);
   1d. a key option from a hand-off image with CIA 1 DDRA = 0: no `--init dc02 ff` needed, joystick 2 still reads, a WARNING when no column is ever selected;
+  1e. `--poke`: RAM, VIC, colour RAM, CIA, the LO-HI range form and frame 0;
   1b. the keyboard matrix: `--keymat` holds a key for the whole run (the fuzzer leaves it alone), `--keymat-frames N` releases it;
   2. if the project has one, `c64trace --selftest IMAGE REFERENCE ...`: a program of the project that transforms a known image (a depacker, an unscrambler) must reproduce a known
      reference byte for byte. A real program of 2 million instructions agreeing with the reference is the strongest evidence the core is right.
@@ -77,6 +78,27 @@ def input_at_selftest(exe):
         return ok, 'input events: joy2/joy1 at frames 10,11,20,21,30,31 = %s (want %s); key down from frame 5 to 20: samples %s (want ff ef ef ff)%s' % (
             ' '.join('%02x/%02x' % g for g in gj), ' '.join('%02x/%02x' % g for g in wj), ' '.join('%02x' % g for g in gk), ' (PASS)' if ok else ' (FAIL)')
 
+POKE_PROG = bytes([0xAD, 0x20, 0xD0, 0x8D, 0x00, 0x02,        # loop: $0200 = $D020 (VIC register)
+                   0xAD, 0x00, 0xD8, 0x8D, 0x01, 0x02,                   # $0201 = $D800 (colour RAM, reads with the high nibble set)
+                   0xAD, 0x03, 0xD8, 0x8D, 0x02, 0x02,                   # $0202 = $D803 (end of a colour RAM fill)
+                   0xAD, 0x02, 0xDC, 0x8D, 0x03, 0x02,                   # $0203 = $DC02 (CIA 1 DDRA)
+                   0xAD, 0x00, 0x03, 0x8D, 0x04, 0x02,                   # $0204 = $0300 (RAM poked at frame 0)
+                   0x4C, 0x00, 0x08])
+
+def poke_selftest(exe):
+    """`--poke`: RAM, VIC registers ($D000-$D3FF), colour RAM ($D800-$DBFF), CIA state ($DC00-$DDFF), the range form LO-HI=VAL, and frame 0 (applied after the image load, before the first
+    instruction). The sample at frame N is taken before the pokes of frame N. Returns (ok, text)."""
+    with tempfile.TemporaryDirectory() as d:
+        ram = bytearray(65536); ram[0x800:0x800 + len(POKE_PROG)] = POKE_PROG; ram[0x300] = 0x11; img = os.path.join(d, 'p.bin'); open(img, 'wb').write(ram)
+        smp = os.path.join(d, 's.bin')
+        subprocess.run([exe, '--ram', img, '--out', os.path.join(d, 'p'), '--pc', '0800', '--port', '35', '--frames', '12', '--seed', '3', '--sample', smp, '200', '204',
+                        '--poke', '0:300=5a', '--poke', '0:D800-D803=07', '--poke', '5:D020=03', '--poke', '6:DC02=a5', '--poke', '8:D800-D803=0b'], capture_output=True)
+        b = open(smp, 'rb').read(); row = lambda f: tuple(b[5 * (f - 1):5 * f])       # the sample of frame f
+        r1, r5, r6, r7, r9 = row(1), row(5), row(6), row(7), row(9)
+        ok = (r1[4] == 0x5A and r1[1] == 0xF7 and r1[2] == 0xF7 and r5[0] & 15 != 3 and r6[0] & 15 == 3 and r6[3] != 0xA5 and r7[3] == 0xA5 and r9[1] == 0xFB and r9[2] == 0xFB)
+        return ok, 'poke: frame-0 RAM %02x (want 5a), frame-0 colour fill %02x/%02x (want f7/f7); VIC poke at 5: samples 5/6 = %02x/%02x (low nibble, want !=3 / 3); CIA poke at 6: samples 6/7 = %02x/%02x (want !=a5 / a5); colour refill at 8: %02x/%02x (want fb/fb)%s' % (
+            r1[4], r1[1], r1[2], r5[0], r6[0], r6[3], r7[3], r9[1], r9[2], ' (PASS)' if ok else ' (FAIL)')
+
 def run(env, quiet=False):
     """-> True when every enabled self-test passes (prints the tracer's lines)"""
     exe = env.build_tracer(); ok = True; c = env.cfg
@@ -96,6 +118,9 @@ def run(env, quiet=False):
     iok, itext = input_at_selftest(exe)
     if not quiet or not iok: print('[input-at] ' + itext)
     ok &= iok
+    pok, ptext = poke_selftest(exe)
+    if not quiet or not pok: print('[poke] ' + ptext)
+    ok &= pok
     for name, cmd in steps:
         r = subprocess.run(cmd, capture_output=True, text=True)
         if not quiet or r.returncode: print('[%s] %s' % (name, (r.stdout + r.stderr).strip()))

@@ -32,6 +32,9 @@ sha256_of() {
     else shasum -a 256 "$1" | cut -d' ' -f1; fi
 }
 
+# Python scripts must not leave __pycache__ in the skill directory, also when this script is run without just.
+export PYTHONDONTWRITEBYTECODE=1
+
 # Optional pre-verify hook. Set PRE_VERIFY_HOOK in project.config to run any
 # project-specific command before assembly (e.g. comment alignment).
 if [ -n "${PRE_VERIFY_HOOK:-}" ]; then

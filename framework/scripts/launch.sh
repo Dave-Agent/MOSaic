@@ -43,7 +43,7 @@ if [ -n "$POKES_FILE" ]; then
     TEMP_PRG=$(mktemp /tmp/c64decomp_poked_XXXXXX.prg)
     cp "$OUTPUT_PRG" "$TEMP_PRG"
     echo ">> applying pokes from $POKES_FILE"
-    python3 framework/scripts/apply_pokes.py "$POKES_FILE" "$TEMP_PRG" "$LOAD_ADDRESS"
+    python3 -B framework/scripts/apply_pokes.py "$POKES_FILE" "$TEMP_PRG" "$LOAD_ADDRESS"
     LAUNCH_PRG="$TEMP_PRG"
 fi
 
@@ -57,7 +57,7 @@ case "$TARGET" in
         # Image cannot be started with a typed SYS: inject it, restore the
         # hardware state and resume at the entry point (see project.config).
         echo ">> launching VICE with snapshot injection${POKES_FILE:+ (poked PRG)}"
-        python3 framework/scripts/vice_snapshot_launch.py --vice "$VICE_BIN" \
+        python3 -B framework/scripts/vice_snapshot_launch.py --vice "$VICE_BIN" \
             --spec "$SNAPSHOT_SPEC" --prg "$LAUNCH_PRG" --symbols "$VICE_SYMBOLS"
     else
         echo ">> launching VICE x64 with symbols${POKES_FILE:+ (poked PRG)}"

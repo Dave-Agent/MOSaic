@@ -80,6 +80,22 @@ d3 = project('''
 tool('set_comment.py', d3, 'LAB_0800', 'Does another thing.', '--write'); t = text(d3)
 check('set_comment: TODO(user) of the old block survives', '// Does another thing.' in t and '// TODO(user): what is $d3?' in t and 'Does a thing' not in t, t)
 
+TODO_SRC = '''
+    // Does a thing.
+    // TODO(user): what is $d3?
+    //   second line of the question
+    LAB_0800:
+      rts  // [0800:60 RTS]
+'''
+d3b = project(TODO_SRC); tool('set_comment.py', d3b, 'LAB_0800', 'Does another thing.', '--drop-todo', '--write'); t = text(d3b)
+check('set_comment --drop-todo: the old TODO paragraph (with its continuation) is removed', '// Does another thing.' in t and 'TODO' not in t and 'second line' not in t and 'Does a thing' not in t, t)
+d3c = project(TODO_SRC); tool('set_comment.py', d3c, tsv(d3c, 'drop.tsv', [['LAB_0800', 'Does another thing.', '', '-']]), '--write'); t = text(d3c)
+check('set_comment map: `-` in the TODO column drops the old TODO', '// Does another thing.' in t and 'TODO' not in t, t)
+d3d = project(TODO_SRC); tool('set_comment.py', d3d, 'LAB_0800', 'Does another thing.', '--drop-todo', '--todo', 'TODO(name): new question', '--write'); t = text(d3d)
+check('set_comment --drop-todo: a new --todo is still written', '// TODO(name): new question' in t and 'what is $d3' not in t, t)
+d3e = project(TODO_SRC); tool('set_comment.py', d3e, 'LAB_0800', 'Does another thing.', '--write'); t = text(d3e)
+check('set_comment without --drop-todo: the old TODO survives', '// TODO(user): what is $d3?' in t and 'second line' in t, t)
+
 # ---- 2. map files: a real newline in a cell, several TODOs ----------------------------------------------------------------------------------------------
 d4 = project('''
     LAB_0800:
@@ -191,6 +207,37 @@ r = p1(range(0x800, 0x806)); check('p1_complete check 7: executed .byte rows are
 r = p1([]); check('p1_complete check 7: nothing executed = 0', '7. data rows that ran as code   0' in r.stdout, r.stdout + r.stderr)
 r = p1([0x806, 0x807]); check('p1_complete check 7: executed table bytes are reported too', '$0806-$0807' in r.stdout, r.stdout)
 r = p1(range(0x800, 0x806), '--no-flags'); check('p1_complete check 7: --no-flags skips it', 'skipped (--no-flags)' in r.stdout, r.stdout)
+
+# ---- 7. records.py: stride, --header, --end, --length, tail reported, bytes unchanged -----------------------------------------------------------------------
+import re
+def rows_of(t):
+    """[(original address, [bytes])] of every `.byte` row with a `// [ADDR]` trace comment"""
+    return [(int(m.group(2), 16), [int(x, 16) for x in re.findall(r'\$([0-9a-f]{2})', m.group(1))]) for m in re.finditer(r'\.byte ((?:\$[0-9a-f]{2},?)+) // \[([0-9a-f]{4})\]', t)]
+def rec_src(vals, per=16):
+    out = ['Table:']
+    for i in range(0, len(vals), per): out.append('  .byte %s // [%04x]' % (','.join('$%02x' % v for v in vals[i:i + per]), 0x800 + i))
+    return '\n'.join(out) + '\n  rts // [%04x:60 RTS]\n' % (0x800 + len(vals))
+def recs(vals, *args, per=16):
+    dd = project(rec_src(vals, per)); r = tool('records.py', dd, 'Table', *args, '--write'); t = text(dd)
+    flat = [v for _, row in rows_of(t) for v in row]; return r, rows_of(t), flat, t
+V = list(range(1, 17))
+r, rows, flat, t = recs(V, '--stride', '4')
+check('records: stride 4 gives one record per row, original addresses, same bytes', [len(x) for _, x in rows] == [4] * 4 and [a_ for a_, _ in rows] == [0x800, 0x804, 0x808, 0x80c] and flat == V and 'rts' in t, r.stdout + r.stderr + t)
+r, rows, flat, t = recs(V[:14], '--stride', '3', '--header', '2')
+check('records: --header K is a row of its own', [len(x) for _, x in rows] == [2, 3, 3, 3, 3] and flat == V[:14], r.stdout + t)
+r, rows, flat, t = recs(V[:7], '--stride', '3')
+check('records: a short last row is allowed and reported', [len(x) for _, x in rows] == [3, 3, 1] and flat == V[:7] and 'last row has 1 bytes' in r.stdout, r.stdout + t)
+E = [1, 2, 3, 4, 5, 6, 0xff, 0x11, 0x22, 0x33, 0x44]
+r, rows, flat, t = recs(E, '--stride', '3', '--end', 'ff')
+check('records: --end puts the terminator in a row of its own and reports the tail, left in exporter rows', [len(x) for _, x in rows] == [3, 3, 1, 4] and rows[2][1] == [0xff] and rows[2][0] == 0x806 and flat == E and '4 bytes after the end marker' in r.stdout, r.stdout + t)
+r, rows, flat, t = recs([1, 2, 3, 4, 5, 6, 0xff], '--stride', '3', '--end', 'ff')
+check('records: --end with nothing after it reports no tail', flat == [1, 2, 3, 4, 5, 6, 0xff] and 'not part' not in r.stdout, r.stdout + t)
+L_ = list(range(1, 14))
+r, rows, flat, t = recs(L_, '--stride', '3', '--length', '6')
+check('records: --length N keeps the rest in 16-byte rows and reports it', [len(x) for _, x in rows] == [3, 3, 7] and flat == L_ and '7 bytes after the first 6' in r.stdout, r.stdout + t)
+dd = project(rec_src(V)); r = tool('records.py', dd, 'Table', '--stride', '4'); check('records: a dry run changes nothing', text(dd) == rec_src(V) or text(dd).strip() == rec_src(V).strip(), text(dd))
+dd = project(rec_src(E)); r = tool('records.py', dd, '--map', tsv(dd, 'rec.tsv', [['Table', '3', 'ff']]), '--write'); t = text(dd)
+check('records: --map with an END column', [len(x) for _, x in rows_of(t)] == [3, 3, 1, 4] and [v for _, x in rows_of(t) for v in x] == E, r.stdout + r.stderr + t)
 
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)

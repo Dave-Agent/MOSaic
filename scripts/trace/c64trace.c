@@ -16,7 +16,7 @@
  * Build:  gcc -O2 -o c64trace c64trace.c
  *
  * Run:    c64trace --ram IMAGE [--rom-dir DIR] --out PREFIX --pc HEX [--a HEX --x HEX --y HEX --sp HEX --p HEX] [--port HEX (the processor port, $01: pass it when the dump's $01 is not the value you want, a dump taken mid-load may hold junk)]
- *                  [--init FILE] [--frames N] [--seed S] [--chaos N] [--poke F[+P]:ADDR=VAL ...] [--joy1 HEX] [--joy2 HEX]
+ *                  [--init FILE] [--frames N] [--seed S] [--chaos N] [--poke F[+P]:ADDR[-HI]=VAL ...] [--joy1 HEX] [--joy2 HEX]
  *                  [--keymat B0,..,B7 [--keymat-frames N]] [--joy1-at F=HEX ...] [--joy2-at F=HEX ...] [--keymat-at F=B0,..,B7 ...] [--skew CYCLES]
  *           IMAGE: 64K RAM (a 65538-byte file with a 2-byte load address is accepted); without --rom-dir the ROM areas read $02 (KIL: executing one stops the run); DIR holds kernal-901227-03.bin,
  *           basic-901226-01.bin, chargen-901225-01.bin (override a name with --kernal / --basic / --chargen FILE).
@@ -36,6 +36,10 @@
  *           gave one. Timing is the one of --poke: the sample taken at frame N (--sample/--sample-set) is taken BEFORE the events of frame N are applied, so the first sample that
  *           shows the program's reaction to an event at frame N is the one at frame N+1. FRAME 0 is applied before the first instruction. Example, joystick 2 up (bit 0 low) from frame 10,
  *           up+right from frame 46, released at 80:  --joy1 ff --joy2-at 10=fe --joy2-at 46=f6 --joy2-at 80=ff
+ * Pokes:    --poke F[+P]:ADDR=VAL writes VAL (hex ADDR/VAL, decimal F/P) at frame F and then every P frames; --poke F[+P]:LO-HI=VAL fills the range LO..HI (inclusive). ADDR in $D000-$D3FF
+ *           writes the VIC register file ($D019/$D01A set the flag/mask), $D400-$D7FF the SID registers, $D800-$DBFF colour RAM (low nibble; a fill of $D800-$DBFF clears the colours),
+ *           $DC00-$DDFF the CIA state (as a register write); anything else is RAM (also under ROM/I/O: a poke ignores banking). Timing: the sample of frame N is taken BEFORE
+ *           the pokes and input events of frame N, so a poke at N shows in the sample of frame N+1. Frame 0 pokes apply after the image load and the --init lines, before the first instruction.
  * Noise: --raster-entropy [--site-map FILE] [--entropy-pool-read]   answer reads of $D012 that the program uses as noise from a private PRNG
  *           (timing-independent, for traces that must survive a change of cycle timing); see the comments at io_read.
  * Output: --out PREFIX (.flags .hits .edges .writer, accumulated over runs), --iolog FILE, --memlog FILE ADDR_LO ADDR_HI [PC_LO PC_HI] (ONE range per run: a second --memlog replaces the first),
@@ -109,7 +113,9 @@ static u64 iolog_n[IOLOG_MAX];
 static int iolog_count;
 static int line;                          /* raster line, defined with the timing state below */
 static int iolog_line[IOLOG_MAX];          /* raster line of a VIC/bank write, -1 for the interrupt-source entries */
+static int poking;
 static void iolog_write(u16 addr, u8 val) {
+    if (poking) return;
     int ln = (addr == 0xD011 || addr == 0xD016 || addr == 0xD018 || addr == 0xDD00) ? line : -1;
     for (int i = 0; i < iolog_count; i++)
         if (iolog_addr[i] == addr && iolog_val[i] == val && iolog_pc[i] == cur_pc && iolog_line[i] == ln) { iolog_n[i]++; return; }
@@ -716,8 +722,22 @@ u32 rnd(void) { rng_state ^= rng_state << 13; rng_state ^= rng_state >> 17; rng_
 
 /* --poke F[+P]:ADDR=VAL (hex ADDR/VAL, decimal F/P): write VAL into RAM at frame F and then every P frames; steers the program into states
    the fuzzer would not reach by itself (a given mode, a given level number) */
-static struct { long frame, period; u16 addr; u8 val; } pokes[64];
+static struct { long frame, period; u16 addr, hi; u8 val; } pokes[64];
 static int npokes;
+/* One poke byte. $D000-$D3FF = VIC register file (raw: the register array, $D019/$D01A set the flag/mask), $D400-$D7FF = SID, $D800-$DBFF = colour RAM (low nibble),
+   $DC00-$DDFF = CIA state (through the register write, so timer latches and masks behave); everything else is RAM (under ROM/I/O too: the poke bypasses banking). */
+static void poke_byte(u16 a, u8 v) {
+    if (a >= 0xD000 && a < 0xD400) { int r = a & 0x3F; if (r == 0x19) vic_flags = v & 0x0F; else if (r == 0x1A) vic_mask = v & 0x0F; else vic[r] = v; }
+    else if (a >= 0xD400 && a < 0xD800) sid[a & 0x1F] = v;
+    else if (a >= 0xD800 && a < 0xDC00) color[a & 0x3FF] = v & 0x0F;
+    else if (a >= 0xDC00 && a < 0xDE00) { poking = 1; io_write(a, v); poking = 0; }
+    else ram[a] = v;
+}
+static void apply_pokes(long fr) {
+    for (int i = 0; i < npokes; i++)
+        if (fr == pokes[i].frame || (pokes[i].period && fr > pokes[i].frame && (fr - pokes[i].frame) % pokes[i].period == 0))
+            for (unsigned a = pokes[i].addr; a <= pokes[i].hi; a++) poke_byte((u16)a, pokes[i].val);
+}
 static int hold_frames;
 static int key_fixed;                  /* --keymat given: the key fuzzer leaves the keyboard matrix alone (as --joy1/--joy2 do for the joysticks) */
 static long keymat_frames;             /* --keymat-frames N: release the fixed keys after N frames (0 = hold them for the whole run) */
@@ -736,9 +756,7 @@ static void apply_events(long fr) {
 static void on_frame(void) {
     if (sample_f && !nset) fwrite(ram + sample_lo, 1, sample_hi - sample_lo + 1, sample_f);
     if (sample_f && nset) for (int i = 0; i < nset; i++) fwrite(ram + set_lo[i], 1, set_hi[i] - set_lo[i] + 1, sample_f);
-    for (int i = 0; i < npokes; i++)
-        if (frame == pokes[i].frame || (pokes[i].period && frame > pokes[i].frame && (frame - pokes[i].frame) % pokes[i].period == 0))
-            ram[pokes[i].addr] = pokes[i].val;
+    apply_pokes(frame);
     /* seeded input fuzzer: joystick changes every few frames, occasional key taps */
     if (frame % 7 == 0 && !joy_fixed) {
         u8 j = 0xFF;
@@ -859,8 +877,13 @@ int main(int argc, char **argv) {
         }
         else if (!strcmp(argv[i], "--poke") && i + 1 < argc && npokes < 64) {
             long f = 0, per = 0; unsigned ad = 0, v = 0; const char *s = argv[++i];
-            if (sscanf(s, "%ld+%ld:%x=%x", &f, &per, &ad, &v) != 4) { per = 0; if (sscanf(s, "%ld:%x=%x", &f, &ad, &v) != 3) { fprintf(stderr, "bad --poke %s\n", s); return 2; } }
-            pokes[npokes].frame = f; pokes[npokes].period = per; pokes[npokes].addr = (u16)ad; pokes[npokes].val = (u8)v; npokes++;
+            unsigned hi = 0; int n = 0;
+            if (sscanf(s, "%ld+%ld:%x-%x=%x", &f, &per, &ad, &hi, &v) == 5) n = 1;
+            else if (per = 0, sscanf(s, "%ld:%x-%x=%x", &f, &ad, &hi, &v) == 4) n = 1;
+            else if (sscanf(s, "%ld+%ld:%x=%x", &f, &per, &ad, &v) == 4) { n = 1; hi = ad; }
+            else if (per = 0, sscanf(s, "%ld:%x=%x", &f, &ad, &v) == 3) { n = 1; hi = ad; }
+            if (!n || hi < ad || ad > 0xFFFF || hi > 0xFFFF) { fprintf(stderr, "bad --poke %s\n", s); return 2; }
+            pokes[npokes].frame = f; pokes[npokes].period = per; pokes[npokes].addr = (u16)ad; pokes[npokes].hi = (u16)hi; pokes[npokes].val = (u8)v; npokes++;
         }
         else if (!strcmp(argv[i], "--port") && i + 1 < argc) port_init = (unsigned)strtoul(argv[++i], 0, 16);
         else if (!strcmp(argv[i], "--dump-at") && i + 1 < argc) dump_at = (int)strtoul(argv[++i], 0, 16);
@@ -972,6 +995,7 @@ int main(int argc, char **argv) {
         cia[0].ddra = 0xFF; if (!cia[0].pra) cia[0].pra = 0xFF;
         fprintf(stderr, "note: --keymat / --keymat-at: CIA 1 DDRA set to $FF and PRA to $FF at the start (the KERNAL's state; an --init line for $DC02 overrides it)\n");
     }
+    apply_pokes(0);                                    /* --poke 0:...: after the image load and the --init lines, before the first instruction */
     if (skew) advance(skew);                           /* --skew: start the clock late, to test that a trace does not depend on cycle timing */
     u64 limit = (u64)frames * LINES * CYCLES_PER_LINE;
     while (cycles < limit && !stop_reason) {
