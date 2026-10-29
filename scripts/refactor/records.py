@@ -3,10 +3,13 @@
 and the order do not change: names and layout only, the build stays byte-identical (run the gate after it).
 
   records.py LABEL --stride N [--end HEX] [--header K] [--phase 1|2 | --main FILE] [--write]
+  records.py LABEL --rule 'b0==FF:1;b0==00:3;b1&40:5;else:4' [--header K] ...      variable-length records (event streams), the length decided by the bytes
   records.py --map MAP [--write]        MAP lines: LABEL<TAB>STRIDE[<TAB>END[<TAB>HEADER[<TAB>LENGTH]]]   (END, HEADER, LENGTH optional; `-` for none)
 
 LABEL     the label line above the rows; the rows run to the first line that is not a `.byte` row with a `// [ADDR]` trace comment.
 --stride  the record size in bytes: every row of the table gets that many bytes, the trace comment keeps the ORIGINAL address of the row's first byte.
+--rule    variable-length records: clauses `COND:LEN` separated by `;`, tried in order at each record start, the first true one gives the record's length in bytes; COND is `bK==VV`, `bK!=VV` or `bK&MM` (any bit of the mask set), K the byte index within the record (b0 = its first byte), VV and MM hex; `else:LEN` is the default. A record that would run past
+          the end of the block is an error (the rule is wrong or the block holds more than the stream: use --length). In a `--map` file the STRIDE column is `@` followed by the rule. --end does not apply (put the terminator in the rule: `b0==FF:1`).
 --header  the first K bytes are one row of their own (a count, a width and height ...) before the records.
 --length  only the first N bytes of the block (header included) are the table; the bytes after them are reported and left in the 16-byte rows (a block label that swallows what follows).
 --end     the list terminator (hex, one byte). A record whose first byte is the terminator ends the list: it is written as a row of its own, and the bytes after it (if the block runs on) are
@@ -17,11 +20,21 @@ import os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, os.path.dirname(HERE))
 from _common import parser, main_file, reachable, read_tsv, ROW
 a = parser(__doc__.split('\n')[0], phase=True)
-a.add_argument('label', nargs='?'); a.add_argument('--stride', type=int); a.add_argument('--end'); a.add_argument('--header', type=int, default=0); a.add_argument('--length', type=int, help='only the first N bytes of the block are the table (header included); the rest is reported and left in the exporter rows'); a.add_argument('--map')
+a.add_argument('label', nargs='?'); a.add_argument('--stride', type=int); a.add_argument('--rule'); a.add_argument('--end'); a.add_argument('--header', type=int, default=0); a.add_argument('--length', type=int, help='only the first N bytes of the block are the table (header included); the rest is reported and left in the exporter rows'); a.add_argument('--map')
 args = a.parse_args(); files = reachable(main_file(args))
-if args.map: specs = [(r[0], int(r[1]), None if len(r) < 3 or r[2] == '-' else int(r[2], 16), int(r[3]) if len(r) > 3 and r[3] != '-' else 0, int(r[4]) if len(r) > 4 and r[4] != '-' else None) for r in (x if isinstance(x, list) else list(x) for x in read_tsv(args.map))]
-elif args.label and args.stride: specs = [(args.label, args.stride, int(args.end, 16) if args.end else None, args.header, args.length)]
-else: sys.exit('LABEL and --stride, or --map')
+if args.map: specs = [(r[0], r[1][1:] if r[1].startswith('@') else int(r[1]), None if len(r) < 3 or r[2] == '-' else int(r[2], 16), int(r[3]) if len(r) > 3 and r[3] != '-' else 0, int(r[4]) if len(r) > 4 and r[4] != '-' else None) for r in (x if isinstance(x, list) else list(x) for x in read_tsv(args.map))]
+elif args.label and (args.stride or args.rule): specs = [(args.label, args.rule if args.rule else args.stride, int(args.end, 16) if args.end else None, args.header, args.length)]
+else: sys.exit('LABEL and --stride or --rule, or --map')
+def rule_len(rule, rec):
+    for cl in rule.split(';'):
+        cond, _, ln = cl.strip().rpartition(':')
+        if cond in ('else', ''): return int(ln)
+        m = re.match(r'^b(\d+)(==|!=|&)([0-9a-fA-F]{1,2})$', cond)
+        if not m: sys.exit('bad rule clause: %r' % cl)
+        k, op, v = int(m.group(1)), m.group(2), int(m.group(3), 16)
+        if k >= len(rec): return None                                   # needs a byte the block does not have
+        if (op == '==' and rec[k] == v) or (op == '!=' and rec[k] != v) or (op == '&' and rec[k] & v): return int(ln)
+    sys.exit('rule has no else clause and no clause matched')
 texts = {p: open(p).read().split('\n') for p in files}; changed = set()
 for label, stride, end, header, length in specs:
     hit = [(p, i) for p, L in texts.items() for i, l in enumerate(L) if re.match(r'^%s:\s*(//.*)?$' % re.escape(label), l)]
@@ -39,10 +52,16 @@ for label, stride, end, header, length in specs:
     else: rest = []
     def row(chunk): return '%s.byte %s // [%04x]' % (indent, ','.join('$%02x' % v for _, v in chunk), chunk[0][0])
     if header: out.append(row(data[:header])); pos = header
+    bad = None
     while pos < len(data):
+        if isinstance(stride, str):
+            n_ = rule_len(stride, [v for _, v in data[pos:pos + 8]])
+            if n_ is None or pos + n_ > len(data): bad = data[pos][0]; break
+            out.append(row(data[pos:pos + n_])); pos += n_; continue
         if end is not None and data[pos][1] == end:
             out.append(row(data[pos:pos + 1])); pos += 1; tail = len(data) - pos; break
         out.append(row(data[pos:pos + stride])); pos += stride
+    if bad is not None: print('%s: the rule runs past the end of the block at $%04x: wrong rule, or the block holds more than the stream (--length); nothing changed' % (label, bad)); continue
     note = ''
     if rest:
         for q in range(0, len(rest), 16): out.append(row(rest[q:q + 16]))
@@ -50,7 +69,7 @@ for label, stride, end, header, length in specs:
     if tail:                                            # keep the bytes after the end marker in the old 16-byte rows
         while pos < len(data): out.append(row(data[pos:pos + 16])); pos += 16
         note = ' (%d bytes after the end marker are not part of the list)' % tail
-    elif end is None and len(data) % stride and not header: note = ' (the last row has %d bytes)' % (len(data) % stride)
+    elif end is None and not isinstance(stride, str) and len(data) % stride and not header: note = ' (the last row has %d bytes)' % (len(data) % stride)
     print('%s: %d bytes -> %d rows%s' % (label, total, len(out), note))
     for o in out[:3]: print('   ' + o.strip())
     texts[p][i + 1:j] = out; changed.add(p)

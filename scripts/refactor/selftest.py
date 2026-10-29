@@ -240,6 +240,12 @@ check('records: --length N keeps the rest in 16-byte rows and reports it', [len(
 dd = project(rec_src(V)); r = tool('records.py', dd, 'Table', '--stride', '4'); check('records: a dry run changes nothing', text(dd) == rec_src(V) or text(dd).strip() == rec_src(V).strip(), text(dd))
 dd = project(rec_src(E)); r = tool('records.py', dd, '--map', tsv(dd, 'rec.tsv', [['Table', '3', 'ff']]), '--write'); t = text(dd)
 check('records: --map with an END column', [len(x) for _, x in rows_of(t)] == [3, 3, 1, 4] and [v for _, x in rows_of(t) for v in x] == E, r.stdout + r.stderr + t)
+S = [0x81, 0x40, 0x05, 0x01, 0x02,  0x82, 0x00, 0x01, 0x03,  0x00, 0x04, 0x06,  0xff,  0x83, 0x00, 0x01, 0x03]       # 5-byte (bit 6 set), 4-byte, 3-byte (note 0), terminator, a second list
+RULE = 'b0==FF:1;b0==00:3;b1&40:5;else:4'
+r, rows, flat, t = recs(S, '--rule', RULE)
+check('records: --rule splits an event stream into one event per row (lengths from the bytes), terminator on its own row', [len(x) for _, x in rows] == [5, 4, 3, 1, 4] and flat == S and [a_ for a_, _ in rows] == [0x800, 0x805, 0x809, 0x80c, 0x80d], r.stdout + r.stderr + t)
+r, rows, flat, t = recs(S[:-1], '--rule', RULE)
+check('records: --rule that runs past the end of the block changes nothing and says so', 'runs past the end' in r.stdout and t.strip() == rec_src(S[:-1]).strip(), r.stdout + t)
 
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
