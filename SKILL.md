@@ -18,9 +18,15 @@ Run `scripts/check_env.py` from the project root (add `--role run|disk|trace|ghi
 3. Commit after each step. **Push only when the user says to.** Never discard uncommitted work (`git checkout/reset/restore/clean`).
 4. A decision made together goes in `references/decisions.md` (date, what, why) and, if it is a rule, in `references/rules.md`.
 
-## At every stage boundary: report and ask
+## Stages: announce when you start, report and ask when you finish
 
-When a stage finishes (research, extraction and the boot chain, the clean reference, the Ghidra export, the first byte-identical build, phase 1, each phase 2 step), the session that is talking to the user does three things before anything else: run `python3 <skill>/scripts/status.py` (`just status` in a project), tell the user in a few sentences what was just done and what the next stage is and roughly what it involves, and **ask whether to continue** (offer: continue, continue after I have looked, stop here). It does not start the next stage unasked and does not stop without offering. A user who has said "carry on" or "go through to <stage>" has answered for the stages up to there. Background workers (a slice's agent) never ask: they report to the session that started them. This is what lets a newcomer use the skill without knowing the stage list. When the user says "move to the next stage", "continue", "what next" or similar in a project, run `status.py`, say what the next stage is and what it involves, ask, and then do it.
+Two cases, and they are different.
+
+**The user tells you to go on** ("move to the next stage", "continue", "what next", "carry on", "go through to <stage>"). That is the go-ahead; do not ask again. Run `python3 <skill>/scripts/status.py` (`just status` in a project), then say in one or two sentences which step you are starting, using HOWTO.md's number and name ("Starting step 6: the first byte-identical build. I will copy the Ghidra export into phase1/src and get `just verify` to pass; I will tell you if I need a decision") and then do it. If the evidence for an earlier step is incomplete (for example `status.py --verify` shows the gate failing), say so first and fix that before starting the new step. "Go through to <stage>" covers every stage up to there, announcing each one as you start it.
+
+**You finish a stage on your own** (the work you were asked to do is done). Run `status.py`, tell the user in a few sentences what was just done and which step is next and roughly what it involves, and **ask whether to continue** (offer: continue, continue after I have looked, stop here). Do not start the next stage unasked and do not stop without offering.
+
+Background workers (a slice's agent) never ask and never announce to the user: they report to the session that started them. Together the two cases mean a newcomer never needs to know the stage list: they are always told which step is running and what comes after it.
 
 ## Phases
 
