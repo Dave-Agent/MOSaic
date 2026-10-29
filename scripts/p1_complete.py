@@ -71,6 +71,7 @@ for f in sorted(set(files)):
             c = l.find('//')
             if XREF_CONT.match(l) or (0 <= c < m.start() and (XREF_HEAD.search(l[c:]) or TRACE_ADDR.search(l[c:]))): ignored[0] += 1; continue
             found.append((os.path.relpath(f, args.root), n, m.group(0), 'comment' if '//' in l and l.index('//') < m.start() else 'code', l.strip()[:90]))
+n_user = 0                                                   # TODO(user) markers in range: a reminder to run the question review (phase1_method.md 6b) before asking the owner
 prov = []; marked = []                                       # provisional names: `unk` identifiers, TODO(name) markers, STATUS:  unknown banners; marked = a TODO(name) is on the line or just above
 PROV = re.compile(r'\bunk[A-Z_]\w*|TODO\((?:name|block)\)|STATUS:\s+unknown\b|\b[a-z]{2,4}_op_[0-9a-fA-F]{3,4}\b')   # the last alternative: generated SMC operand names such as sta_op_09fe
 NEAR = 12                                                    # a TODO(name) within this many lines above (or on the line) marks the name as honest-provisional
@@ -78,6 +79,7 @@ for f in sorted(set(files)):
     FL = open(f).read().split('\n'); FA = line_addrs(FL)
     for n, l in enumerate(FL, 1):
         if not inside(FA[n - 1]): continue
+        n_user += l.count('TODO(user)')
         for m in PROV.finditer(l):
             item = (os.path.relpath(f, args.root), n, m.group(0), l.strip()[:90])
             is_marker = m.group(0).startswith('TODO(name)')
@@ -187,5 +189,6 @@ review = [('3', imm), ('4', len(words)), ('5', len(pairs)), ('6', len(runs)), ('
 if not ok: word, detail = 'NOT COMPLETE', 'raw operands %d, placeholders %d, provisional unmarked %d, marked %d' % (raw, len(found), len(prov), len(marked))
 elif RANGE or marked: word, detail = 'SLICE CLEAN', '%s%s' % ('%d marked provisional names remain' % len(marked) if marked else 'no provisional names', '; review items: ' + rv if rv else '')
 else: word, detail = 'COMPLETE', ('review items: ' + rv) if rv else 'no review items'
+if n_user: print(f'  NOTE: {n_user} TODO(user) marker(s) open: run the question review first (references/phase1_method.md 6b: code and tracer before the owner; todo_list.py --tag user,name)')
 print('VERDICT: %s (%s)' % (word, detail))
 sys.exit(0 if ok else 1)

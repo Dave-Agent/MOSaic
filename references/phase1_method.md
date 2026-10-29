@@ -49,6 +49,12 @@ Per routine or section: read, name, add the section banner, comment (the comment
 
 **Corrections to earlier work.** When your reading contradicts a comment or a name from an earlier slice (a routine described as moving sprites 7 down to 2 that moves 7 down to 3; a routine called a keyboard scan that is the frame dispatcher), fix it in the same commit and list it in the log under "Corrections". An earlier slice's text is evidence, not authority.
 
+## 6b. The question review (before and near the end of phase 1; decided with the user)
+Questions to the owner are expensive and, asked too early, usually answerable. Two rules:
+1. **Code first.** Before a `TODO(user)` goes to the owner, derive what the code and a controlled tracer run prove: every caller and argument (an event-to-number mapping), every reader and writer of a flag, the data tables that classify characters or objects, where a start value is set. The owner's repeated correction on the test game was that hazards, the purpose of a save/restore pair and a character class table were all answerable from the code. A question that remains must be sharp: it attaches a picture (`just gfx`, a rendered screen from the tracer's `--dump` state) or a concrete observation, and asks only what a name MEANS to a player (what a sprite or sound IS), never what the code does.
+2. **Review the open questions near the end of phase 1**, and again whenever the owner answers one. Run `todo_list.py --tag user,name`; for each marker re-read its code with everything learned since it was written (later slices, the owner's answers in `docs/user_answers.md`, new names, new renders, new tracer runs) and ask: has it been answered, can it now be deduced, can a recorded answer name something here (rename, replace a raw constant with a named one)? Delete or narrow the marker, record what settled it in `docs/user_answers.md` (the question, the answer or the proof, the evidence rung), and only then batch the survivors for the owner, one at a time, each with its picture. `TODO(name)` markers are reviewed in the same pass: an owner's answer often confirms a provisional name in a neighbouring routine.
+The list of answers (`docs/user_answers.md`) is part of the project: it is what lets a later agent not re-ask.
+
 ## 7. Things that go wrong
 - Naming by pattern (renaming every `lda #0 / sta x` the same way) without checking each.
 - Treating a document's POKE address as proof.
