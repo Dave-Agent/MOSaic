@@ -52,3 +52,5 @@ Rules of thumb: dry-run first and read the per-name counts (a name with 0 uses i
 - **Rows left behind by `move_img.py` / `add_label.py` / `table_words.py`**: splitting a `.byte` row at a label leaves short rows (a 1-byte `.byte $00 // [2188]` between two labels) and the
   blank-line rule wants a blank line before each new top-level label. Both are cosmetic and byte-neutral; `just align` (`align_comments.py`) tidies the blank lines, and nothing needs the rows
   joined again.
+
+**Shared labels inside a scope.** A label inside a scope that another routine references (a shared `rts`) must be listed INNER, and the outside use written as `Scope.name` by hand: `scopeify.py` does not rewrite uses of INNER labels. In `add_label.py --map` a newline inside a comment cell is the two characters `\n`, never a real newline.

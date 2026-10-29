@@ -6,6 +6,7 @@
 # PROJECT_ROOT is exported so the scripts resolve paths from the project root
 # regardless of where just is invoked.
 export PROJECT_ROOT := justfile_directory()
+export PYTHONDONTWRITEBYTECODE := "1"
 
 # Assemble canonical source and diff against the reference PRG. The gate.
 verify:

@@ -45,6 +45,8 @@ Mechanical passes first, prose last: a rename after the prose is written means r
 ## 6. The work loop
 Per routine or section: read, name, add the section banner, comment (the comment rules), replace raw operands with labels, `just verify` (byte-identical), commit. Small commits; the gate is never red at a commit. Track `p1_complete.py` as the progress number. Keep a log (`docs/phase1_log.md`): order, evidence used, questions for the user. `todo_list.py [--range]` lists the `TODO(user|name|block)` markers with label and routine for the log and the questions to the user. `p1_complete.py` always ends with `VERDICT: COMPLETE | SLICE CLEAN | NOT COMPLETE` (a slice is never called COMPLETE); with `--range` it also reads data rows, and a range with no instruction line is judged by its checks 5 and 6 and by reading.
 
+**Music / sound data.** Describe a sound driver by the registers it writes and the tables it reads. Name per-voice arrays by the SID register or the record byte they hold. Use the position-advance rate as the rung-3 check of the tick period. Leave what a song or effect IS as `TODO(user)`/`TODO(sound)`.
+
 **Corrections to earlier work.** When your reading contradicts a comment or a name from an earlier slice (a routine described as moving sprites 7 down to 2 that moves 7 down to 3; a routine called a keyboard scan that is the frame dispatcher), fix it in the same commit and list it in the log under "Corrections". An earlier slice's text is evidence, not authority.
 
 ## 7. Things that go wrong
