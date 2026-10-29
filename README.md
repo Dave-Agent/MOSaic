@@ -20,7 +20,7 @@ python3 scripts/check_env.py
 python3 scripts/new_project.py --help
 ```
 
-Needs Python 3, Java 17+, Kick Assembler, git and [`just`](https://github.com/casey/just). VICE, Ghidra, a C compiler, and Pillow are needed for some steps; `check_env.py` reports what each role requires.
+Needs Python 3, Java 17+, Kick Assembler, git and [`just`](https://github.com/casey/just). VICE, Ghidra, a C compiler, and Pillow are needed for some steps; `check_env.py` reports what each role requires. Developed on Linux; macOS should work; on Windows use WSL.
 
 ## Tests
 
