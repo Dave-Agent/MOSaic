@@ -15,7 +15,7 @@ def main_file(args):
     cfg = config(args.root)
     m = args.main or cfg.get('SRC_MAIN' if args.phase == 1 else 'PHASE2_MAIN')
     if not m: sys.exit('no main file: pass --main, or set SRC_MAIN / PHASE2_MAIN in project.config')
-    path = os.path.normpath(os.path.join(args.root, m))      # normalised: reachable() returns normalised paths, so a `./x` spelling would never match them
+    path = os.path.abspath(os.path.join(args.root, m))      # normalised: reachable() returns normalised paths, so a `./x` spelling would never match them
     if not os.path.exists(path):
         sys.exit('main file %s not found (phase %s): this project may not have that phase yet; use --phase 1, or --main FILE' % (m, args.phase))
     return path
@@ -104,7 +104,10 @@ def wrap_comment(text, indent='', width=WRAP):
     """Wrap text into `//` comment lines. Paragraphs are separated by a real newline or a literal backslash-n; a paragraph that starts with `TODO(tag):` gets its
     continuation lines indented by three spaces after the `//` (the TODO marker form of rules.md). `indent` goes before every `//`."""
     out = []
-    for para in re.split(r'\\n|\n', text):
+    paras = []
+    for para in re.split(r'\\n|\n', text):                       # a TODO(tag): written in the middle of a paragraph starts a paragraph of its own (rules.md: its own line)
+        paras += [x for x in re.split(r'\s+(?=TODO\(\w+\):)', para.strip()) if x]
+    for para in paras:
         words = para.split()
         if not words: continue
         cont = '//   ' if re.match(r'TODO\(\w+\):', words[0]) else '// '
@@ -114,6 +117,18 @@ def wrap_comment(text, indent='', width=WRAP):
             else: cur += w + ' '
         out.append(cur.rstrip())
     return out
+
+def todo_paragraphs(cell):
+    """The fourth column of a rename / set_comment map: one or more `TODO(tag): text` paragraphs (`\\n` or a real newline between them). `TODO(tag) text` (no colon) is accepted and
+    normalised. Returns the text for wrap_comment; exits with a message on anything that is not a TODO."""
+    out = []
+    for para in re.split(r'\\n|\n', cell):
+        para = para.strip()
+        if not para: continue
+        m = re.match(r'^TODO\((\w+)\):?\s*(\S.*)$', para)
+        if not m: sys.exit('the TODO column must read `TODO(tag): text` (tags: sound user code phase2 name block), got: %r' % para[:60])
+        out.append('TODO(%s): %s' % (m.group(1), m.group(2)))
+    return '\n'.join(out)
 
 def code_files(main):
     """Every .asm file of the main file's source directory (recursive, without libs/): the code files and the label files."""

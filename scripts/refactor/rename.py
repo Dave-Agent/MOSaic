@@ -3,23 +3,27 @@
 
   rename.py MAP.tsv [--phase 1|2 | --main FILE] [--comments] [--allow-existing] [--write]
 
-MAP.tsv:  OLD<TAB>NEW[<TAB>DESCRIPTION]    ('#' lines and blank lines ignored). NEW may be an expression (`base+1`).
+MAP.tsv:  OLD<TAB>NEW[<TAB>DESCRIPTION[<TAB>TODO(tag): text]]    ('#' lines and blank lines ignored). NEW may be an expression (`base+1`).
   - Only the code part of a line changes: never a `// comment` (unless --comments, which also renames prose mentions but never the XREF or [ADDR:bytes] trace comments) and never a "string".
   - Whole-name match; a name reached through a path (`Scope.old`) is not touched, `old.member` becomes `new.member`.
   - Refuses a NEW that already exists as an identifier (a rename must not merge two names) unless --allow-existing; two OLDs may not map to the same NEW.
   - A DESCRIPTION is written as a wrapped `// NEW: description` block above the definition (`.label OLD = ...` or the in-stream `OLD:` line).
+  - The fourth column is one or more `TODO(tag): text` paragraphs (`\\n` between them), each written as its own `// TODO(tag):` line below the description, continuation lines indented
+    by three spaces (rules.md); a `TODO(tag):` written inside the description is split off the same way. Leave the description empty (two tabs) to write only the TODO.
+  - --comments LISTS every comment line it changed (file:line, before and after) so a reviewer can check them; --max-list N caps the list (default 200).
 Without --write it prints what it would change."""
 import os, re, sys, collections
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from _common import parser, main_file, code_files, read_tsv, map_code, split_comment, block_flags, wrap_comment, write_changed
-a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('map'); a.add_argument('--comments', action='store_true', help='also rename in prose comments (never in XREF / [ADDR:bytes] trace comments)'); a.add_argument('--allow-existing', action='store_true')
+from _common import parser, main_file, code_files, read_tsv, map_code, split_comment, block_flags, wrap_comment, write_changed, todo_paragraphs
+a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('map'); a.add_argument('--comments', action='store_true', help='also rename in prose comments (never in XREF / [ADDR:bytes] trace comments)'); a.add_argument('--allow-existing', action='store_true'); a.add_argument('--max-list', type=int, default=200)
 args = a.parse_args(); main = main_file(args); files = code_files(main)
-ren = {}; desc = {}
+ren = {}; desc = {}; todo = {}
 for p in read_tsv(args.map):
     if len(p) < 2: sys.exit('bad map line (need OLD<TAB>NEW): %r' % p)
     if p[0] in ren: sys.exit('duplicate OLD in the map: ' + p[0])
     ren[p[0]] = p[1].strip()
     if len(p) > 2 and p[2].strip(): desc[p[0]] = p[2].strip()
+    if len(p) > 3 and p[3].strip(): todo[p[0]] = todo_paragraphs(p[3])
 texts = {f: open(f).read().split('\n') for f in files}
 idents = set()
 for L in texts.values():
@@ -36,23 +40,31 @@ pat = re.compile(r'(?<![\w.])(' + '|'.join(sorted(map(re.escape, ren), key=len, 
 cnt = collections.Counter()
 def sub(m): cnt[m.group(1)] += 1; return ren[m.group(1)]
 TRACE = re.compile(r'^//\s*(?:Ghidra\s+)?XREF|^//\s*\[[0-9A-Fa-f]{4}[:\]]')
-def fix_comment(c):
+comment_changes = []
+def fix_comment(c, where):
     if not c or not args.comments or TRACE.match(c): return c
-    return pat.sub(sub, c)
+    new = pat.sub(sub, c)
+    if new != c: comment_changes.append((where, c.strip(), new.strip()))
+    return new
 changed = {}
 for f, L in texts.items():
     out = []; flags = block_flags(L)
-    for l, blk in zip(L, flags):
+    for ln, (l, blk) in enumerate(zip(L, flags), 1):
         if blk: out.append(l); continue
         code, cm = split_comment(l)
-        new = map_code(code, lambda s: pat.sub(sub, s)) + fix_comment(cm)
+        new = map_code(code, lambda s: pat.sub(sub, s)) + fix_comment(cm, '%s:%d' % (os.path.relpath(f, os.path.dirname(main)), ln))
         dm = re.match(r'^(\s*)(?:\.label\s+(\w+)\s*=|(\w+):(?!\S))', code)
-        if dm and (dm.group(2) or dm.group(3)) in desc:
-            o = dm.group(2) or dm.group(3)
-            out += wrap_comment('%s: %s' % (re.sub(r'\+.*$', '', ren[o]), desc[o]), '' if dm.group(2) else '  ')
+        o = (dm.group(2) or dm.group(3)) if dm else None
+        if o in desc or o in todo:
+            ind = '' if dm.group(2) else '  '
+            if o in desc: out += wrap_comment('%s: %s' % (re.sub(r'\+.*$', '', ren[o]), desc[o]), ind)
+            if o in todo: out += wrap_comment(todo[o], ind)
         out.append(new)
     nt = '\n'.join(out)
     if nt != '\n'.join(L): changed[f] = nt
 for o, n in ren.items(): print('  %-28s -> %-28s %4d uses' % (o, n, cnt[o]))
-print('%d replacements in %d files, %d descriptions %s' % (sum(cnt.values()), len(changed), len(desc), '(written)' if args.write else '(dry run; --write applies)'))
+if args.comments:
+    print('%d comment lines changed by --comments%s:' % (len(comment_changes), '' if len(comment_changes) <= args.max_list else ' (first %d listed)' % args.max_list))
+    for where, old, new in comment_changes[:args.max_list]: print('  %s\n    - %s\n    + %s' % (where, old[:150], new[:150]))
+print('%d replacements in %d files, %d descriptions, %d TODO blocks %s' % (sum(cnt.values()), len(changed), len(desc), len(todo), '(written)' if args.write else '(dry run; --write applies)'))
 write_changed(changed, args.write)
