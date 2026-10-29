@@ -28,9 +28,27 @@ sprite is drawn in ITS OWN mode, colours and expansion: live ($D01C, $D027-$D02E
 = multicolour (00 = bg, 01 = c1, 10 = c2, 11 = v & 7), else hires ink v & 7 on bg; --char-colours ADDR|LABEL = 256 such values (per char code), --shared-colours bg,c1,c2 (decimal)
 or three ADDR/LABEL per-stage tables with --stage N ($D021-$D023). --palette c0,c1,c2,c3 and --char-colour N override / guess. See README.md (how to derive them from the source).
 
+RECORDS (--records SPEC, needs --mc-flag-bit and --mc-when): games keep OBJECT RECORDS (a table of pointers to records; each record has a first sprite pointer, a flags byte, a
+colour byte, more sprite pointers = animation frames). This draws one row per record, labelled with its number, mode (MC / hires), colour and frame pointers, frames deduplicated.
+  --records 'table=ADDR,count=N,first=OFF,flags=OFF,colour=OFF[,extra=OFF/OFF/..][,span=N][,stride=2][,table_hi=ADDR][,mask=0x0F]'
+      table=ADDR     pointer table of 16-bit words (stride=K bytes per entry, default 2); table_hi=ADDR: split tables, table = low bytes and table_hi = high bytes
+      base=ADDR,size=N   instead of table=: records lie contiguously, N bytes each
+      first / flags / colour / extra   byte offsets in a record: first sprite pointer, flags, colour, further frame pointers (slash separated)
+      span=N         every record is N consecutive sprites side by side (pointers p, p+1, ...); per record: a names-file column (below)
+      mask           colour mask (default 0x0F: the low 4 bits are the colour)
+  --mc-flag-bit N --mc-when set|clear   REQUIRED, no default: which flag bit decides the mode and whether the sprite is MULTICOLOUR when it is set or when it is clear.
+      Read it from the code that applies the flag (the spawn / init routine that writes $D01C); a game can CLEAR the multicolour bit when the flag is SET.
+  --priority-bit N   optional: shown as pri=0/1 in the label (what it means is yours to say)
+  --names FILE       lines 'NUM label words [span=K]' (record number, free label, optional span for that record); '#' comments
+  --group N          records per picture (default 16);  files records_<label>_<k>.png
+  --check-against DUMP   a state dump (the --state format) taken while the objects are on screen: for each record, every enabled sprite of the dump whose pointer is one of
+      the record's frames is reported with its ACTUAL multicolour bit ($D01C) and colour ($D027+n) next to the record's; a difference is flagged MISMATCH (the semantics
+      you gave are wrong, or the game changes the flags after spawning), a record with no sprite is 'not on screen'. The result is also in the picture labels. Exit status 3
+      when a MISMATCH was found.
+
 CUSTOM RENDERS (they replace the default render unless --all is given):
   --sprites A:B[:N]   pointers A..B inclusive (hex) or labels, N sprites per row (default 8); empty blocks are skipped and named on stdout
-  --chars A:B[,C..]   character codes (hex) from the character set; each range one row of 8x8 cells
+  --chars A:B[,C..]   character codes (hex) from the character set; --rows N lays them out N per row (default: all in rows of up to 16)
   --char-anim SPEC    animation records: SPEC is key=value pairs separated by commas:
         table=ADDR        first record (label or $address)                  stride=N   bytes per record (decimal; default 8)
         count=N           number of records                                 period=K   offset of the period byte (informational, shown in the label)
@@ -311,7 +329,7 @@ def render_chars(st, args, out, idx, codes=None, label=None):
                 mc = var == 'mc'; col = (v & 7) if v is not None else None
             cells.append((char_tile(st, char_bytes(st, c), mc, args.scale, col), '%02X' % c))
         full = codes == list(range(256))
-        im = sheet(cells, 16 if full else min(16, len(cells)), 13)
+        im = sheet(cells, 16 if full else (args.rows or min(16, len(cells))), 13)
         name = 'chars_%s_%s.png' % (label, var) if label else 'chars_%s.png' % var
         save(im, out, name, idx, 'character set, %s, %s' % ('all 256 characters' if full else '%d selected characters' % len(codes), {'auto': 'each character in its own mode and colour (table)', 'mc': 'all read as multicolour', 'hires': 'all read as hires'}[var]),
              'charset at $%04X' % st.charset, st.chars_how(var == 'auto'))
@@ -487,6 +505,128 @@ def render_char_anim(st, args, out, idx):
         save(im, out, name, idx, 'character animation records, one row per record, one strip per frame, %s' % ('multicolour' if mc else 'hires'),
              'record table $%04X stride %d x %d, frame lists read from the records' % (table, stride, count), st.chars_how(False))
 
+
+# ------------------------------------------------------------------ object records
+def load_names(path):
+    """{record number: (label, span or None)} from lines 'NUM label words [span=K]'."""
+    out = {}
+    for ln in open(path, encoding='utf-8', errors='replace'):
+        ln = ln.split('#', 1)[0].strip()
+        if not ln: continue
+        parts = ln.split(None, 1)
+        try: n = int(parts[0], 0)
+        except ValueError: die('--names %s: line %r does not start with a record number' % (path, ln))
+        rest = parts[1] if len(parts) > 1 else ''
+        m = re.search(r'\bspan=(\d+)', rest); span = int(m.group(1)) if m else None
+        out[n] = (re.sub(r'\bspan=\d+', '', rest).strip(), span)
+    return out
+
+def parse_records(spec):
+    d = {}
+    for kv in spec.split(','):
+        if '=' not in kv: die('--records: %r is not key=value' % kv)
+        k, v = kv.split('=', 1); d[k.strip()] = v.strip()
+    for need in ('count', 'first', 'flags', 'colour'):
+        if need not in d: die('--records: key %r is missing (see --help)' % need)
+    if 'table' not in d and not ('base' in d and 'size' in d): die('--records: give table=ADDR (pointer table) or base=ADDR,size=N (contiguous records)')
+    return d
+
+def read_records(st, args, d, names):
+    """[dict(n, addr, flags, mc, colour, frames, span, label)] ; the mode is decided ONLY by --mc-flag-bit / --mc-when."""
+    R = st.ram; count = int(d['count'], 0)
+    off_first = int(d['first'], 0); off_flags = int(d['flags'], 0); off_col = int(d['colour'], 0)
+    extra = [int(x, 0) for x in d.get('extra', '').split('/') if x.strip() != '']
+    mask = int(d.get('mask', '0x0F'), 0); span_all = int(d.get('span', '1'), 0)
+    when_set = args.mc_when == 'set'
+    recs = []
+    for i in range(count):
+        if 'table' in d:
+            if 'table_hi' in d: a = R[resolve_addr(d['table']) + i * int(d.get('stride', '1'), 0)] | (R[resolve_addr(d['table_hi']) + i * int(d.get('stride', '1'), 0)] << 8)
+            else:
+                t = resolve_addr(d['table']) + i * int(d.get('stride', '2'), 0); a = R[t] | (R[t + 1] << 8)
+        else: a = resolve_addr(d['base']) + i * int(d['size'], 0)
+        mx = max([off_first, off_flags, off_col] + extra)
+        if a + mx >= 0x10000: die('record %d at $%04X runs past the end of RAM (wrong table or offsets?)' % (i, a))
+        fl = R[a + off_flags]; bit = bool(fl >> args.mc_flag_bit & 1)
+        mc = bit if when_set else not bit
+        lab, sp = names.get(i, ('', None))
+        span = sp or span_all
+        ptrs = []
+        for o in [off_first] + extra:
+            if R[a + o] not in ptrs: ptrs.append(R[a + o])
+        recs.append(dict(n=i, addr=a, flags=fl, mc=mc, colour=R[a + off_col] & mask, ptrs=ptrs, span=span, label=lab,
+                         pri=(fl >> args.priority_bit & 1) if args.priority_bit is not None else None))
+    return recs
+
+def load_dump(path):
+    if not os.path.exists(path): die('--check-against: %s not found' % path)
+    b = open(path, 'rb').read()
+    if len(b) < 65536 + 64 + 1024 + 1: die('--check-against: %s is %d bytes, a state dump of 66625 bytes is expected (RAM + 64 VIC registers + colour RAM + $DD00)' % (path, len(b)))
+    return b[:65536], b[65536:65600], b[65600:66624], b[66624]
+
+def check_records(recs, dump):
+    """sets rec['check'] (list of result lines) and rec['bad'] by comparing with the sprites of the dump."""
+    ram, v, _, dd00 = dump
+    base = (3 - (dd00 & 3)) * 0x4000; scr = base + (v[0x18] >> 4) * 0x400
+    sprites = [(n, ram[(scr + 0x3f8 + n) & 0xffff]) for n in range(8) if v[0x15] >> n & 1]
+    bad = 0
+    for r in recs:
+        r['check'] = []; r['bad'] = False
+        frames = {p + k for p in r['ptrs'] for k in range(r['span'])}
+        for n, p in sprites:
+            if p not in frames: continue
+            amc = bool(v[0x1c] >> n & 1); acol = v[0x27 + n] & 15
+            ok = amc == r['mc'] and acol == r['colour']
+            r['check'].append('sprite %d ptr $%02X: dump %s colour %d; record %s colour %d%s' % (n, p, 'MC' if amc else 'hires', acol, 'MC' if r['mc'] else 'hires', r['colour'], '' if ok else '  MISMATCH'))
+            if not ok: r['bad'] = True
+        if not r['check']: r['check'].append('not on screen')
+        bad += r['bad']
+    return bad
+
+def record_tile(st, ptr, mc, own, scale):
+    a = st.base + ptr * 64
+    d = st.ram[a:a + 63]
+    cols = [None, RGB[st.sh[0]], RGB[own], RGB[st.sh[1]]]
+    return tile(decode([d[i:i + 3] for i in range(0, 63, 3)], 3, mc, cols, 2), st.bg_rgb, scale)
+
+def render_records(st, args, out, idx):
+    if args.mc_flag_bit is None or args.mc_when is None: die('--records needs --mc-flag-bit N and --mc-when set|clear (no default: read them from the code that applies the flag)')
+    if not 0 <= args.mc_flag_bit <= 7: die('--mc-flag-bit is 0-7')
+    d = parse_records(args.records)
+    names = load_names(args.names) if args.names else {}
+    recs = read_records(st, args, d, names)
+    nbad = None
+    if args.check_against:
+        nbad = check_records(recs, load_dump(args.check_against))
+        for r in recs:
+            for ln in r['check']: print('  record %d%s: %s' % (r['n'], (' ' + r['label']) if r['label'] else '', ln))
+        print('  check: %d record(s) with MISMATCH, %d not on screen' % (nbad, sum(1 for r in recs if r.get('check') == ['not on screen'])))
+    f = font(11); sc = args.scale; per = args.group
+    if per < 1: die('--group must be at least 1')
+    for gi in range(0, len(recs), per):
+        grp = recs[gi:gi + per]
+        rowh = max(21 * sc + 6, 4 * 13 + 6); labw = 230
+        maxw = max(len(r['ptrs']) * (r['span'] * 24 * sc + 8) for r in grp)
+        im = Image.new('RGB', (labw + maxw + 8, 24 + len(grp) * rowh), PAPER); dr = ImageDraw.Draw(im)
+        dr.text((6, 4), 'object records %d-%d (mc flag: bit %d %s = multicolour)' % (grp[0]['n'], grp[-1]['n'], args.mc_flag_bit, args.mc_when), fill=LABEL, font=font(13))
+        for k, r in enumerate(grp):
+            y = 24 + k * rowh
+            chk = '' if nbad is None else ('  MISMATCH' if r.get('bad') else ('  (not on screen)' if r['check'] == ['not on screen'] else '  check ok'))
+            dr.text((6, y), 'rec %d %s' % (r['n'], r['label']), fill=LABEL, font=f)
+            dr.text((6, y + 13), '%s col %d%s span %d' % ('MC' if r['mc'] else 'hires', r['colour'], '' if r['pri'] is None else ' pri=%d' % r['pri'], r['span']), fill=(255, 120, 120) if r.get('bad') else LABEL, font=f)
+            dr.text((6, y + 26), 'ptr ' + ' '.join('%02X' % p for p in r['ptrs']) + '  flags %02X' % r['flags'], fill=LABEL, font=f)
+            dr.text((6, y + 39), chk.strip(), fill=(255, 120, 120) if r.get('bad') else LABEL, font=f)
+            x = labw
+            for p in r['ptrs']:
+                for s in range(r['span']):
+                    t = record_tile(st, (p + s) & 255, r['mc'], r['colour'], sc); im.paste(t, (x, y)); x += t.width
+                x += 8
+        name = 'records_%s_%d.png' % (args.label, gi // per) if args.label else 'records_%d.png' % (gi // per)
+        save(im, out, name, idx, 'object records %d-%d, one row per record, frames deduplicated, mode from flag bit %d (%s = multicolour)' % (grp[0]['n'], grp[-1]['n'], args.mc_flag_bit, args.mc_when),
+             'records %s; sprite data at $%04X + pointer*64' % ('from the pointer table at ' + d['table'] if 'table' in d else 'at ' + d['base'], st.base),
+             'mode from the flag bit given on the command line; colour = colour byte & mask; shared colours: %s' % st.sh_src + ('; checked against %s' % os.path.basename(args.check_against) if args.check_against else '; NOT checked against a dump (--check-against)'))
+    return nbad
+
 # ------------------------------------------------------------------ main
 def write_index(out, st, idx, root, cmd):
     p = os.path.join(out, 'index.md'); old = ''
@@ -530,6 +670,14 @@ def main():
     ap.add_argument('--sprites', help='A:B[:N] sprite pointer range (hex or labels), N sprites per row')
     ap.add_argument('--chars', help='A:B[,C:D] character codes (hex)')
     ap.add_argument('--char-anim', help='animation record table spec (see above)')
+    ap.add_argument('--rows', type=int, help='with --chars: characters per row (default: all in rows of up to 16)')
+    ap.add_argument('--records', help='object record spec (see above); needs --mc-flag-bit and --mc-when')
+    ap.add_argument('--mc-flag-bit', type=int, help='records: the flags bit (0-7) that decides multicolour')
+    ap.add_argument('--mc-when', choices=('set', 'clear'), help='records: the sprite is multicolour when that bit is set / clear (REQUIRED with --records, no default)')
+    ap.add_argument('--priority-bit', type=int, help='records: flags bit shown as pri=0/1')
+    ap.add_argument('--names', help='records: file with lines "NUM label [span=K]"')
+    ap.add_argument('--group', type=int, default=16, help='records: records per picture (default 16)')
+    ap.add_argument('--check-against', help='records: state dump taken with the objects on screen; compares each record\'s mode and colour with the sprites using its frames')
     ap.add_argument('--label', help='name part of the files of a custom render')
     ap.add_argument('--mc', action='store_true', help='render the multicolour variant only')
     ap.add_argument('--hires', action='store_true', help='render the hires variant only')
@@ -543,12 +691,14 @@ def main():
     cfg = _common.config(root); load_syms(args)
     st = State(args, cfg, root)
     out = os.path.join(root, args.out); idx = Index(out)
-    custom = bool(args.sprites or args.chars or args.char_anim)
+    custom = bool(args.sprites or args.chars or args.char_anim or args.records)
+    nbad = None
     print('graphics from %s: bank %d ($%04X), screen $%04X, charset $%04X' % ('state file' if st.vic else 'RAM image (no VIC state)', st.bank, st.base, st.screen, st.charset))
     if custom:
         if args.sprites: render_sprites_range(st, args, out, idx)
         if args.chars: render_chars_range(st, args, out, idx)
         if args.char_anim: render_char_anim(st, args, out, idx)
+        if args.records: nbad = render_records(st, args, out, idx)
     if not custom or args.all:
         render_chars(st, args, out, idx); render_sprite_pages(st, args, out, idx); render_screen(st, args, out, idx)
     if not idx.rows: die('nothing was rendered')
@@ -556,5 +706,6 @@ def main():
     print('\npictures are in %s/\n  start with: %s' % (out, p))
     for r in idx.rows[:6]: print('  ' + r[0])
     if len(idx.rows) > 6: print('  ... (%d pictures; index.md lists them)' % len(idx.rows))
+    if nbad: sys.exit(3)
 
 if __name__ == '__main__': main()

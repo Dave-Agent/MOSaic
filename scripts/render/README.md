@@ -34,10 +34,19 @@ Rule used for a cell colour value v: bit 3 set = multicolour cell with pairs 00 
 
 ## Custom renders (they replace the default unless `--all`)
 - `--sprites A:B[:N]` pointers A..B (hex or labels), N per row. A row is a pose: `--columns 0,1,2` makes column k use sprite k's mode, colours and expansion (a pose of three sprites with three colours). Without `--columns` a block takes the sprite that points at it now, else sprite 0. When every cell's mode is known one `_auto` picture is written, otherwise `_hires` and `_mc`.
-- `--chars A:B[,C:D]` char codes from the character set.
+- `--chars A:B[,C:D]` char codes from the character set; `--rows N` lays them out N per row (default: one row of up to 16).
 - `--char-anim SPEC` animation records (period, frame count, byte count, destination, pointer to a list of frame addresses): `table=ADDR, count=N, stride=8, frames=OFF, bytes=OFF, ptr=OFF, period=OFF, dest=ADDR (word table) or dest_lo=ADDR,dest_hi=ADDR; frame_bias / byte_bias default 1` (stored values are usually count-1). One row per record, one strip of 8x8 characters per frame; the label gives the destination char codes.
 - `--label NAME`, `--mc` / `--hires`, `--palette c0,c1,c2,c3`, `--scale N`, `--out DIR`.
 Errors are plain (bank outside 0-3, pointer outside 00-FF, label not found with the closest matches, an address outside the VIC bank, a frame list pointing outside RAM, all blocks empty). Empty blocks are skipped and named.
+
+## Object records (`--records`) and the check against a dump
+Games keep object records: a pointer table to records, each with a first sprite pointer, a flags byte (multicolour / hires, priority), a colour byte and more frame pointers. `--records` draws one row per record (number, mode, colour, frame pointers; frames deduplicated; `--span N` or a `span=K` column in the `--names` file for an object of several consecutive sprites).
+```
+python3 -B scripts/render/gfx_sheets.py --records 'table=LABEL,count=N,first=0,flags=1,colour=2,extra=3/4' \
+    --mc-flag-bit 0 --mc-when clear --names names.txt --group 16 --label objs --check-against dumps/objects_on_screen.bin
+```
+`table=` is a table of 16-bit pointers (`stride=` spacing, `table_hi=` for split low / high tables) or `base=ADDR,size=N` for contiguous records; offsets are bytes inside a record; `mask=` is the colour mask (default `0x0F`); `--priority-bit N` shows the bit as `pri=`. **`--mc-flag-bit` and `--mc-when set|clear` are required and have no default**: the bit that means multicolour can be inverted (a spawn routine that CLEARS the multicolour bit when the flag is SET makes "bit set" = hires). Read the code that applies the flag, then state it.
+`--check-against DUMP` (a state dump in the `--state` format, taken while the objects are on screen) lists, for every record, each enabled sprite of the dump whose pointer is one of the record's frames, with the sprite's ACTUAL `$D01C` bit and `$D027+n` colour next to the record's. A difference is flagged `MISMATCH` (also in the picture label, exit status 3); a record no sprite shows is `not on screen` (take another dump). **A MISMATCH means one of two things: the semantics you gave are wrong (check the flag bit, `--mc-when`, the colour offset and mask), or the game changes the flags after spawning (then the record is only the start value).** A match proves only the records that were on screen. Self-test: `python3 -B scripts/render/selftest.py` (synthetic data; skips without Pillow).
 
 ## Limits
 One palette per picture (a mix of colours per sprite is handled only through the sprite numbers of `--columns` / the live pointers); sprite multiplexing and raster splits show only the state of the dump; FLI, split screens, ECM in bitmap mode and the border are not drawn; expansion is applied only to a block drawn as a real sprite; the unused 64th byte of a block is ignored; a dump taken before the game sets up its screen shows whatever screen RAM held then.
