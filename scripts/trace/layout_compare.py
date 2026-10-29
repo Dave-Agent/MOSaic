@@ -10,6 +10,8 @@ variables by LABEL in each (so a moved variable stays comparable), and report th
   --standard FRAMES        the generated scenario set (idle, fire on port 1, fire on port 2, a timed walk right then left) for a project that has no scenarios of its own
   --base-prg/--base-sym    the baseline build (default: the project's TRACE_PRG / TRACE_SYM, or the phase's OUTPUT_PRG)
   --persist K              a byte counts as different only when it stays different for K frames in a row (default 8: a one-frame skew from a cycle count is not a failure)
+  --state-frames F,F,..    also compare the whole machine state at these frames (a tracer --dump of each build run to that frame): the VIC registers, colour RAM, $DD00 (the VIC bank) and the --range ranges; the VIC and I/O are modelled as stored values only, nothing is rendered
+  --state-ignore HEX,..    VIC register numbers left out of that comparison (default 11,12,19,1e,1f: raster, interrupt flags, collision latches)
   --lag N                  a variant that matches the baseline when shifted by up to N frames (either way) passes and is reported as lagged (default 3): a start-up loop crossing a page costs cycles, which is timing, not behaviour
   --ignore LO-HI           addresses to leave out of the comparison (frame-phase counters, scratch an unrelated builder uses); repeatable, hex
   --no-entropy             do not pass --raster-entropy (the default makes reads of the raster register that a program uses as noise deterministic, so a moved handler does not change the run)
@@ -21,7 +23,7 @@ from _common import parser
 from c64env import Env
 a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--variant-prg', required=True); a.add_argument('--variant-sym', required=True)
 a.add_argument('--base-prg'); a.add_argument('--base-sym'); a.add_argument('--scenario', action='append', default=[]); a.add_argument('--range', action='append', default=[]); a.add_argument('--persist', type=int, default=8)
-a.add_argument('--standard', type=int, metavar='FRAMES'); a.add_argument('--ignore', action='append', default=[]); a.add_argument('--no-entropy', action='store_true'); a.add_argument('--lag', type=int, default=3); a.add_argument('--phase', type=int, default=1)
+a.add_argument('--standard', type=int, metavar='FRAMES'); a.add_argument('--ignore', action='append', default=[]); a.add_argument('--no-entropy', action='store_true'); a.add_argument('--state-frames'); a.add_argument('--state-ignore', default='11,12,19,1e,1f'); a.add_argument('--lag', type=int, default=3); a.add_argument('--phase', type=int, default=1)
 args = a.parse_args()
 if args.standard:                                    # a generated scenario set for a project with no golden traces: idle, fire on each port, and a timed walk (joystick bits are active low: right $F7, left $FB)
     n = args.standard
@@ -91,4 +93,27 @@ with tempfile.TemporaryDirectory(prefix='lcmp_') as tmp:
                 print('%-12s same%s (%d frames, %d ranges)' % (name, '' if lag == 0 else ', lagged by %+d frame(s) (timing only)' % lag, min(len(A), len(B)), len(RB))); break
         else:
             h = res[0]; print('%-12s DIFF: from frame %d, first at $%04X (baseline address); no lag of up to %d frames makes the runs equal' % (name, h[0], h[1], args.lag)); bad += 1
+def state_run(env, ranges, sargs, frames, tmp, tag):
+    ramf = os.path.join(tmp, 'ram_%s.bin' % tag); open(ramf, 'wb').write(env.base_ram(stale_check=False)); dump = os.path.join(tmp, 'dump_%s.bin' % tag)
+    a_ = re.sub(r'--frames\s+\d+', '--frames %d' % frames, sargs)
+    cmd = [exe] + env.base_args(ramf) + ['--out', os.path.join(tmp, 'cov_' + tag), '--dump', dump] + ([] if args.no_entropy else ['--raster-entropy']) + shlex.split(a_)
+    subprocess.run(cmd, capture_output=True, text=True)
+    if not os.path.exists(dump) or os.path.getsize(dump) < 66625: sys.exit('tracer produced no state dump (%s)' % tag)
+    return open(dump, 'rb').read()
+if args.state_frames:
+    ign_regs = {int(x, 16) for x in args.state_ignore.split(',') if x}
+    with tempfile.TemporaryDirectory(prefix='lcmp_s_') as tmp:
+        for sc in args.scenario:
+            name, _, sargs = sc.partition('=')
+            for fr in [int(x) for x in args.state_frames.split(',')]:
+                A = state_run(base, RB, sargs, fr, tmp, 'b'); B = state_run(var, RV, sargs, fr, tmp, 'v'); why = []
+                for r in range(0x2F):
+                    if r in ign_regs: continue
+                    if A[65536 + r] != B[65536 + r]: why.append('VIC $D0%02X %02X/%02X' % (r, A[65536 + r], B[65536 + r]))
+                cd = [i for i in range(1024) if A[65600 + i] & 15 != B[65600 + i] & 15]
+                if cd: why.append('colour RAM %d cell(s) from $D8%02X' % (len(cd), cd[0] & 255) if cd[0] < 256 else 'colour RAM %d cell(s), first offset %d' % (len(cd), cd[0]))
+                if A[66624] != B[66624]: why.append('$DD00 %02X/%02X (VIC bank)' % (A[66624], B[66624]))
+                for (a0, a1), (b0, b1), spec in zip(RB, RV, args.range):
+                    if A[a0:a1 + 1] != B[b0:b1 + 1]: why.append('range %s differs' % spec)
+                print('%-12s state@%-5d %s' % (name, fr, 'same' if not why else 'DIFF: ' + '; '.join(why[:4]))); bad += 1 if why else 0
 print('layout_compare: %d scenario(s), %d different' % (len(args.scenario), bad)); sys.exit(1 if bad else 0)
