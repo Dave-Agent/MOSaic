@@ -12,6 +12,7 @@ check   every gate a slice must pass, one verdict (exit 1 when any gate fails):
           unreferenced   no label that nothing refers to without a `TODO(phase2): remove?` marker (unreferenced.py)
           sections       the SECTION banners tile the whole image, no gap or overlap (section_coverage.py)
           p1_complete    the phase 1 completeness report; with --range LO-HI it is the slice's range alone (a slice with no raw operand or placeholder left is CLEAN)
+          table_tails    hints only (a symbolic .word pointer table continued by raw .byte rows: more address words, table_tails.py)
           sentinel_scan  hints only (a list with a missing or misplaced end marker): reported, never fails
         A slice is not done until `check` passes in the scratch copy and again after the merge.
 start   copies the project (git repo included, `originals/` skipped, `build/` skipped except `build/trace/`, the tracer) to $SLICE_SCRATCH/NAME/project (default /tmp/c64-slices) and records the base commit. The agent works there
@@ -43,6 +44,7 @@ def check(root_):
     r = run(pc, root_); v = [l for l in r.stdout.split('\n') if l.startswith('VERDICT')]
     res.append(('p1_complete', bool(v) and ('COMPLETE' in v[0] and 'NOT COMPLETE' not in v[0] or 'SLICE CLEAN' in v[0]), v[0][:150] if v else 'no verdict', False))
     s = run([sys.executable, '-B', os.path.join(HERE, 'sentinel_scan.py')] + ph, root_); res.append(('sentinel_scan', True, (s.stdout.strip().split('\n') or [''])[-1], True))
+    t = run([sys.executable, '-B', os.path.join(HERE, 'table_tails.py')] + ph, root_); res.append(('table_tails', True, (t.stdout.strip().split('\n') or [''])[0], True))
     root = old; w = max(len(n) for n, *_ in res)
     for n, good, msg, hint in res: print('%s  %-*s  %s' % ('hint' if hint else ('PASS' if good else 'FAIL'), w, n, msg))
     ok = all(g for _, g, _, h in res if not h); print('slice check: %s' % ('PASS' if ok else 'FAIL')); return ok

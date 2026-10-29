@@ -108,6 +108,26 @@ check('code_to_bytes: instructions become one .byte row with the original addres
 r = subprocess.run([sys.executable, '-B', c2b, '--root', d, '--main', 'src/m.asm', '--range', '1004-1004'], capture_output=True, text=True)
 check('code_to_bytes: dry run leaves the file alone', 'rts' in open(os.path.join(d, 'src', 'm.asm')).read(), r.stdout)
 
+# ---- addr_immediates.py / section_coverage.py ----------------------------------------------------------------------------------------------------------------
+AI = """  lda #$66                            // [0900:a9 66    LDA #$66]
+  sta ptr                             // [0902:85 02    STA $02]
+  lda #$04                            // [0904:a9 04    LDA #$04]
+  sta ptr_hi                          // [0906:85 03    STA $03]
+"""
+def with_vars(src):
+    d = project('#import "variables.asm"\n' + src); open(os.path.join(d, 'variables.asm'), 'w').write('.label ptr = $02\n.label ptr_hi = $03\n.label counter = $0466\n'); return d
+r = tool('addr_immediates.py', with_vars(AI))
+check('addr_immediates: a lo/hi pair that is the address of a named variable below the image is reported', '(named variable counter)' in r.stdout and '1 candidate' in r.stdout, r.stdout + r.stderr)
+r = tool('addr_immediates.py', with_vars('  // NOT-ADDRESS: two values\n' + AI))
+check('addr_immediates: NOT-ADDRESS waives a pair', '0 candidate' in r.stdout, r.stdout + r.stderr)
+BAN = lambda n, a, b: '// SECTION: %s\n// RANGE:   $%04X-$%04X\n// STATUS:  understood\n// SUMMARY: x\n  nop  // [%04X:ea       NOP]\n' % (n, a, b, a)
+r = tool('section_coverage.py', project(BAN('one', 0x800, 0x80F) + BAN('two', 0x810, 0x81F)))
+check('section_coverage: contiguous banners pass', r.returncode == 0 and 'ok' in r.stdout, r.stdout + r.stderr)
+r = tool('section_coverage.py', project(BAN('one', 0x800, 0x80F) + BAN('two', 0x820, 0x82F)))
+check('section_coverage: a gap fails', r.returncode == 1 and 'GAP     $0810-$081F' in r.stdout, r.stdout + r.stderr)
+r = tool('table_tails.py', project("tbl:\n  .word a,b,c // [0800]\n  .byte $84,$59,$ce,$59 // [0806]\nother:\n  .word a,b // [080a]\n"))
+check('table_tails: symbolic .word rows continued by .byte rows are reported, a clean table is not', '1 table(s)' in r.stdout and 'tbl (line 1)' in r.stdout and 'other' not in r.stdout, r.stdout + r.stderr)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')

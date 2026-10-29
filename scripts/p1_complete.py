@@ -28,7 +28,7 @@ Checks (1, 2 and 2b must be 0; the other two list candidates that are reviewed, 
 --range LO-HI   (hex) report only the part of the source whose [ADDR:bytes] trace addresses lie in the range, so a slice can be called clean on its own. A line without an address
                 (a label line, a comment block, a `.label` of a label file) belongs to the next line that has one, or to its own `$ADDR` value in a label file.
 --allow-marked  marked provisional names (TODO(name)) do not fail the exit status: the verdict is then `SLICE CLEAN`, with the number of marked names left.
-Exit status 0 only when checks 1, 2 and 2b are clean (2b: no unmarked, and no marked unless --allow-marked); 3-6 are review items and are named in the verdict when not 0.
+Exit status 0 only when checks 1, 2 and 2b are clean (and no check 3 pair builds the address of a NAMED variable: that is a raw operand in disguise) (2b: no unmarked, and no marked unless --allow-marked); 3-6 are review items and are named in the verdict when not 0.
 The last line is always `VERDICT: <word> (details)` with the word COMPLETE (whole source, nothing provisional left), SLICE CLEAN (a --range, or marked names allowed and left) or NOT COMPLETE."""
 import re, os, sys, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -85,7 +85,9 @@ for f in sorted(set(files)):
             is_marker = m.group(0).startswith('TODO(name)')
             near = is_marker or any('TODO(name)' in FL[k] for k in range(max(0, n - 1 - NEAR), n))
             (marked if near and not m.group(0).startswith(('TODO(block)', 'STATUS')) else prov).append(item)
-imm = int(re.search(r'(\d+) candidate', run('addr_immediates.py', '--lo', str(args.lo), '--hi', str(args.hi), *rng)).group(1))
+_imm_out = run('addr_immediates.py', '--lo', str(args.lo), '--hi', str(args.hi), *rng)
+imm = int(re.search(r'(\d+) candidate', _imm_out).group(1))
+imm_named = _imm_out.count('(named variable')       # an address pair that IS a named variable's address: a raw operand in disguise (blocks like check 1)
 words = []
 for f in sorted(set(files)):
     FL = open(f).read().split('\n'); FA = line_addrs(FL)
@@ -183,10 +185,10 @@ else:
     print(f'  7. data rows that ran as code {len(exe_runs):3d}   (review: `.byte` rows whose bytes the tracer EXECUTED: code that is still data rows, disassemble it; {sum(e - s_ + 1 for s_, e in exe_runs)} bytes)')
     for s_, e_ in exe_runs[:8]: print('       $%04X-$%04X (%d bytes) after %s' % (s_, e_, e_ - s_ + 1, label_before(s_)))
 print(f'  range content: {n_ins} instruction lines, {n_rows} data rows' + (('   NOTE: no instruction line in this range: checks 1-3 had nothing to see; this slice is judged by checks 5 and 6 and by reading it') if n_ins == 0 else ''))
-hard = raw == 0 and not found and not prov
+hard = raw == 0 and not found and not prov and imm_named == 0
 ok = hard and (not marked or args.allow_marked)
 review = [('3', imm), ('4', len(words)), ('5', len(pairs)), ('6', len(runs)), ('7', len(exe_runs or []))]; rv = ', '.join('check %s: %d' % (k, v) for k, v in review if v)
-if not ok: word, detail = 'NOT COMPLETE', 'raw operands %d, placeholders %d, provisional unmarked %d, marked %d' % (raw, len(found), len(prov), len(marked))
+if not ok: word, detail = 'NOT COMPLETE', 'raw operands %d, address pairs naming a variable %d, placeholders %d, provisional unmarked %d, marked %d' % (raw, imm_named, len(found), len(prov), len(marked))
 elif RANGE or marked: word, detail = 'SLICE CLEAN', '%s%s' % ('%d marked provisional names remain' % len(marked) if marked else 'no provisional names', '; review items: ' + rv if rv else '')
 else: word, detail = 'COMPLETE', ('review items: ' + rv) if rv else 'no review items'
 if n_user: print(f'  NOTE: {n_user} TODO(user) marker(s) open: run the question review first (references/phase1_method.md 6b: code and tracer before the owner; todo_list.py --tag user,name)')
