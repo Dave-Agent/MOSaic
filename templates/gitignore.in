@@ -2,6 +2,7 @@
 /build/
 /ghidra/
 /analysis/
+/gfx/
 /extracted/
 __pycache__/
 # Supplied game data: never committed (see README.md for how to supply it).

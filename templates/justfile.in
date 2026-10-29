@@ -110,3 +110,7 @@ launch: experiment
 # Unattended start test (about 20 s): build, boot headless in VICE (warp), screenshot after SMOKE_CYCLES, fail when the game did not start. The first run creates the reference screenshot (JUDGE_REF): look at it once and commit it.
 smoke: experiment
     python3 {{skill}}/scripts/launcher/smoke.py --root .
+
+# Render the game's graphics (character set, every sprite block of the VIC bank, the screen) as PNGs into gfx/ with gfx/index.md; extra options pass through, e.g. just gfx --sprites 30:57:3 --columns 0,1,2 --label player (scripts/render/README.md). Look at the pictures; attach one to a naming question.
+gfx *args:
+    python3 -B {{skill}}/scripts/render/gfx_sheets.py --root . {{args}}
