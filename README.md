@@ -1,5 +1,7 @@
 # MOSaic
 
+## MOS AI deCompiler
+
 Turn a Commodore 64 game's disk or tape image into byte-identical, fully commented, relocatable [Kick Assembler](http://theweb.dk/KickAssembler/) source, one piece of evidence at a time.
 
 MOSaic is a Claude Code skill: a process, its rules, and the scripts that check them.
