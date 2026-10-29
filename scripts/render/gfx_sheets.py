@@ -41,6 +41,7 @@ colour byte, more sprite pointers = animation frames). This draws one row per re
   --priority-bit N   optional: shown as pri=0/1 in the label (what it means is yours to say)
   --names FILE       lines 'NUM label words [span=K]' (record number, free label, optional span for that record); '#' comments
   --group N          records per picture (default 16);  files records_<label>_<k>.png
+  --check-sprites N,N,..  with --check-against: compare only these sprites (a sprite used for the player can hold a frame pointer by chance: pass the numbers the objects use)
   --check-against DUMP   a state dump (the --state format) taken while the objects are on screen: for each record, every enabled sprite of the dump whose pointer is one of
       the record's frames is reported with its ACTUAL multicolour bit ($D01C) and colour ($D027+n) next to the record's; a difference is flagged MISMATCH (the semantics
       you gave are wrong, or the game changes the flags after spawning), a record with no sprite is 'not on screen'. The result is also in the picture labels. Exit status 3
@@ -564,11 +565,11 @@ def load_dump(path):
     if len(b) < 65536 + 64 + 1024 + 1: die('--check-against: %s is %d bytes, a state dump of 66625 bytes is expected (RAM + 64 VIC registers + colour RAM + $DD00)' % (path, len(b)))
     return b[:65536], b[65536:65600], b[65600:66624], b[66624]
 
-def check_records(recs, dump):
+def check_records(recs, dump, only=None):
     """sets rec['check'] (list of result lines) and rec['bad'] by comparing with the sprites of the dump."""
     ram, v, _, dd00 = dump
     base = (3 - (dd00 & 3)) * 0x4000; scr = base + (v[0x18] >> 4) * 0x400
-    sprites = [(n, ram[(scr + 0x3f8 + n) & 0xffff]) for n in range(8) if v[0x15] >> n & 1]
+    sprites = [(n, ram[(scr + 0x3f8 + n) & 0xffff]) for n in range(8) if v[0x15] >> n & 1 and (only is None or n in only)]
     bad = 0
     for r in recs:
         r['check'] = []; r['bad'] = False
@@ -597,7 +598,7 @@ def render_records(st, args, out, idx):
     recs = read_records(st, args, d, names)
     nbad = None
     if args.check_against:
-        nbad = check_records(recs, load_dump(args.check_against))
+        nbad = check_records(recs, load_dump(args.check_against), {int(x) for x in args.check_sprites.split(',')} if args.check_sprites else None)
         for r in recs:
             for ln in r['check']: print('  record %d%s: %s' % (r['n'], (' ' + r['label']) if r['label'] else '', ln))
         print('  check: %d record(s) with MISMATCH, %d not on screen' % (nbad, sum(1 for r in recs if r.get('check') == ['not on screen'])))
@@ -677,6 +678,7 @@ def main():
     ap.add_argument('--priority-bit', type=int, help='records: flags bit shown as pri=0/1')
     ap.add_argument('--names', help='records: file with lines "NUM label [span=K]"')
     ap.add_argument('--group', type=int, default=16, help='records: records per picture (default 16)')
+    ap.add_argument('--check-sprites', help='records: only these sprite numbers (comma separated) are compared by --check-against: a sprite that holds something else (the player) can use a frame pointer by coincidence')
     ap.add_argument('--check-against', help='records: state dump taken with the objects on screen; compares each record\'s mode and colour with the sprites using its frames')
     ap.add_argument('--label', help='name part of the files of a custom render')
     ap.add_argument('--mc', action='store_true', help='render the multicolour variant only')
