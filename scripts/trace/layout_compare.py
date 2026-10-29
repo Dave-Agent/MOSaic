@@ -17,7 +17,7 @@ variables by LABEL in each (so a moved variable stays comparable), and report th
   --no-entropy             do not pass --raster-entropy (the default makes reads of the raster register that a program uses as noise deterministic, so a moved handler does not change the run)
   --phase N                phase of the project's build and symbols (default 1)
 Exit 0 when every scenario is the same, 1 on a difference. Writes only scratch files (deleted)."""
-import os, re, subprocess, sys, tempfile, shlex
+import bisect, os, re, subprocess, sys, tempfile, shlex, zlib
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, os.path.dirname(HERE)); sys.path.insert(0, HERE)
 from _common import parser
 from c64env import Env
@@ -57,10 +57,25 @@ for s, (a0, a1), (b0, b1) in zip(args.range, RB, RV):
     if a1 - a0 != b1 - b0: sys.exit('range %s has a different size in the two builds (%d vs %d bytes): sample a fixed size (LABEL:N)' % (s, a1 - a0 + 1, b1 - b0 + 1))
 if len(RB) > 64: sys.exit('more than 64 ranges')
 exe = base.build_tracer()
+def site_map(env, tmp, tag):
+    """The program's noise sites (reads of the raster register used as a random source), keyed by the enclosing label and the offset into it, not by address: the tracer's private noise generator
+    is keyed by the site, so without this a moved instruction draws different random numbers and a free-running (attract / idle) scenario diverges for no layout reason (golden.py does the same)."""
+    syms = env.symbols(); labels = sorted((a, n) for n, a in syms.items()); addrs = [a for a, _ in labels]
+    prg = open(env.prg, 'rb').read(); load = prg[0] | prg[1] << 8; img = prg[2:]
+    def key(site):
+        i = bisect.bisect_right(addrs, site) - 1
+        return zlib.crc32(('%s+%d' % (labels[i][1] if i >= 0 else '?', site - addrs[i] if i >= 0 else site)).encode())
+    sites = set()
+    for i in range(len(img) - 5):
+        a = load + i; op = img[i]
+        if op in (0x6D, 0x2D, 0xED, 0x4D, 0x0D) and img[i + 1] == 0x12 and img[i + 2] == 0xD0: sites.add(a)
+        if op == 0xAD and img[i + 1] == 0x12 and img[i + 2] == 0xD0 and img[i + 3] == 0x29: sites.add(a)
+        if op == 0xAD and img[i + 3] == 0x6D and img[i + 4] == 0x12 and img[i + 5] == 0xD0: sites.add(a)
+    f = os.path.join(tmp, 'sites_%s.txt' % tag); open(f, 'w').write(''.join('%04x %08x\n' % (a, key(a)) for a in sorted(sites))); return f
 def run(env, ranges, scen_args, tmp, tag):
     ramf = os.path.join(tmp, 'ram_%s.bin' % tag); open(ramf, 'wb').write(env.base_ram(stale_check=False))
     rf = os.path.join(tmp, 'r_%s.txt' % tag); open(rf, 'w').write(''.join('%04x %04x\n' % r for r in ranges)); smp = os.path.join(tmp, 's_%s.smp' % tag)
-    cmd = [exe] + env.base_args(ramf) + ['--out', os.path.join(tmp, 'cov_' + tag), '--sample-set', smp, rf] + ([] if args.no_entropy else ['--raster-entropy']) + shlex.split(scen_args)
+    cmd = [exe] + env.base_args(ramf) + ['--out', os.path.join(tmp, 'cov_' + tag), '--sample-set', smp, rf] + ([] if args.no_entropy else ['--raster-entropy', '--site-map', site_map(env, tmp, tag)]) + shlex.split(scen_args)
     r = subprocess.run(cmd, capture_output=True, text=True)
     if not os.path.exists(smp): sys.exit('tracer run failed (%s): %s' % (tag, (r.stdout + r.stderr)[-300:]))
     sz = sum(b - a_ + 1 for a_, b in ranges); d = open(smp, 'rb').read()
@@ -69,7 +84,7 @@ def addr_of(ranges, j):
     for a_, b in ranges:
         if j < b - a_ + 1: return a_ + j
         j -= b - a_ + 1
-bad = 0
+bad = 0; lag_of = {}
 with tempfile.TemporaryDirectory(prefix='lcmp_') as tmp:
     for sc in args.scenario:
         name, _, sargs = sc.partition('=')
@@ -90,13 +105,14 @@ with tempfile.TemporaryDirectory(prefix='lcmp_') as tmp:
         for lag in sorted(range(-args.lag, args.lag + 1), key=abs):      # the variant may run a few frames behind or ahead (a start-up loop that crosses a page costs cycles): same behaviour, shifted in time
             res[lag] = first_diff(A[max(0, -lag):], B[max(0, lag):])
             if res[lag] is None:
+                lag_of[name] = lag
                 print('%-12s same%s (%d frames, %d ranges)' % (name, '' if lag == 0 else ', lagged by %+d frame(s) (timing only)' % lag, min(len(A), len(B)), len(RB))); break
         else:
             h = res[0]; print('%-12s DIFF: from frame %d, first at $%04X (baseline address); no lag of up to %d frames makes the runs equal' % (name, h[0], h[1], args.lag)); bad += 1
 def state_run(env, ranges, sargs, frames, tmp, tag):
     ramf = os.path.join(tmp, 'ram_%s.bin' % tag); open(ramf, 'wb').write(env.base_ram(stale_check=False)); dump = os.path.join(tmp, 'dump_%s.bin' % tag)
     a_ = re.sub(r'--frames\s+\d+', '--frames %d' % frames, sargs)
-    cmd = [exe] + env.base_args(ramf) + ['--out', os.path.join(tmp, 'cov_' + tag), '--dump', dump] + ([] if args.no_entropy else ['--raster-entropy']) + shlex.split(a_)
+    cmd = [exe] + env.base_args(ramf) + ['--out', os.path.join(tmp, 'cov_' + tag), '--dump', dump] + ([] if args.no_entropy else ['--raster-entropy', '--site-map', site_map(env, tmp, tag + 's')]) + shlex.split(a_)
     subprocess.run(cmd, capture_output=True, text=True)
     if not os.path.exists(dump) or os.path.getsize(dump) < 66625: sys.exit('tracer produced no state dump (%s)' % tag)
     return open(dump, 'rb').read()
@@ -106,7 +122,7 @@ if args.state_frames:
         for sc in args.scenario:
             name, _, sargs = sc.partition('=')
             for fr in [int(x) for x in args.state_frames.split(',')]:
-                A = state_run(base, RB, sargs, fr, tmp, 'b'); B = state_run(var, RV, sargs, fr, tmp, 'v'); why = []
+                lg = max(0, lag_of.get(name, 0)); A = state_run(base, RB, sargs, fr, tmp, 'b'); B = state_run(var, RV, sargs, fr + lg, tmp, 'v'); why = []                # the variant that runs lg frames behind is read lg frames later
                 for r in range(0x2F):
                     if r in ign_regs: continue
                     if A[65536 + r] != B[65536 + r]: why.append('VIC $D0%02X %02X/%02X' % (r, A[65536 + r], B[65536 + r]))
@@ -115,5 +131,5 @@ if args.state_frames:
                 if A[66624] != B[66624]: why.append('$DD00 %02X/%02X (VIC bank)' % (A[66624], B[66624]))
                 for (a0, a1), (b0, b1), spec in zip(RB, RV, args.range):
                     if A[a0:a1 + 1] != B[b0:b1 + 1]: why.append('range %s differs' % spec)
-                print('%-12s state@%-5d %s' % (name, fr, 'same' if not why else 'DIFF: ' + '; '.join(why[:4]))); bad += 1 if why else 0
+                print('%-12s state@%-5d %s' % (name, fr, ('same' if not lg else 'same (variant read %d frames later)' % lg) if not why else 'DIFF: ' + '; '.join(why[:4]))); bad += 1 if why else 0
 print('layout_compare: %d scenario(s), %d different' % (len(args.scenario), bad)); sys.exit(1 if bad else 0)
