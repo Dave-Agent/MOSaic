@@ -32,21 +32,23 @@ Step 0 sets up your machine (once). Then fourteen steps. Each one says what you 
 
 The Ghidra exporter script downloads itself the first time it is needed.
 
-**(b) Get the skill, and link it so Claude Code can find it.**
+**(b) Run the setup script.** It links the skill so Claude Code can find it, checks your tools, and then offers to create your first project (that is step 1):
 ```
 git clone https://github.com/Dave-Agent/MOSaic.git ~/MOSaic
+cd ~/MOSaic
+./setup.sh
+```
+It asks a few questions and explains each step as it goes. It changes only the link `~/.claude/skills/mosaic` and the project folder you name; it installs nothing itself. To check the tools without doing anything else, run `./setup.sh --check`.
+
+If you would rather do it by hand, the script does exactly this:
+```
 mkdir -p ~/.claude/skills
 ln -s ~/MOSaic ~/.claude/skills/mosaic
+python3 ~/.claude/skills/mosaic/scripts/check_env.py --role run --role trace --role ghidra
 ```
 The link must be called `mosaic`: that is the name the skill is registered under, and the commands in this guide use that path.
 
-**(c) Check the tools.**
-```
-python3 ~/.claude/skills/mosaic/scripts/check_env.py --role run --role trace --role ghidra
-```
-The last line should read `all required tools present for roles: build, ghidra, run, trace`. If it lists missing tools, install them and run it again.
-
-**Done when:** that last line says all required tools are present.
+**Done when:** the tool check ends with `all required tools present`.
 
 ---
 
@@ -55,9 +57,11 @@ The last line should read `all required tools present for roles: build, ghidra, 
 ### 1. Add the game
 **What you need:** the game's disk or tape file. It ends in `.d64`, `.g64` or `.tap`. A copy with the copy protection removed is best.
 
-**Do this once, in a terminal:**
+**The easy way:** if you ran `./setup.sh` in step 0 and said yes to "Create a project now?", this step is already done. Run `./setup.sh` again to create another project.
 
-- **(a) Choose a folder for the project.** It can be new or empty. Example: `~/C64Projects/MyGame`.
+**By hand, in a terminal:**
+
+- **(a) Create or choose a folder for the project.** It can be new or empty. Example: `~/C64Projects/MyGame`.
 - **(b) Run this command.** Change the three values after `--root`, `--name` and `--media`:
   ```
   python3 ~/.claude/skills/mosaic/scripts/new_project.py \

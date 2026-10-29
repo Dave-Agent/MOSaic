@@ -9,7 +9,7 @@ Roles limit what is required: build (default: python3, java, Kick Assembler, git
 import os, re, shutil, subprocess, sys, glob
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser, config
-a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--role', action='append', default=[]); args = a.parse_args()
+a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--role', action='append', default=[]); a.add_argument('--brief', action='store_true', help='show only the tools the roles need, and one line for the optional ones that are missing'); args = a.parse_args()
 cfg = config(args.root); roles = set(args.role) | {'build'}; home = os.path.expanduser('~')
 def ver(cmd, rx=r'(\d+(?:\.\d+)+)'):
     try:
@@ -57,7 +57,7 @@ try:
     import PIL; pil = PIL.__version__
 except Exception: pil = ''
 rows.append(('Pillow (python)', 'python module' if pil else '', pil, 'screenshot judging and image tools (optional)', 'optional', 'pip install pillow', None))
-miss_req = 0
+miss_req = 0; brief_opt = []
 print('tool environment', '(project.config found)' if cfg else '(no project.config here: default locations)', '| roles:', ', '.join(sorted(roles)))
 for name, path, v, why, role, hint, minv in rows:
     need = role in roles; ok = bool(path)
@@ -66,6 +66,10 @@ for name, path, v, why, role, hint, minv in rows:
         except ValueError: pass
     flag = 'ok  ' if ok else ('MISSING' if need else 'absent')
     if need and not ok: miss_req += 1
+    if args.brief and not need:
+        if not ok and role in ('headless',): brief_opt.append(name)
+        continue
     print(f'  {flag:8}{name:22}{(v or ""):12}{why}' + ('' if ok else f'\n          install: {hint}') + ('' if path or not ok else '') + (f'   [{path}]' if ok and path and path != 'python module' else ''))
+if args.brief and brief_opt: print('  optional, not installed: %s (the project still works; see references/hand_off_tools.md)' % ', '.join(brief_opt))
 print('required tools missing:', miss_req) if miss_req else print('all required tools present for roles:', ', '.join(sorted(roles)))
 sys.exit(1 if miss_req else 0)

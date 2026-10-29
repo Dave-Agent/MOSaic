@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser
 SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--name', required=True); a.add_argument('--media', action='append', default=[])
-a.add_argument('--handoff-media', help='file name (in originals/) the dumps are taken from: the UNPROTECTED medium'); a.add_argument('--protect', action='store_true'); a.add_argument('--no-git', action='store_true'); a.add_argument('--force', action='store_true')
+a.add_argument('--handoff-media', help='file name (in originals/) the dumps are taken from: the UNPROTECTED medium'); a.add_argument('--protect', action='store_true'); a.add_argument('--no-next', action='store_true', help='do not print the next steps (a wrapper script prints its own)'); a.add_argument('--no-git', action='store_true'); a.add_argument('--force', action='store_true')
 args = a.parse_args(); root = os.path.abspath(args.root); os.makedirs(root, exist_ok=True)
 slug = re.sub(r'[^a-z0-9]+', '', args.name.lower()) or 'game'
 for d in ('originals', 'dumps', 'reference', 'build', 'docs', 'tools/ghidra', 'phase1/src/libs'): os.makedirs(os.path.join(root, d), exist_ok=True)
@@ -48,7 +48,7 @@ if media:                                                    # the SHA-256 of ev
     open(os.path.join(root, 'originals.sha256'), 'w').write('\n'.join(sums) + '\n'); print('recorded the SHA-256 of %d original file(s) in originals.sha256%s' % (len(media), ', files made read-only' if args.protect else ''))
 if not args.no_git and not os.path.isdir(os.path.join(root, '.git')):
     subprocess.run(['git', 'init', '-q', '-b', 'main'], cwd=root); print('git init (local)')
-print('''
+if not args.no_next: print('''
 Next:
   1. cd into the project and run `just env` to check the tools, then `just status` to see where you are.
   2. Open Claude Code in the project folder and say: "Use the MOSaic skill. Research this game, then continue to the first byte-identical build."
