@@ -1,0 +1,40 @@
+# Every push to main is a release: the version is worked out from the commits (scripts/release_bump.py), VERSION is bumped, tagged and published with notes.
+# Minor when a commit closes an `enhancement` issue, otherwise patch. A major release is only made by hand: Actions > release > Run workflow > bump: major.
+name: release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'auto reads the commits; major is only ever chosen here'
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
+concurrency:
+  group: release
+  cancel-in-progress: false
+permissions:
+  contents: write
+  issues: read
+jobs:
+  release:
+    if: ${{ github.event_name == 'workflow_dispatch' || !startsWith(github.event.head_commit.message, 'Release ') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Bump, tag, publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUMP: ${{ inputs.bump || 'auto' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          out=$(python3 scripts/release_bump.py --bump "$BUMP" --write --notes "$RUNNER_TEMP/notes.md")
+          echo "$out"
+          v=$(echo "$out" | sed -n 's/^VERSION=//p')
+          [ -n "$v" ] || { echo "nothing to release"; exit 0; }
+          git push origin HEAD:main "v$v"
+          gh release create "v$v" --title "MOSaic $v" --notes-file "$RUNNER_TEMP/notes.md"

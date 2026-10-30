@@ -162,6 +162,24 @@ check('version_check --line: a newer release in the cache gives one UPDATE line 
 _r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'version_check.py'), '--line'], capture_output=True, text=True, env=dict(os.environ, XDG_CACHE_HOME=_cd, MOSAIC_NO_UPDATE_CHECK='1'))
 check('version_check --line: MOSAIC_NO_UPDATE_CHECK=1 silences it', _r.stdout == '', _r.stdout)
 
+# ---- release_bump.py: patch for fixes and docs, minor for an enhancement closed, major only by hand, the bot's own commits ignored ---------------------------------------
+def _git(d, *a): return subprocess.run(['git', '-C', d, '-c', 'user.name=t', '-c', 'user.email=t@t'] + list(a), capture_output=True, text=True).stdout
+def _rel(d, *a, labels='{}'):
+    return subprocess.run([sys.executable, '-B', os.path.join(HERE, 'release_bump.py'), '--root', d] + list(a), capture_output=True, text=True, env=dict(os.environ, MOSAIC_RELEASE_LABELS=labels))
+_d = tempfile.mkdtemp(prefix='c64rel_'); _git(_d, 'init', '-q', '-b', 'main'); open(os.path.join(_d, 'VERSION'), 'w').write('1.1.0\n'); _git(_d, 'add', '-A'); _git(_d, 'commit', '-q', '-m', 'first'); _git(_d, 'tag', '-a', 'v1.1.0', '-m', 'x')
+check('release_bump: nothing since the last tag, nothing to release', _rel(_d).stdout == '')
+open(os.path.join(_d, 'a.txt'), 'w').write('1'); _git(_d, 'add', '-A'); _git(_d, 'commit', '-q', '-m', 'Fix a thing\n\nFixes #5')
+check('release_bump: a fix (issue labelled bug) is a patch release', _rel(_d, labels='{"5": ["bug"]}').stdout.strip() == 'VERSION=1.1.1', _rel(_d, labels='{"5": ["bug"]}').stdout)
+open(os.path.join(_d, 'b.txt'), 'w').write('1'); _git(_d, 'add', '-A'); _git(_d, 'commit', '-q', '-m', 'A new tool. Fixes #6')
+check('release_bump: closing an enhancement issue makes it a minor release (patch part reset)', _rel(_d, labels='{"5": ["bug"], "6": ["enhancement"]}').stdout.strip() == 'VERSION=1.2.0')
+check('release_bump: a major release is never chosen from the commits, only by --bump major', _rel(_d, labels='{"6": ["enhancement"]}').stdout.strip() == 'VERSION=1.2.0' and _rel(_d, '--bump', 'major').stdout.strip() == 'VERSION=2.0.0')
+_n = os.path.join(_d, 'notes.md'); _r = _rel(_d, '--write', '--notes', _n, labels='{"6": ["enhancement"]}')
+check('release_bump --write: VERSION rewritten, committed as `Release 1.2.0 [skip ci]`, tagged v1.2.0 (annotated)', open(os.path.join(_d, 'VERSION')).read() == '1.2.0\n' and _git(_d, 'log', '-1', '--format=%s').strip() == 'Release 1.2.0 [skip ci]' and 'v1.2.0' in _git(_d, 'tag', '--list').split() and _git(_d, 'cat-file', '-t', 'v1.2.0').strip() == 'tag', _r.stdout + _r.stderr)
+_t = open(_n).read(); check('release_bump --notes: one line per commit (not the bot\'s), the issues closed, the kind of release', 'A new tool. Fixes #6' in _t and 'Fix a thing' in _t and 'Release 1.2.0' not in _t and 'Closes: #5, #6' in _t and '(minor release)' in _t, _t)
+check('release_bump: after the release commit and tag there is nothing new to release (the bot\'s commit does not count)', _rel(_d, labels='{}').stdout == '')
+open(os.path.join(_d, 'README.md'), 'w').write('docs'); _git(_d, 'add', '-A'); _git(_d, 'commit', '-q', '-m', 'README: a sentence')
+check('release_bump: a push with no issue closed (documentation) is a patch release', _rel(_d).stdout.strip() == 'VERSION=1.2.1', _rel(_d).stdout)
+
 # ---- gauge.py: a clean area is 100%, an area with an unnamed routine is not -------------------------------------------------------------------------------------
 _g = project(".pc = $0800 \"RAM\"\nStart:\n  lda #1 // [0800:a9 01    LDA #$01]\n  rts // [0802:60       RTS]\n.pc = $1000 \"RAM2\"\nSUB_1000:\n  lda #2 // [1000:a9 02    LDA #$02]\n  jsr SUB_1000 // [1002:20 00 10 JSR $1000]\n  rts // [1005:60       RTS]\n")
 _r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'gauge.py'), '--root', _g, '--main', 'main.asm', '--json'], capture_output=True, text=True)
