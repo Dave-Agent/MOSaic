@@ -180,6 +180,26 @@ check('review cap: SLICE_REVIEW_MAX_CLAIMS limits the names tested, the estimate
 open(os.path.join(_pr, 'project.config'), 'a').write('SLICE_REVIEW_MAX_CLAIMS="50"\n')
 check('review brief: with the cap above the number of names there is no budget line', 'AT MOST' not in rev('brief', 'risky', env=_e3).stdout, rev('brief', 'risky', env=_e3).stdout[-500:])
 
+# ---- questions.py: the closing questions as one-click choices, held to the tool's limits ------------------------------------------------------------------------
+def qs_(*a, **k): return subprocess.run([sys.executable, '-B', os.path.join(HERE, 'questions.py'), *a], capture_output=True, text=True, **k)
+_r = qs_('check'); check('questions: the shipped questions meet the tool\'s limits', _r.returncode == 0 and '5 question(s), 0 problem(s)' in _r.stdout, _r.stdout + _r.stderr)
+_q = json.load(open(os.path.join(HERE, '..', 'references', 'questions.json')))
+def _bad(mut):
+    import copy; q2 = copy.deepcopy(_q); mut(q2); f = os.path.join(tempfile.mkdtemp(prefix='c64q_'), 'q.json'); json.dump(q2, open(f, 'w')); return qs_('check', '--file', f)
+_r = _bad(lambda q: q[0].__setitem__('header', 'a header that is too long')); check('questions: a header over 12 characters is refused', _r.returncode == 1 and 'characters' in _r.stdout, _r.stdout)
+_r = _bad(lambda q: q[0].__setitem__('options', q[0]['options'][:1])); check('questions: fewer than 2 options is refused', _r.returncode == 1 and '1 options' in _r.stdout, _r.stdout)
+_r = _bad(lambda q: q[0]['options'][0].__setitem__('label', 'one two three four five six')); check('questions: a label of more than 5 words is refused', _r.returncode == 1 and 'words' in _r.stdout, _r.stdout)
+_r = _bad(lambda q: q[0].__setitem__('question', 'Start phase 1.')); check('questions: a question without a question mark is refused', _r.returncode == 1 and 'question mark' in _r.stdout, _r.stdout)
+_r = _bad(lambda q: q[0]['options'][0].__setitem__('label', 'Other')); check('questions: an `Other` option is refused (the tool adds it)', _r.returncode == 1 and 'Other' in _r.stdout, _r.stdout)
+_r = _bad(lambda q: q[0]['options'][1].pop('after')); check('questions: an option that says nothing about what to do after it is refused', _r.returncode == 1 and 'what to do after' in _r.stdout, _r.stdout)
+_pc = project('Start:\n  rts  // [0800:60 RTS]\n'); open(os.path.join(_pc, 'project.config'), 'a').write('PHASE2_MAIN="phase2/src/game.asm"\n')
+_r = qs_('show', 'step4-done', '--root', _pc, '--json'); _j = json.loads(_r.stdout)
+check('questions show --json: exactly the AskUserQuestion argument, one question, the project\'s source file filled in, nothing left to fill', len(_j['questions']) == 1 and _j['questions'][0]['multiSelect'] is False and '`phase2/src/game.asm`' in _j['questions'][0]['question'] and '{src' not in _r.stdout and set(_j['questions'][0]['options'][0]) == {'label', 'description'}, _r.stdout)
+_r = qs_('show', 'step2-done', '--root', _pc); check('questions show: says what to do after each answer, for Other, and that no answer is not an answer', 'Stop and wait' in _r.stdout and 'Other (free text)' in _r.stdout and 'Never start the next step on it' in _r.stdout, _r.stdout)
+_ids = {x['id'] for x in _q}; _doc = open(os.path.join(HERE, '..', 'SKILL.md')).read() + open(os.path.join(HERE, '..', 'HOWTO.md')).read()
+_used = set(re.findall(r'questions\.py show ([a-z0-9-]+)', _doc)); _used |= set(re.findall(r'`(step[2-5]-done)`', _doc))
+check('questions: every question id the docs name exists, and every question is asked from the docs', _used <= _ids and _ids <= _used, (_used - _ids, _ids - _used))
+
 # ---- code_to_bytes.py: instructions the export read from data go back to .byte rows -------------------------------------------------------------------------------
 d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'src'))
 with open(os.path.join(d, 'project.config'), 'w') as f: f.write('SRC_MAIN="src/m.asm"\n')

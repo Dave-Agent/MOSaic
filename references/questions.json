@@ -1,0 +1,117 @@
+[
+  {
+    "id": "step2-done",
+    "when": "step 2 ends: the build is byte-identical and the game starts",
+    "header": "Phase 1",
+    "question": "Raw disassembly complete: it assembles byte for byte to the original and starts. Launch it with `just launch 1`; the source is {src1} (still the exporter's names). Start phase 1, naming every routine?",
+    "options": [
+      {
+        "label": "Start phase 1",
+        "description": "Name every routine from evidence, in slices, asking you only what a thing is to a player.",
+        "after": "Say which step you are starting (step 3, naming every routine), ask the phase 1 review question (phase1-review) if it has not been answered, then start."
+      },
+      {
+        "label": "Let me look first",
+        "description": "Stop here. Read or play it, then say 'move to the next stage'.",
+        "after": "Stop and wait. Do not start step 3 unasked."
+      },
+      {
+        "label": "Stop here",
+        "description": "Leave it for now.",
+        "after": "Stop. Say how to continue later ('move to the next stage')."
+      }
+    ]
+  },
+  {
+    "id": "step3-done",
+    "when": "step 3 ends: the completeness report says COMPLETE",
+    "header": "Phase 2",
+    "question": "Named monolith complete. Launch it with `just launch 1`; read it at {src1}. Start the phase 2 refactoring into files with a port interface?",
+    "options": [
+      {
+        "label": "Start phase 2",
+        "description": "Split it into files, add a platform interface and make it relocatable, byte-identical throughout.",
+        "after": "Say which step you are starting (step 4, parts 4.1 to 4.4) and start; stop before the removals."
+      },
+      {
+        "label": "Let me look first",
+        "description": "Stop here. Read or play it, then say 'move to the next stage'.",
+        "after": "Stop and wait. Do not start step 4 unasked."
+      },
+      {
+        "label": "Stop here",
+        "description": "Leave it for now.",
+        "after": "Stop. Say how to continue later ('move to the next stage')."
+      }
+    ]
+  },
+  {
+    "id": "step4-done",
+    "when": "step 4 ends: the source is split, namespaced, relocatable and byte-identical",
+    "header": "Dead code",
+    "question": "Phase 2 refactoring is done up to the removals. Launch it with `just launch 2`; the source is {src2}. Step 5 removes dead code and needs your decision. Review the list of dead blocks with their sizes now?",
+    "options": [
+      {
+        "label": "Show me the list",
+        "description": "I show every dead block with its size; you decide which may go.",
+        "after": "Show the list of dead blocks (with sizes), one question at a time, and record each decision in docs/user_answers.md; then do step 5."
+      },
+      {
+        "label": "Let me look first",
+        "description": "Stop here. Play it, then say 'move to the next stage'.",
+        "after": "Stop and wait. Do not start step 5 unasked."
+      },
+      {
+        "label": "Stop here",
+        "description": "Leave it for now.",
+        "after": "Stop. Say how to continue later ('move to the next stage')."
+      }
+    ]
+  },
+  {
+    "id": "step5-done",
+    "when": "step 5 ends: the approved blocks are removed and the gate passes",
+    "header": "Play it",
+    "question": "Phase 2 complete. Play it with `just launch 2`. Shall I launch it for you?",
+    "options": [
+      {
+        "label": "Launch it now",
+        "description": "Runs `just launch 2`; tell me what you see.",
+        "after": "Run `just launch 2` and ask what they see."
+      },
+      {
+        "label": "I will play it",
+        "description": "I will launch it myself and report back.",
+        "after": "Stop and wait for their report."
+      },
+      {
+        "label": "Something is wrong",
+        "description": "Tell me what you see and I will look into it.",
+        "after": "Ask what they see, reproduce it, and fix it with the gates green."
+      }
+    ]
+  },
+  {
+    "id": "phase1-review",
+    "when": "the start of step 3, once per project (the answer sets SLICE_REVIEW in project.config and is recorded in docs/user_answers.md)",
+    "header": "Slice review",
+    "question": "A second agent can review every slice of phase 1 before it merges: it catches wrong names and untrue comments that the automatic checks cannot. It costs tokens: about 30,000 for a slice with no new names plus about 4,000 per name tested (at most 12 a slice), so a project is several hundred thousand tokens and can reach a million. Review every slice?",
+    "options": [
+      {
+        "label": "No review",
+        "description": "Nothing extra is spent; the automatic checks still gate every slice.",
+        "after": "Leave SLICE_REVIEW=\"off\". Record the answer in docs/user_answers.md. Start phase 1."
+      },
+      {
+        "label": "Ask me per slice",
+        "description": "Before each slice I show what its review would cost and you decide.",
+        "after": "Leave SLICE_REVIEW=\"off\" and, before each slice merges, run `just review-risk NAME`, show the numbers and ask whether to review that slice. Record the answer in docs/user_answers.md."
+      },
+      {
+        "label": "Review every slice",
+        "description": "A read-only second agent tests the names and comments of each slice before it merges.",
+        "after": "Set SLICE_REVIEW=\"required\" in project.config. Record the answer in docs/user_answers.md. Start phase 1."
+      }
+    ]
+  }
+]

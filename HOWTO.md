@@ -4,7 +4,7 @@ Five steps after setup. Steps 2 and 4 are big jobs that the agent does in the ba
 
 **How it works.** You tell Claude what to do, or run the setup script, and it does the work. You can always just say **"move to the next stage"**. `just status` in the project tells you where you are.
 
-**The agent asks you a question at four points only**, when a step ends:
+**The agent asks you a question at four points only**, when a step ends (as a multiple-choice question you answer with one click or a number, or with your own words under "Other"; if you do not answer, it waits and does not carry on):
 
 - **step 2** ("Raw disassembly complete: start phase 1?")
 - **step 3** ("Named monolith complete: start the phase 2 refactoring?")
