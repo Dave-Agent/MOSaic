@@ -6,8 +6,8 @@
 #   what      one sentence
 # references/rules.md holds the table generated from this file (scripts/rules_table.py --write); the prose of each rule stays in rules.md.
 byte-identical	check	framework/scripts/verify.sh	phase 2 only: PHASE2_ALLOWED_DIFF (a file of approved LO-HI ranges)	The built image equals the reference byte for byte (phase 1 always; phase 2 until the approved removals).
-no-raw-operands	check	raw_refs.py,p1_complete.py	-	No hex address as a code operand: give the target a label (`#<label` / `#>label` for half an address).
-no-address-pairs	check	addr_immediates.py,p1_complete.py	`// NOT-ADDRESS: reason` on the line	No lo/hi pair of immediates that builds the address of a named variable or label.
+no-raw-operands	check	cpu/6502/raw_refs.py,p1_complete.py	-	No hex address as a code operand: give the target a label (`#<label` / `#>label` for half an address).
+no-address-pairs	check	cpu/6502/addr_immediates.py,p1_complete.py	`// NOT-ADDRESS: reason` on the line	No lo/hi pair of immediates that builds the address of a named variable or label.
 no-placeholder-names	check	p1_complete.py	-	No Ghidra placeholder name (DAT_, LAB_, SUB_, FUN_ ...) anywhere in the source, comments included.
 no-provisional-names	check	p1_complete.py	`TODO(name)` marker within 12 lines above (marked ones are listed, not failed, with --allow-marked)	No `unk` name, TODO(name) / TODO(block) marker or `STATUS:  unknown` banner left at the end of phase 1.
 anon-labels-limit	check	anon_labels.py	-	An anonymous label only in one routine, at most two steps and 40 lines from its use, nothing else referring to it.
@@ -24,12 +24,12 @@ originals-untouched	check	check_layout.py	-	Every file in originals/ matches the
 routine-tests-pass	check	sim/run_tests.py	-	The routine tests (code run in the 6510 simulator against Python models) pass on the current build.
 golden-traces-match	check	golden/golden.py	timing-tolerant set (check-t), --lag N, GOLDEN_PIN	The per-frame state of the scenarios equals the recorded traces (exact, or timing-tolerant after a byte-changing step).
 framework-in-step	hint	framework_sync.py	-	The project's framework/ equals the skill's master; a local edit is moved into the skill or removed.
-smc-operands-named	hint	smc_list.py	-	A self-modified operand is named `label:operand`, with a `// SMC: kind patched by routine` line and a trailing SMC marker.
+smc-operands-named	hint	cpu/6502/smc_list.py	-	A self-modified operand is named `label:operand`, with a `// SMC: kind patched by routine` line and a trailing SMC marker.
 pointer-data-is-names	hint	addr_tables.py	`// NOT-POINTERS: reason`	Pointer data is `.word label` or `#<label` / `#>label`, never a literal, so a table or block can move.
 one-record-per-row	hint	sentinel_scan.py,table_tails.py,table_counts.py	-	A table of fixed-size records, or a stream of events, is written one record per row with the terminator on its own row.
 values-have-names	hint	magic_scan.py	-	A state value ($00 / $80 / $FF), a stride or a count the code repeats gets a constant; the raw value is written once.
 machine-dependencies-tagged	hint	port_scan.py	-	A routine that spins on a hardware register, patches its own code, calls ROM, switches banking or relies on the stack pointer carries a TODO(port) line.
-relocation-hazards-resolved	hint	reloc_hazards.py	`docs/relocation_hazards.md` (documented hazards)	Nothing breaks when the image or a variable moves: indirect addressing, pointer tables, SMC, aligned bases.
+relocation-hazards-resolved	hint	cpu/6502/reloc_hazards.py	`docs/relocation_hazards.md` (documented hazards)	Nothing breaks when the image or a variable moves: indirect addressing, pointer tables, SMC, aligned bases.
 names-need-proof	review	review	`TODO(name)` until the evidence is there	A name that claims a role needs the document AND an observation (the evidence ladder); a document alone is not enough.
 no-guesses	review	review	-	What art, a sound or a game mode IS is asked of the owner after the code and a tracer run; never invented.
 terminology-follows-author	review	review	-	The original author's word is used, not a synonym, in identifiers, comments and docs alike.

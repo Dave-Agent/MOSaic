@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-"""List every self-modifying site (a line ending in an `SMC` marker, or a `// SMC` comment line) with its line number and comment.
-  smc_list.py [--phase 1|2 | --main FILE]"""
-import re, os, sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, expanded_lines, rule_line
-a = parser(__doc__.split('\n')[0], write=False, phase=True); args = a.parse_args(); n = 0
-for i, l in enumerate(expanded_lines(main_file(args))):
-    if re.search(r'\]\s+SMC\s*$', l) or l.lstrip().startswith('// SMC'): n += 1; print(f'{i+1:6d}  {l.strip()[:150]}')
-print(n, 'SMC lines')
-rule_line('smc-operands-named', n, '(to look at)', hint=True)
+"""MOVED to scripts/cpu/6502/smc_list.py (references/tool_layout.tsv). This stub keeps the old path working for a project whose justfile still names it; it goes at the next major version."""
+import os, sys
+_t = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cpu/6502/smc_list.py'))
+if __name__ == '__main__':
+    import runpy; sys.argv[0] = _t; sys.path.insert(0, os.path.dirname(_t)); runpy.run_path(_t, run_name='__main__')
+else:                                                        # imported as a module: be the real one
+    sys.path.insert(0, os.path.dirname(_t)); sys.modules.pop(__name__, None); import importlib; sys.modules[__name__] = importlib.import_module(os.path.splitext(os.path.basename(_t))[0])

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Platforms as data (issue #39): load, validate and query a platform descriptor (platforms/<id>/platform.json).
 
-  platform.py list                       the platforms there are
-  platform.py check [ID]                 validate a descriptor (all of them without ID); exit 1 on a problem
-  platform.py show ID                    the descriptor
-  platform.py get ID PATH                one value, PATH dotted (`memory.banking.register`, `chips.0.lo`)
-  platform.py visible ID ADDR [PORT]     what the CPU sees at ADDR (hex) when the banking register holds PORT (hex, default 07)
-  platform.py mirror ID ADDR             the register address a mirror of a chip answers on (as apply_libs.py does)
+  platforms.py list                       the platforms there are
+  platforms.py check [ID]                 validate a descriptor (all of them without ID); exit 1 on a problem
+  platforms.py show ID                    the descriptor
+  platforms.py get ID PATH                one value, PATH dotted (`memory.banking.register`, `chips.0.lo`)
+  platforms.py visible ID ADDR [PORT]     what the CPU sees at ADDR (hex) when the banking register holds PORT (hex, default 07)
+  platforms.py mirror ID ADDR             the register address a mirror of a chip answers on (as apply_libs.py does)
 
 A project names its platform in project.config (`PLATFORM="c64"`; the default is c64, so a project that has no such key is unchanged). Tools read what they need from the descriptor instead
 of assuming it; references/platform_descriptor.md says what each section is for and which tool reads it. Standard library only."""

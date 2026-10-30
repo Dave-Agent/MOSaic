@@ -7,7 +7,7 @@ A .tap holds the pulse lengths of the recording (`C64-TAPE-RAW` / `C16-TAPE-RAW`
 $89..$81 and $09..$01, a header block (type 1 relocatable / 3 absolute program, 4 data header, 5 end of tape) of 192 bytes with the load range and the 16-character name, then the data block,
 each block recorded TWICE with an XOR checksum (a bad first copy is replaced by the second). Each program file becomes `NNN_<name>.prg` in DIR (the two load-address bytes, then the
 body); `manifest.txt` lists name, header type, load address, body length, end address, SHA-256 and which copy was used.
-Many games load themselves with a turbo or custom loader: the first file on the tape is then a normal-format loader stub (extract it, disassemble it with scripts/disasm/dis6502.py: that is
+Many games load themselves with a turbo or custom loader: the first file on the tape is then a normal-format loader stub (extract it, disassemble it with scripts/cpu/6502/dis6502.py: that is
 the boot-chain step) and the rest is non-standard pulses, which this tool does NOT decode. It reports how many pulses follow the last standard block and their lengths, and the way on is the
 hand-off route: run the tape in VICE (the media is copied, never attached directly), dump RAM when the game is loaded (scripts/vice/vice_handoff.py, references/hand_off_tools.md).
 --histogram only prints the pulse-length clusters (a quick look at what a tape holds). --short N sets the short-pulse length in .tap units (1 unit = 8 cycles; the standard is about 48);
@@ -99,7 +99,7 @@ print('standard-format files decoded: %d' % len([f for f in files if f[4] is not
 if rest and len(rest) > 2000:
     print('%d pulses follow the last standard block (%.0f%% of the tape): custom / turbo loader data, not decoded. Pulse clusters (units of 8 cycles):' % (len(rest), 100.0 * len(rest) / len(pulses)))
     for v, c in clusters(pulses[last + 2:] if last else pulses, 4): print('  ~%3d: %d' % (v, c))
-    print('Next: disassemble the loader stub above (scripts/disasm/dis6502.py), then run the tape in VICE and dump RAM at the hand-off (references/hand_off_tools.md).')
+    print('Next: disassemble the loader stub above (scripts/cpu/6502/dis6502.py), then run the tape in VICE and dump RAM at the hand-off (references/hand_off_tools.md).')
 if not files: sys.exit(2)
 if not args.out: sys.exit(0 if any(f[4] is not None for f in files) else 2)
 out = args.out if os.path.isabs(args.out) else os.path.join(args.root, args.out); os.makedirs(out, exist_ok=True)

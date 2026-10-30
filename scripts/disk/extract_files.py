@@ -5,7 +5,7 @@
 
 Uses `c1541 -attach IMAGE -list` / `-read` (VICE's disk tool: the image is only read, never written). For each file DIR gets `NNN_<name>.<type>` and `manifest.txt` lists
 name, type, blocks, the load address (the first two bytes of a PRG), the body length (without the address), the end address and the SHA-256 of the file. Names with spaces or
-non-ASCII characters are handled; a file that cannot be read is listed as FAILED. Then disassemble the small ones (scripts/disasm/dis6502.py) and find the big one(s)
+non-ASCII characters are handled; a file that cannot be read is listed as FAILED. Then disassemble the small ones (scripts/cpu/6502/dis6502.py) and find the big one(s)
 (scripts/reference/file_coverage.py tells which stage of a run contains them)."""
 import hashlib, os, re, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

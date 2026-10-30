@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from _common import parser
 a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--pokes', required=True); a.add_argument('--reference', required=True); a.add_argument('--base', default='0800'); a.add_argument('--main')
 args = a.parse_args(); os.chdir(args.root); base = int(args.base, 16); ref = bytearray(open(args.reference, 'rb').read())
-spec = importlib.util.spec_from_file_location('dis6502', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'disasm', 'dis6502.py')); dis = importlib.util.module_from_spec(spec); spec.loader.exec_module(dis)
+spec = importlib.util.spec_from_file_location('dis6502', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cpu', '6502', 'dis6502.py')); dis = importlib.util.module_from_spec(spec); spec.loader.exec_module(dis)
 def num(t):
     t = t.strip()
     return int(t[1:], 16) if t.startswith('$') else int(t, 16) if t.lower().startswith('0x') else int(t)

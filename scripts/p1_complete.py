@@ -54,7 +54,7 @@ def run(script, *extra):
     if r.returncode != 0 or not r.stdout.strip(): sys.exit('%s failed: %s' % (script, (r.stderr.strip().splitlines() or ['no output'])[-1]))
     return r.stdout
 rng = ['--range', args.range] if args.range else []
-raw = int(re.match(r'(\d+)', run('raw_refs.py', *rng)).group(1))
+raw = int(re.match(r'(\d+)', run('cpu/6502/raw_refs.py', *rng)).group(1))
 ph = r'\b(?:DAT|LAB|SUB|FUN|PTR|UNK|EXT|OFF|CODE|BYTE|WORD|DWORD|QWORD|ADDR|JT|thunk_FUN|switchD|caseD)_[0-9a-fA-F]{3,8}\b' + (('|' + args.extra) if args.extra else '')
 pat = re.compile(ph); found = []; ignored = [0]
 # Original-code trace comments may keep Ghidra names (decided with the user 2026-10-29: they exist to trace back to the original): an `XREF[...]` comment, its continuation
@@ -85,7 +85,7 @@ for f in sorted(set(files)):
             is_marker = m.group(0).startswith('TODO(name)')
             near = is_marker or any('TODO(name)' in FL[k] for k in range(max(0, n - 1 - NEAR), n))
             (marked if near and not m.group(0).startswith(('TODO(block)', 'STATUS')) else prov).append(item)
-_imm_out = run('addr_immediates.py', '--lo', str(args.lo), '--hi', str(args.hi), *rng)
+_imm_out = run('cpu/6502/addr_immediates.py', '--lo', str(args.lo), '--hi', str(args.hi), *rng)
 imm = int(re.search(r'(\d+) candidate', _imm_out).group(1))
 imm_named = _imm_out.count('(named variable')       # an address pair that IS a named variable's address: a raw operand in disguise (blocks like check 1)
 words = []

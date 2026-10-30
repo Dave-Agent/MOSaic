@@ -238,8 +238,8 @@ golden-record: (build "1")
 
 # What would break if the image or a variable moved (reloc_scan: indirect addressing, SMC, jmp (), code as data; reloc_hazards: aligned bases, guards, sprite pointers, file I/O).
 reloc phase=active_phase:
-    python3 -B {{skill}}/scripts/reloc_scan.py --root . --phase {{phase}}
-    python3 -B {{skill}}/scripts/reloc_hazards.py --root . --phase {{phase}}
+    python3 -B {{skill}}/scripts/cpu/6502/reloc_scan.py --root . --phase {{phase}}
+    python3 -B {{skill}}/scripts/cpu/6502/reloc_hazards.py --root . --phase {{phase}}
 
 # Relocation stress test: variants with N bytes inserted (and the same N taken from a dead pad), each run against the baseline (scripts/layout_fuzz.py, scripts/trace/layout_compare.py, references/testing.md).
 fuzz-layout *args:
@@ -251,7 +251,7 @@ check phase=active_phase:
     set -euo pipefail
     just verify {{phase}}
     if [ "{{phase}}" = "2" ]; then
-        python3 -B {{skill}}/scripts/raw_refs.py --root . --phase 2
+        python3 -B {{skill}}/scripts/cpu/6502/raw_refs.py --root . --phase 2
         python3 -B {{skill}}/scripts/comment_check.py --root . --phase 2
     fi
     just test {{phase}}

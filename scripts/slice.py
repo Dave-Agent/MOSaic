@@ -56,7 +56,7 @@ def check(root_):
     t = run([sys.executable, '-B', os.path.join(HERE, 'table_counts.py')] + ph, root_); res.append(('table_counts', True, (t.stdout.strip().split('\n') or [''])[0], True))
     t = run([sys.executable, '-B', os.path.join(HERE, 'port_scan.py')] + ph, root_); res.append(('port_scan', True, (t.stdout.strip().split('\n') or ['', ''])[1] if len(t.stdout.strip().split('\n')) > 1 else '', True))
     t = run([sys.executable, '-B', os.path.join(HERE, 'magic_scan.py')] + ph, root_); res.append(('magic_scan', True, (t.stdout.strip().split('\n') or [''])[0], True))
-    t = run([sys.executable, '-B', os.path.join(HERE, 'reloc_hazards.py')] + ph, root_); res.append(('reloc_hazards', True, (t.stdout.strip().split('\n') or [''])[0], True))
+    t = run([sys.executable, '-B', os.path.join(HERE, 'cpu', '6502', 'reloc_hazards.py')] + ph, root_); res.append(('reloc_hazards', True, (t.stdout.strip().split('\n') or [''])[0], True))
     root = old; w = max(len(n) for n, *_ in res)
     for n, good, msg, hint in res: print('%s  %-*s  %s' % ('hint' if hint else ('PASS' if good else 'FAIL'), w, n, msg))
     ok = all(g for _, g, _, h in res if not h); print('slice check: %s' % ('PASS' if ok else 'FAIL')); return ok

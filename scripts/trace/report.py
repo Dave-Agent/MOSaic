@@ -15,7 +15,7 @@ line comes from a table or another register), indirect entries (JMP (ind), RTS t
 unconditional backward JMP is a loop that never ends), subroutine entries with their JSR callers, and the byte classes: code, self-modifying (executed AND written),
 data written, data read only. Read-only; changes nothing. The image must be the one the runs started from, with the ORIGINAL layout, since the instructions are decoded from it."""
 import os, re, struct, sys, glob, collections
-HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, os.path.dirname(HERE))
+HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, os.path.dirname(HERE)); sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'cpu', '6502'))
 from _common import parser, config
 
 from optable import OPTABLE, OPS, LEN

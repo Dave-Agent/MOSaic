@@ -1,6 +1,6 @@
 # Platforms as data (issue #39)
 
-**Status: defined, not yet read.** `platforms/c64/platform.json` says what the tools assume about the C64 today; `scripts/platform.py` loads, validates and queries it. No tool reads it yet: moving them over is the work of the next phases. Scope: 6502-family machines only (#38 is the assembler question).
+**Status: defined, not yet read.** `platforms/c64/platform.json` says what the tools assume about the C64 today; `scripts/platforms.py` loads, validates and queries it. No tool reads it yet: moving them over is the work of the next phases. Scope: 6502-family machines only (#38 is the assembler question).
 
 ## What a platform is
 A platform is not one file. It is five things, and the descriptor holds the data and names the rest:
@@ -34,25 +34,25 @@ Addresses are hex strings without a prefix. Every section has a `used_by` list: 
 | `hardware_markers` | the KERNAL jump table, the raster register, the interrupt flags: what a port has to replace | `port_scan.py`, `platform_deps.py`, `reloc_hazards.py` |
 | `tracer` | the model's file and its start defaults | the tracer's callers |
 
-`platform.py visible c64 D000 05` answers "what does the CPU see at `$D000` when `$01` is `$05`?" from the banking rules; a self-test compares that with the tracer's own memory map for every value of `$01`, so the data and the code that will be replaced agree today.
+`platforms.py visible c64 D000 05` answers "what does the CPU see at `$D000` when `$01` is `$05`?" from the banking rules; a self-test compares that with the tracer's own memory map for every value of `$01`, so the data and the code that will be replaced agree today.
 
 ## Where the tools live
-The directories follow the same split as the descriptor. `references/tool_layout.tsv` is the plan (every tool, its axis, where it goes and why); `scripts/layout_plan.py check` fails when a tool is not in it, so a new script has to be classified.
+The directories follow the same split as the descriptor (a platform's data is in `platforms/<id>/`, its tools in `scripts/platform/<id>/`). `references/tool_layout.tsv` is the plan (every tool, its axis, where it goes and why); `scripts/layout_plan.py check` fails when a tool is not in it, so a new script has to be classified.
 
 | Axis | Where | What is there |
 |---|---|---|
 | **shared** | `scripts/` (and its subfolders by job: `refactor/`, `research/`, `golden/`, `coverage/`, `reference/`) | the process (slices, review, status, rules, questions, releases) and the source-text tools and checks; they read the descriptor for their parameters |
 | **cpu/6502** | `scripts/cpu/6502/` | what parses instructions and addressing modes: the decode table, the disassembler, raw operands, lo/hi immediate pairs, relocation scans, self-modifying sites, bytes-to-code |
-| **platform/c64** | `platforms/c64/tools/` (next to the descriptor), by job: `trace/` (the machine model and its environment), `emulator/` (VICE, the launcher), `video/` (the VIC-II renderer), `media/` (disk, tape) | machine behaviour: emulating the machine, driving its emulator, rendering its graphics, reading its media |
+| **platform/c64** | `scripts/platform/c64/`, by job: `trace/` (the machine model and its environment), `emulator/` (VICE, the launcher), `video/` (the VIC-II renderer), `media/` (disk, tape) | machine behaviour: emulating the machine, driving its emulator, rendering its graphics, reading its media |
 | **backend/ghidra** | `scripts/ghidra/` | the disassembler backend (unchanged: it is already its own directory) |
 
 **The rule of placement: a tool is placed by what it cannot do without.** A tool that needs only parameters (a mirror step, a vector address, a ROM name, a chip's scope) stays shared and reads the descriptor; one that contains behaviour moves. Of 113 files, 76 stay shared, 11 go to the CPU directory, 21 to the C64's, and 5 are the Ghidra backend.
 
-**What changes in the code.** The tools that move are mostly entered by name from the justfile. A tool deeper in the tree finds the skill by walking up to `SKILL.md`, not by a fixed number of `..`. The shared tools that import the tracer's environment (`golden.py`, the coverage and entry-point tools, `layout_compare.py`) get the platform's machine through `platform.py` instead of an import: this is the machine model's interface (open question below). **Existing projects** keep working: a project's justfile has the old paths, so each moved tool leaves a small forwarding stub at its old path until the next major version.
+**What changes in the code.** The tools that move are mostly entered by name from the justfile. A tool deeper in the tree finds the skill by walking up to `SKILL.md`, not by a fixed number of `..`. The shared tools that import the tracer's environment (`golden.py`, the coverage and entry-point tools, `layout_compare.py`) get the platform's machine through `platforms.py` instead of an import: this is the machine model's interface (open question below). **Existing projects** keep working: a project's justfile has the old paths, so each moved tool leaves a small forwarding stub at its old path until the next major version.
 
 ## Phases
 1. **Define (done on this branch).** The C64 as data, the loader and validator, tests that tie the data to the code it will replace, this page.
-2. **Move the tools** into the layout above (the plan is checked by `layout_plan.py`), with forwarding stubs at the old paths; the self-tests and a replay of a real project must pass unchanged.
+2. **Move the tools** into the layout above (the plan is checked by `layout_plan.py`), with forwarding stubs at the old paths; the self-tests and a replay of a real project must pass unchanged. **CPU tools: done** (11 tools in `scripts/cpu/6502/`, each old path a stub that `layout_plan.py check` verifies; `import optable` through the old path still works; a real project's gates and its old `justfile` give identical results). **Platform tools: to do** (21, to `scripts/platform/c64/`).
 3. **Read-only consumers.** Move the tools that only look things up onto the descriptor, one at a time: the mirror and vector tables of `apply_libs.py`, `port_scan.py` and `platform_deps.py`, the I/O exclusion of `raw_refs.py`, the ROM names of `check_env.py`, the dump-noise defaults of `golden.py`. Each swap must change no output on the existing projects (the byte-identical gate, the self-tests, a replay of a real project).
 4. **The machine model.** Split `c64trace.c` into a CPU core and a machine file so another machine can be added without touching the core; the machine reads its parameters from the descriptor.
 5. **Emulator and media adapters.** A small interface (start unattended, monitor, screenshot, scratch copy of the medium) with VICE as the first implementation; the media tools selected by `media.types`.

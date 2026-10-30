@@ -28,7 +28,7 @@ The skill and its agents refer to recipes by **role**, because projects do not a
 | Role | Usual name | If the project has none |
 |---|---|---|
 | assemble, no diff | `build` (older name `experiment`, or `assemble`) | run `framework/scripts/build.sh` |
-| phase 2 gate | `check` | run its parts: build phase 2, `scripts/raw_refs.py`, align check, the tests, the golden traces |
+| phase 2 gate | `check` | run its parts: build phase 2, `scripts/cpu/6502/raw_refs.py`, align check, the tests, the golden traces |
 | tests | `test` | run the project's test runner directly |
 | list TODO markers | `todo [tag]` (or `todos`, `p2todos`) | `grep -rn 'TODO(' phase*/src` |
 | list sections | `sections` | `grep -rn 'SECTION:' phase*/src` |

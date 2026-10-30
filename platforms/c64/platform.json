@@ -40,7 +40,7 @@
       "doc": "Only the low three bits of $01 select the memory map (a game that runs with $01 = $35 has everything but I/O out, so its interrupts use the RAM vectors under the KERNAL). Writes always go to the RAM under a ROM."
     },
     "rom_images": {"kernal": "kernal-901227-03.bin", "basic": "basic-901226-01.bin", "character": "chargen-901225-01.bin"},
-    "used_by": ["scripts/trace/c64trace.c", "scripts/trace/rom_dir.py", "scripts/check_env.py", "scripts/raw_refs.py"]
+    "used_by": ["scripts/trace/c64trace.c", "scripts/trace/rom_dir.py", "scripts/check_env.py", "scripts/cpu/6502/raw_refs.py"]
   },
 
   "chips": [
@@ -109,7 +109,7 @@
     "kernal_jump_table": {"lo": "FF81", "hi": "FFF5"},
     "raster_register": "D012",
     "interrupt_flags": ["D019", "DC0D", "DD0D"],
-    "used_by": ["scripts/port_scan.py", "scripts/platform_deps.py", "scripts/reloc_hazards.py"]
+    "used_by": ["scripts/port_scan.py", "scripts/platform_deps.py", "scripts/cpu/6502/reloc_hazards.py"]
   },
 
   "tracer": {

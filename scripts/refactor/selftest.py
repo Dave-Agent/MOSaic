@@ -126,13 +126,13 @@ BIT_SRC = '''
       rts                // [0807:60 RTS]
 '''
 d5 = project(BIT_SRC); m5 = tsv(d5, 'b.tsv', [['0804', 'value_is_zero']])
-r = tool('bitskip.py', d5, m5)
+r = tool('../cpu/6502/bitskip.py', d5, m5)
 check('bitskip: a side word warns', 'WARNING' in r.stdout and 'zero' in r.stdout, r.stdout + r.stderr)
-r = tool('bitskip.py', d5, m5, '--accept', 'value_is_zero')
+r = tool('../cpu/6502/bitskip.py', d5, m5, '--accept', 'value_is_zero')
 check('bitskip: --accept silences the warning and lists it once', 'WARNING' not in r.stdout and r.stdout.count('accepted after review') == 1 and 'value_is_zero' in r.stdout and ' 0 warning' in r.stdout, r.stdout + r.stderr)
-r = tool('bitskip.py', d5, m5, '--accept', 'some_other_name')
+r = tool('../cpu/6502/bitskip.py', d5, m5, '--accept', 'some_other_name')
 check('bitskip: accepting another name does not silence it', 'WARNING' in r.stdout, r.stdout)
-r = tool('bitskip.py', d5, tsv(d5, 'b2.tsv', [['0804', 'value_is_zero', '', 'accept']]))
+r = tool('../cpu/6502/bitskip.py', d5, tsv(d5, 'b2.tsv', [['0804', 'value_is_zero', '', 'accept']]))
 check('bitskip: the accept column works', 'WARNING' not in r.stdout and 'accepted after review' in r.stdout, r.stdout)
 
 # ---- 4. anon_labels.py --check: a reference that crosses a routine boundary -----------------------------------------------------------------------------------
@@ -179,7 +179,7 @@ def conv(src, rng, names=(), locs=(), extra=(), ref=None, write=False):
     if names: a_ += ['--names', tsv(dd, 'n.tsv', names)]
     if locs: a_ += ['--locals', tsv(dd, 'l.tsv', locs)]
     if write: a_ += ['--write']
-    return dd, subprocess.run([sys.executable, '-B', os.path.join(HERE, 'bytes_to_code.py')] + a_ + ['--root', dd, '--main', 'main.asm'], capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    return dd, subprocess.run([sys.executable, '-B', os.path.join(HERE, '..', 'cpu', '6502', 'bytes_to_code.py')] + a_ + ['--root', dd, '--main', 'main.asm'], capture_output=True, text=True, stdin=subprocess.DEVNULL)
 GOOD = [0xa2, 0x03, 0xca, 0xd0, 0xfd, 0x8d, 0x20, 0xd0, 0x60]
 dd, r = conv(CODE_ROWS, '0800-0808', [('D020', 'VIC.BORDER')], [('0802', 'loop')], ['--scope', 'Routine'], ref=GOOD, write=True); t = text(dd)
 want = ['Routine: {', '  ldx #$03', '// [0800:a2 03    LDX #$03]', 'loop:', '  dex', 'bne loop', '// [0803:d0 fd    BNE $0802]', 'sta VIC.BORDER', '// [0805:8d 20 d0 STA $d020]', '} // Routine']

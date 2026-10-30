@@ -235,13 +235,12 @@ def _st(cfg_extra, contract=False):
 check('status: LAUNCH_MODE=inject with no docs/start_contract.md prints the start warning, naming the setting', 'WARNING start' in _st('LAUNCH_MODE="inject"\n') and 'LAUNCH_MODE=inject' in _st('LAUNCH_MODE="inject"\n'))
 check('status: disk mode, SMOKE_MODE=inject and LAUNCH_POKES each warn', all('WARNING start' in _st(x) for x in ('LAUNCH_MODE="disk"\n', 'SMOKE_MODE="inject"\n', 'LAUNCH_POKES="d01c=ff"\n')))
 check('status: a recorded start contract silences it, and sys mode (or no key) never warns', 'WARNING start' not in _st('LAUNCH_MODE="inject"\n', contract=True) and 'WARNING start' not in _st('LAUNCH_MODE="sys"\n') and 'WARNING start' not in _st(''))
-# ---- platform.py: the descriptor is valid, and it says what the code it will replace does today ------------------------------------------------------------------------
-import platform as _pyplat; del _pyplat      # (the stdlib module; ours is imported by file below)
+# ---- platforms.py: the descriptor is valid, and it says what the code it will replace does today ------------------------------------------------------------------------
 import importlib.util as _iu2
-_ps = _iu2.spec_from_file_location('mosaic_platform', os.path.join(HERE, 'platform.py')); _pf = _iu2.module_from_spec(_ps); _ps.loader.exec_module(_pf)
+_ps = _iu2.spec_from_file_location('mosaic_platforms', os.path.join(HERE, 'platforms.py')); _pf = _iu2.module_from_spec(_ps); _ps.loader.exec_module(_pf)
 _c64 = _pf.load('c64')
 check('platform c64: the descriptor is valid', _pf.validate(_c64) == [], _pf.validate(_c64))
-check('platform: `platform.py check` passes on every descriptor', subprocess.run([sys.executable, '-B', os.path.join(HERE, 'platform.py'), 'check'], capture_output=True, text=True).returncode == 0)
+check('platform: `platforms.py check` passes on every descriptor', subprocess.run([sys.executable, '-B', os.path.join(HERE, 'platforms.py'), 'check'], capture_output=True, text=True).returncode == 0)
 def _oracle(a, b):      # the memory map as scripts/trace/c64trace.c reads it (its read path): BASIC needs LORAM and HIRAM, the D000 area needs LORAM or HIRAM (I/O with CHAREN, else character ROM), the KERNAL needs HIRAM
     if 0xA000 <= a < 0xC000 and (b & 3) == 3: return 'BASIC ROM'
     if 0xD000 <= a < 0xE000 and (b & 3): return 'I/O area' if b & 4 else 'character ROM'
@@ -270,7 +269,6 @@ check('platform validate: overlapping regions, a gap, a bad hex value, a chip ou
 _pp = project('Start:\n  rts  // [0800:60 RTS]\n')
 check('platform for_project: a project with no PLATFORM key is the c64', _pf.for_project(_pp)['id'] == 'c64')
 open(os.path.join(_pp, 'project.config'), 'a').write('PLATFORM="nes"\n')
-_r = subprocess.run([sys.executable, '-B', '-c', 'import sys; sys.path.insert(0, %r); import platform as p; print(1)' % HERE], capture_output=True, text=True)
 try: _pf.for_project(_pp); _ok = False
 except SystemExit as _e: _ok = 'no platform' in str(_e) and 'c64' in str(_e)
 check('platform for_project: an unknown PLATFORM names the platforms there are', _ok)
@@ -279,13 +277,28 @@ check('platform for_project: an unknown PLATFORM names the platforms there are',
 _r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_plan.py'), 'check'], capture_output=True, text=True)
 check('layout plan: every file under scripts/ has a row in references/tool_layout.tsv, every row exists (a new script must be classified)', _r.returncode == 0, _r.stdout)
 _pl = [l.split('\t') for l in open(os.path.join(HERE, '..', 'references', 'tool_layout.tsv')) if l.strip() and not l.startswith('#')]
-check('layout plan: the platform and CPU axes carry a reason for every tool that moves, and the targets are inside platforms/c64/tools or cpu/6502', all(r[3].strip() for r in _pl if r[1] in ('platform/c64', 'cpu/6502')) and all(r[2].startswith('../platforms/c64/tools/') for r in _pl if r[1] == 'platform/c64') and all(r[2].startswith('cpu/6502/') for r in _pl if r[1] == 'cpu/6502'))
+check('layout plan: the platform and CPU axes carry a reason for every tool that moves, and the targets are inside platform/c64 or cpu/6502', all(r[3].strip() for r in _pl if r[1] in ('platform/c64', 'cpu/6502')) and all(r[2].startswith('platform/c64/') for r in _pl if r[1] == 'platform/c64') and all(r[2].startswith('cpu/6502/') for r in _pl if r[1] == 'cpu/6502'))
+
+# ---- the CPU tools moved to scripts/cpu/6502/: the old paths still work through forwarding stubs -------------------------------------------------------------------
+_stubs = [l.split('\t') for l in open(os.path.join(HERE, '..', 'references', 'tool_layout.tsv')) if l.strip() and not l.startswith('#')]
+_stubs = [(p, t_) for p, ax, t_, w in _stubs if p != t_ and ax == 'cpu/6502']
+check('cpu move: the eleven CPU tools are in scripts/cpu/6502/ and each old path is a forwarding stub', len(_stubs) == 11 and all(os.path.exists(os.path.join(HERE, t_)) and 'MOVED to' in open(os.path.join(HERE, p)).read() for p, t_ in _stubs), _stubs)
+_old = project('Main:\n  lda $1234        // [0800:ad 34 12 LDA $1234]\n  rts              // [0803:60 RTS]\n')
+def _run(script): return subprocess.run([sys.executable, '-B', os.path.join(HERE, script), '--root', _old, '--main', 'main.asm'], capture_output=True, text=True)
+_o, _n = _run('raw_refs.py'), _run('cpu/6502/raw_refs.py')
+check('cpu move: the old path (a stub) and the new one give the same output and exit status', _o.returncode == _n.returncode and _o.stdout == _n.stdout and 'FAIL no-raw-operands: 1 place' in _o.stdout, _o.stdout + _o.stderr)
+_r = subprocess.run([sys.executable, '-B', '-c', 'import sys; sys.path.insert(0, %r); import optable; print(len(optable.OPS), optable.__file__)' % HERE], capture_output=True, text=True)
+check('cpu move: `import optable` through the old path gives the real module (a project test or tool that imports it still works)', _r.returncode == 0 and 'cpu/6502/optable.py' in _r.stdout, _r.stdout + _r.stderr)
+_r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'refactor', 'bytes_to_code.py'), '--help'], capture_output=True, text=True)
+check('cpu move: a stub in a subfolder (refactor/bytes_to_code.py) forwards too', _r.returncode == 0 and 'bytes_to_code' in (_r.stdout + _r.stderr), _r.stdout[:200] + _r.stderr[:200])
+_l = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_plan.py'), 'check'], capture_output=True, text=True)
+check('cpu move: layout_plan check passes (a missing or edited stub fails it)', _l.returncode == 0, _l.stdout)
 
 # ---- code_to_bytes.py: instructions the export read from data go back to .byte rows -------------------------------------------------------------------------------
 d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'src'))
 with open(os.path.join(d, 'project.config'), 'w') as f: f.write('SRC_MAIN="src/m.asm"\n')
 with open(os.path.join(d, 'src', 'm.asm'), 'w') as f: f.write('.pc = $1000 "x"\nstart:\n  ror $fc55,x // [1000:7e 55 fc ROR $fc55,X]\n  brk // [1003:00       BRK]\nafter:\n  rts // [1004:60       RTS]\n')
-c2b = os.path.join(HERE, 'refactor', 'code_to_bytes.py')
+c2b = os.path.join(HERE, 'cpu', '6502', 'code_to_bytes.py')
 r = subprocess.run([sys.executable, '-B', c2b, '--root', d, '--main', 'src/m.asm', '--range', '1000-1003', '--write'], capture_output=True, text=True)
 t = open(os.path.join(d, 'src', 'm.asm')).read()
 check('code_to_bytes: instructions become one .byte row with the original address', '.byte $7e,$55,$fc,$00 // [1000]' in t and 'rts' in t and 'ror' not in t, r.stdout + r.stderr + t)
@@ -300,9 +313,9 @@ AI = """  lda #$66                            // [0900:a9 66    LDA #$66]
 """
 def with_vars(src):
     d = project('#import "variables.asm"\n' + src); open(os.path.join(d, 'variables.asm'), 'w').write('.label ptr = $02\n.label ptr_hi = $03\n.label counter = $0466\n'); return d
-r = tool('addr_immediates.py', with_vars(AI))
+r = tool('cpu/6502/addr_immediates.py', with_vars(AI))
 check('addr_immediates: a lo/hi pair that is the address of a named variable below the image is reported', '(named variable counter)' in r.stdout and '1 candidate' in r.stdout, r.stdout + r.stderr)
-r = tool('addr_immediates.py', with_vars('  // NOT-ADDRESS: two values\n' + AI))
+r = tool('cpu/6502/addr_immediates.py', with_vars('  // NOT-ADDRESS: two values\n' + AI))
 check('addr_immediates: NOT-ADDRESS waives a pair', '0 candidate' in r.stdout, r.stdout + r.stderr)
 BAN = lambda n, a, b: '// SECTION: %s\n// RANGE:   $%04X-$%04X\n// STATUS:  understood\n// SUMMARY: x\n  nop  // [%04X:ea       NOP]\n' % (n, a, b, a)
 r = tool('section_coverage.py', project(BAN('one', 0x800, 0x80F) + BAN('two', 0x810, 0x81F)))
@@ -330,7 +343,7 @@ RH = """Go:
 buf2:
   .byte 1 // [2000]
 """
-r = tool('reloc_hazards.py', project(RH))
+r = tool('cpu/6502/reloc_hazards.py', project(RH))
 check('reloc_hazards: aligned base, raw sprite pointer and an end guard on a page-aligned label are reported', 'aligned-base 1' in r.stdout and 'sprite-ptr 1' in r.stdout and 'end-guard 1' in r.stdout, r.stdout + r.stderr)
 # ---- version_check.py: how far behind, and silent when it cannot tell -----------------------------------------------------------------------------------------
 sys.path.insert(0, HERE); import version_check as _vc
@@ -429,14 +442,14 @@ _p = project('''
       lda $1234        // [0800:ad 34 12 LDA $1234]
       rts              // [0803:60 RTS]
 ''')
-_r = tool('raw_refs.py', _p); check('rules: raw_refs prints `FAIL no-raw-operands: 1 place` for a raw operand', 'FAIL no-raw-operands: 1 place' in _r.stdout, _r.stdout + _r.stderr)
+_r = tool('cpu/6502/raw_refs.py', _p); check('rules: raw_refs prints `FAIL no-raw-operands: 1 place` for a raw operand', 'FAIL no-raw-operands: 1 place' in _r.stdout, _r.stdout + _r.stderr)
 _p = project('''
     Main:
       lda Var          // [0800:ad 34 12 LDA Var]
       rts              // [0803:60 RTS]
     .label Var = $1234
 ''')
-_r = tool('raw_refs.py', _p); check('rules: raw_refs prints `PASS no-raw-operands: 0 places` when there is none', 'PASS no-raw-operands: 0 places' in _r.stdout, _r.stdout + _r.stderr)
+_r = tool('cpu/6502/raw_refs.py', _p); check('rules: raw_refs prints `PASS no-raw-operands: 0 places` when there is none', 'PASS no-raw-operands: 0 places' in _r.stdout, _r.stdout + _r.stderr)
 _p = project('// ' + 'x' * 140 + '\nMain:\n  rts   // [0800:60 RTS]\n')
 _r = tool('comment_check.py', _p); check('rules: comment_check names the rule: `FAIL comment-width: 1 place`', 'FAIL comment-width: 1 place' in _r.stdout and _r.returncode == 1, _r.stdout + _r.stderr)
 _p = project('// ' + 'x' * 140 + '\nMain:\n  rts   // [0800:60 RTS]\n'); os.makedirs(os.path.join(_p, 'tools'), exist_ok=True)
