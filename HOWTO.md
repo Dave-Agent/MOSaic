@@ -56,9 +56,9 @@ Your file is copied into the project's `originals/` folder and its SHA-256 recor
 
 **Goal:** an `.asm` source that assembles byte for byte to the original game and starts. This is one job in seven parts (research, extracting the files, the clean reference, the Ghidra export, the first build, naming the hardware registers, starting the game; see Appendix A), and there is no point at which you would want to stop in the middle.
 
-Open Claude Code in the project folder and say:
+Open Claude Code in the project folder and say **"move to the next stage"**, or, to be explicit:
 
-> Use the MOSaic skill. Do HOWTO step 2: create a source that builds and starts this game, without stopping between its parts.
+> Use the MOSaic skill. Create a source that builds and starts this game, without stopping between its parts.
 
 The agent tells you each part as it starts and stops early only if it needs something from you: a decision, a missing tool, or a failure it cannot resolve.
 
@@ -74,7 +74,7 @@ The agent tells you each part as it starts and stops early only if it needs some
 
 Say "yes" to the question after step 2, or:
 
-> Use the MOSaic skill. Do HOWTO step 3: phase 1, naming every routine. Work in slices, and ask me what a thing is only after trying the code and a tracer run.
+> Use the MOSaic skill. Do phase 1: name every routine. Work in slices, and ask me what a thing is only after trying the code and a tracer run.
 
 The agent names things from evidence only (the code plus a tracer observation). It **asks you** one question at a time about what a thing is to a player, with a picture, and records each answer in `docs/user_answers.md`. It never asks what the code does.
 
@@ -88,7 +88,7 @@ The agent names things from evidence only (the code plus a tracer observation). 
 
 Say "yes" to the question after step 3, or:
 
-> Use the MOSaic skill. Do HOWTO step 4: refactor this game for phase 2, without stopping between its parts, and stop before the removals.
+> Use the MOSaic skill. Refactor this game for phase 2, without stopping between its parts, and stop before the removals.
 
 The agent tells you each part as it starts.
 

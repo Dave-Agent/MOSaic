@@ -51,5 +51,5 @@ if not args.no_git and not os.path.isdir(os.path.join(root, '.git')):
 if not args.no_next: print('''
 Next:
   1. cd into the project and run `just env` to check the tools, then `just status` to see where you are.
-  2. Open Claude Code in the project folder and say: "Use the MOSaic skill. Do HOWTO step 2: create a source that builds and starts this game, without stopping between its parts."
+  2. Open Claude Code in the project folder and say: "Use the MOSaic skill. Create a source that builds and starts this game, without stopping between its parts."
      Afterwards, "move to the next stage" does the next step. The full step-by-step is HOWTO.md in the skill (step 2 covers this stage).''')
