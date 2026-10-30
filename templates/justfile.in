@@ -61,7 +61,7 @@ reference:
 # The whole derivation from the medium to the reference.
 derive: dumps vote decrunch reference
 
-# Stage 5a: run the game in the tracer from the hand-off with seeded fuzz (press SEED_JOY1 values) and write the Ghidra seeds from what executed.
+# Stage 5a: run the game in the tracer from the hand-off with seeded fuzz (joystick presses fuzzed unless SEED_JOY1/SEED_JOY2 hold a value) and write the Ghidra seeds from what executed.
 seeds:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -70,9 +70,20 @@ seeds:
     mkdir -p build/trace tools/ghidra
     [ -x build/trace/c64trace ] || gcc -O2 -o build/trace/c64trace {{skill}}/scripts/trace/c64trace.c
     rm -f build/trace/cov.*
+    # Input: an empty SEED_JOY1/SEED_JOY2 leaves that joystick to the tracer's random presses (a menu needs them); a value holds it (ff = nothing pressed).
+    # SEED_EXTRA adds tracer arguments, e.g. --joy2-at 100=ef --joy2-at 110=ff (fire pulsed at frame 100).
+    inp=()
+    [ -n "${SEED_JOY1:-}" ] && inp+=(--joy1 "$SEED_JOY1")
+    [ -n "${SEED_JOY2:-}" ] && inp+=(--joy2 "$SEED_JOY2")
+    : > build/trace/seed_runs.txt
     for s in $(seq 1 "${SEED_RUNS:-6}"); do
-        build/trace/c64trace --ram dumps/handoff.bin --rom-dir {{rom_dir}} --out build/trace/cov --pc "$HANDOFF_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port 35 --frames "${SEED_FRAMES:-6000}" --seed $s --chaos 6 --joy1 "${SEED_JOY1:-ff}" --joy2 "${SEED_JOY2:-ff}" | tail -1 || true
+        # shellcheck disable=SC2086  # SEED_EXTRA is a list of arguments on purpose
+        build/trace/c64trace --ram dumps/handoff.bin --rom-dir {{rom_dir}} --out build/trace/cov --pc "$HANDOFF_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port 35 --frames "${SEED_FRAMES:-6000}" --seed $s --chaos 6 ${inp[@]+"${inp[@]}"} ${SEED_EXTRA:-} | tail -1 | tee -a build/trace/seed_runs.txt || true
     done
+    # The same address count in every run means the input never changed what the game did (stuck on a title or menu?).
+    if [ "$(awk '{for(i=1;i<NF;i++) if($(i+1)=="distinct") print $i}' build/trace/seed_runs.txt | sort -u | wc -l)" = 1 ] && [ "$(wc -l < build/trace/seed_runs.txt)" -gt 2 ]; then
+        echo "WARNING: every run executed the same number of addresses: the game probably never got past a title or menu. Leave SEED_JOY1/SEED_JOY2 empty, or press what it waits for with SEED_EXTRA (--joy2-at FRAME=VALUE ...)." >&2
+    fi
     python3 -B {{skill}}/scripts/ghidra/make_seeds.py --root . --reference "$REFERENCE_PRG" --base "${LOAD_ADDRESS#0x}" --out tools/ghidra/seeds.txt --entry "$HANDOFF_PC:hand-off" --vectors dumps/handoff.bin --edges build/trace/cov.edges --executed build/trace/cov.flags
 
 # First conversion step after the first byte-identical build: name the hardware registers with the libs (names only; the gate must stay green).

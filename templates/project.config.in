@@ -42,8 +42,9 @@ DECRUNCH_P="34"
 DECRUNCH_PORT="34"
 HANDOFF_PC=""                  # the tracer stops here (the depacker's exit = the game's entry) and dumps RAM: the reference is that state
 # --- Seeds for Ghidra (the game's own behaviour, from the tracer; stage 5) ---
-SEED_JOY1="ff"                 # joystick 1 value held during the coverage run (ff = nothing pressed; ef = fire): press what the game waits for
-SEED_JOY2="ff"
+SEED_JOY1=""                   # joystick 1 during the coverage run: empty = random presses (fuzzed: gets past a menu); a value holds it (ff = nothing pressed, ef = fire)
+SEED_JOY2=""
+SEED_EXTRA=""                  # extra tracer arguments, e.g. "--joy2-at 100=ef --joy2-at 110=ff" (fire pulsed at frame 100). A --joy1-at or --joy2-at switches the fuzzers off.
 SEED_FRAMES="6000"
 SEED_RUNS="6"
 
