@@ -196,7 +196,7 @@ verify phase=active_phase:
 launch phase=active_phase: (build phase)
     #!/usr/bin/env bash
     set -euo pipefail
-    extra=(); if [ "{{phase}}" = "2" ]; then extra=(--prg build/p2/game.prg --symbols "$(ls -t build/p2/*.vs | head -1)"); fi
+    extra=(); if [ "{{phase}}" = "2" ]; then extra=(--mode sys --prg build/p2/game.prg --symbols "$(ls -t build/p2/*.vs | head -1)"); fi      # phase 2 never injects state: whatever the game needs at start is code in its Boot routine
     python3 -B {{skill}}/scripts/launcher/run_game.py --root . ${extra[@]+"${extra[@]}"}
 
 # Unattended start test (about 20 s): boot a phase headless in VICE (warp), screenshot after SMOKE_CYCLES, fail when the game did not start or the picture differs from the reference (tools/smoke_ref.png; the first run creates it: look at it once and commit it).

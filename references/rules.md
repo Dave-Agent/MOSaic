@@ -53,6 +53,7 @@ Every rule has a short name that says what is wrong and does not change when rul
 | `emulator-tests-unattended` | review | a reviewer | none | Emulator tests run unattended and are judged by screenshot, not by a PC sample; the emulator never takes the desktop focus. |
 | `originals-never-attached` | review | a reviewer | none | An original is never attached to an emulator directly: VICE runs scratch copies. |
 | `slice-reviewed` | check | `review.py`, `slice.py` | SLICE_REVIEW="off" in project.config, or `slice-merge --skip-review "reason"` (recorded in docs/reviews/) | A slice is reviewed by a second agent (the Challenger) before it merges: a record for the slice's current diff, answering every review rule, with VERDICT: PASS. |
+| `self-contained-start` | review | a reviewer | `docs/start_contract.md` lists what an inject launch of phase 1 needs and why the game cannot set it itself | The build starts at a point in the game's own code with a plain boot (`LAUNCH_MODE=sys`); phase 1 may use `inject` only as a recorded fallback, and phase 2 never: its start contract is code in the Boot routine. |
 
 <!-- RULES-TABLE:END -->
 
