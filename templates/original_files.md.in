@@ -1,0 +1,9 @@
+# The original game's files (for the repository owner)
+
+**No game binary is in this repository by default** (`reference.sha256` holds the SHA-256 the build is checked against). MOSaic keeps the game's files out of git because the game belongs to its rights holders, and a public repository would redistribute it. That is a recommendation, not a rule: it is your repository, and some people want a self-contained one. If you commit them, do it knowingly, and remove `/originals/`, `/dumps/` and `/reference/` from `.gitignore`.
+
+## What needs them
+Building needs nothing from the original. These do: `just verify` and `just check` (they compare with the original), `just derive` and `just reference` (they make the reference), and `just launch` when `LAUNCH_MODE` in `project.config` is `inject` or `disk` (it restores a memory dump taken from the original, or boots the real medium).
+
+## Supplying them
+Put the media in `originals/` (read-only, SHA-256 in `originals.sha256`; **never attach an original to an emulator directly**: VICE writes disk images back), then `just derive` (`just reference-prg` when the target is a PRG file). Deriving also needs `c1541`, `gcc` and, for the Ghidra export, Ghidra 11+ (the Kick Assembler exporter script is fetched automatically, pinned, on first use). The MOSaic skill (`~/.claude/skills/mosaic`, or set `MOSAIC`) provides the scripts the `just` recipes call.

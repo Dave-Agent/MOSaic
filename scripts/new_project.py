@@ -3,7 +3,7 @@
 
   new_project.py --root DIR --name "Game Name" [--media FILE ...] [--protect] [--no-git] [--force]
 
-Creates in DIR (made if missing): project.config, justfile, README.md, .gitignore, docs/background.md and docs/boot_analysis.md (templates to fill in), tools/reference.spec,
+Creates in DIR (made if missing): project.config, justfile, README.md, .gitignore, docs/background.md, docs/boot_analysis.md and docs/original_files.md (templates to fill in), tools/reference.spec,
 phase1/src/libs/ (the skill's hardware libs), framework/ (a copy of the skill's master), and the empty dirs the recipes use (originals, dumps, reference, build).
 --media FILE   copy a medium into DIR/originals/ if it is not there already (the original file is never modified)
 --handoff-media NAME  which file in originals/ the hand-off dumps are taken from (default: the first image alphabetically, with a warning when there are several)
@@ -42,7 +42,7 @@ if target == 'prg':      # the reference is the PRG itself: its first two bytes 
         c = c.replace('REFERENCE_IS_RAW="true"', 'REFERENCE_IS_RAW="false"       # the reference is a PRG file, header included; the tools read its load address from the header').replace('LOAD_ADDRESS="0x0800"          # first address of the reference image; set it with REF_KEEP below', '# LOAD_ADDRESS is not set: it comes from the PRG header (if you set it, it must agree)')
         open(cp, 'w').write(c); print('target: the PRG file itself (REFERENCE_IS_RAW="false"); `just reference` copies it from originals/')
 put('justfile', 'justfile.in'); put('README.md', 'README.md.in'); put('.gitignore', 'gitignore.in')
-put('docs/background.md', 'background.md.in'); put('docs/boot_analysis.md', 'boot_analysis.md.in'); put('tools/reference.spec', 'reference.spec.in')
+put('docs/background.md', 'background.md.in'); put('docs/boot_analysis.md', 'boot_analysis.md.in'); put('docs/original_files.md', 'original_files.md.in'); put('tools/reference.spec', 'reference.spec.in')
 for f in glob.glob(os.path.join(SKILL, 'libs', '*.asm')):
     d = os.path.join(root, 'phase1/src/libs', os.path.basename(f))
     if not os.path.exists(d) or args.force: shutil.copy2(f, d)
