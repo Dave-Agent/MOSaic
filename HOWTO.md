@@ -114,7 +114,7 @@ The agent tells you each part as it starts.
 
 Say "yes" to the review question.
 
-The agent lists every dead block with its size. **You decide which may go**; it records your answer in `docs/user_answers.md`. It removes each approved block leaving a hole, so nothing else moves, and records any bugs of the original it finds (kept, not fixed).
+The agent lists every dead block with its size. **You decide which may go**; it records your answer in `docs/user_answers.md` and the list of removals in `docs/phase2_removals.md`. It removes each approved block leaving a hole, so nothing else moves, and records any bugs of the original it finds (kept, not fixed).
 
 `just verify 2` then passes only when every changed byte is inside the removed ranges.
 

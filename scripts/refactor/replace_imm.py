@@ -13,6 +13,8 @@ from _common import parser, main_file, code_files, read_tsv, split_comment, writ
 a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('map')
 args = a.parse_args(); main = main_file(args)
 mp = {int(p[0].lstrip('$'), 16): p[1].strip() for p in read_tsv(args.map)}
+bad = [(hex(k), v) for k, v in mp.items() if v.startswith('#')]
+if bad: sys.exit('the expression is written WITHOUT the `#` (the instruction already has one; it would become `##`): ' + ', '.join('%s -> %s' % b for b in bad[:5]))
 done = set(); changed = {}
 for f in code_files(main):
     L = open(f).read().split('\n')

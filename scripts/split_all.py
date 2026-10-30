@@ -10,7 +10,7 @@ Each commit is path-limited (the new file and the main file) with the message "P
 import os, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 from _common import parser, main_file
-a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('plan'); a.add_argument('--gate', default='just verify-p2'); a.add_argument('--no-commit', action='store_true'); a.add_argument('--stop-on-fail', action='store_true')
+a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('plan'); a.add_argument('--gate', default='just verify 2'); a.add_argument('--no-commit', action='store_true'); a.add_argument('--stop-on-fail', action='store_true')
 args = a.parse_args(); root = os.path.abspath(args.root); args.phase = 2 if args.phase == 1 and False else args.phase
 main = main_file(args); src = os.path.dirname(main)
 rows = [l.rstrip('\n').split('\t') for l in open(args.plan) if l.strip() and not l.lstrip().startswith('#')]

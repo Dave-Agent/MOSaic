@@ -28,6 +28,7 @@ mkdir -p "$BUILD_DIR"
 # KickAssembler flags:
 #   -o            output PRG path
 #   -vicesymbols  emit VICE-format symbol file (.vs) next to output
+#   -symbolfile   emit the plain symbol file (.sym): Kick 5.x writes none without it, and the routine tests, golden traces and layout_compare read labels from it
 #   -debugdump    emit KickAss debug file (.dbg) for RetroDebugger
 # KickAss derives .vs/.dbg names from the output basename, so we point -o at
 # OUTPUT_PRG and let the sibling files fall out, then confirm they match config.
@@ -36,6 +37,7 @@ ASM_CMD=( "$JAVA" -jar "$KICKASS_JAR"
           -o "$OUTPUT_PRG"
           -odir "$BUILD_DIR"
           -vicesymbols
+          -symbolfile
           -debugdump )
 
 LOG="$(mktemp)"; trap 'rm -f "$LOG"' EXIT

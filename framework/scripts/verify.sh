@@ -121,6 +121,11 @@ if [ "$REF_SIZE" -ne "$OUT_SIZE" ]; then
     exit 1
 fi
 
+if [ "${C64_PHASE:-1}" = "2" ] && [ -n "${PHASE2_ALLOWED_DIFF:-}" ] && [ ! -f "$PHASE2_ALLOWED_DIFF" ]; then
+    echo "FAIL: PHASE2_ALLOWED_DIFF is set to '$PHASE2_ALLOWED_DIFF', which is not a file. It must be the path of a file of LO-HI hex ranges, one per line (ranges written in the variable itself are not read)."
+    exit 1
+fi
+
 # Phase 2, byte-changing steps with APPROVED changes (PHASE2_ALLOWED_DIFF: a file of `LO-HI` C64 address ranges in hex, one per line, `#` comments): the built image may differ from the reference
 # only inside those ranges (a removed block left as a hole, an operand rewritten on purpose); every other byte must be identical. A byte outside them fails the gate and names the first one.
 if [ "${C64_PHASE:-1}" = "2" ] && [ -n "${PHASE2_ALLOWED_DIFF:-}" ] && [ -f "$PHASE2_ALLOWED_DIFF" ] && ! cmp -s "$REFERENCE_PRG" "$BUILT_IMAGE"; then

@@ -21,8 +21,8 @@ st.append(('Project scaffolded', os.path.exists(P('project.config')) and os.path
 st.append(('Original medium in originals/', bool(media) and os.path.exists(P('originals.sha256')), '%d file(s), originals.sha256 %s' % (len(media), 'present' if os.path.exists(P('originals.sha256')) else 'missing'), 'Put the disk or tape image in originals/ (new_project.py --media) so its SHA-256 is recorded.', 'references/layout.md'))
 res = size('docs', 'gameplay.md') > 900 or size('docs', 'background.md') > 900
 st.append(('Research', res, 'docs/gameplay.md, docs/background.md filled' if res else 'docs still templates', 'Research the game: manual, release facts, POKE lists; write docs/gameplay.md and docs/background.md.', 'references/research.md'))
-bootdoc = size('docs', 'boot_analysis.md') > 1500 and bool(files('extracted/*'))
-st.append(('Files extracted, boot chain analysed', bootdoc, 'extracted/ and docs/boot_analysis.md', 'Extract the files (disk: c1541 / extract_files.py, tape: tap_extract.py), disassemble the boot stub, work out the boot chain.', 'references/new_game.md, stage 2'))
+bootdoc = size('docs', 'boot_analysis.md') > 1500      # the written analysis is the evidence; extracted/ is git-ignored and regenerable
+st.append(('Files extracted, boot chain analysed', bootdoc, 'docs/boot_analysis.md', 'Extract the files (disk: c1541 / extract_files.py, tape: tap_extract.py), disassemble the boot stub, work out the boot chain.', 'references/new_game.md, stage 2'))
 ref = (cfg.get('REFERENCE_PRG') and os.path.exists(P(cfg['REFERENCE_PRG']))) or bool(files('reference/*.bin'))
 st.append(('Clean reference derived', ref and os.path.exists(P('reference.sha256')), 'reference image + reference.sha256', 'Find the hand-off, dump RAM from a scratch copy, derive the game-only reference (tools/reference.spec, just derive).', 'references/new_game.md, stages 2-3'))
 gh = bool(files('ghidra/*.asm'))

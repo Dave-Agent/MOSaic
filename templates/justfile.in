@@ -132,7 +132,7 @@ ghidra:
 
 # Per-frame samples of variables under a scripted input (rung 3 evidence): just trace-run 'NAME_A NAME_B' '--joy2-at 5=ef' 300
 trace-run vars inputs="" frames="300":
-    . ./project.config; python3 -B {{skill}}/scripts/trace/sample_report.py --root . --phase 1 {{vars}} --run -- --ram dumps/handoff.bin --rom-dir {{rom_dir}} --pc "$HANDOFF_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port 35 --frames {{frames}} --seed 1 --chaos 6 --joy1 ff {{inputs}}
+    . ./project.config; python3 -B {{skill}}/scripts/trace/sample_report.py --root . --phase 1 {{vars}} --run -- --ram dumps/handoff.bin --rom-dir {{rom_dir}} --pc "${TRACE_ENTRY:-$HANDOFF_PC}" --sp "${TRACE_SP:-${DECRUNCH_SP:-fc}}" --p "${TRACE_P:-${DECRUNCH_P:-34}}" --port "${TRACE_PORT:-35}" --frames {{frames}} --seed 1 --chaos 6 --joy1 ff {{inputs}}
 
 # Render the game's graphics (character set, every sprite block of the VIC bank, the screen) as PNGs into docs/gfx/ with docs/gfx/index.md; extra options pass through, e.g. just gfx --sprites 30:57:3 --columns 0,1,2 --label player (scripts/render/README.md). Look at the pictures; attach one to a naming question.
 gfx *args:
