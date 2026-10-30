@@ -200,6 +200,18 @@ _ids = {x['id'] for x in _q}; _doc = open(os.path.join(HERE, '..', 'SKILL.md')).
 _used = set(re.findall(r'questions\.py show ([a-z0-9-]+)', _doc)); _used |= set(re.findall(r'`(step[2-5]-done)`', _doc))
 check('questions: every question id the docs name exists, and every question is asked from the docs', _used <= _ids and _ids <= _used, (_used - _ids, _ids - _used))
 
+# ---- run_game.py inject: the VIC registers the game configures are all restored (the multicolour register $D01C was skipped) ------------------------------------------
+import importlib.util as _iu3
+_rg = _iu3.spec_from_file_location('mosaic_run_game', os.path.join(HERE, 'launcher', 'run_game.py')); _rgm = _iu3.module_from_spec(_rg); _rg.loader.exec_module(_rgm)
+_vic = bytes(range(0x10, 0x50)); _cmds = _rgm.vic_restore_commands(_vic)
+_wr = {}
+for _c in _cmds:
+    _p = _c.split(); _a = int(_p[1], 16)
+    for _i, _b in enumerate(_p[2:]): _wr[_a + _i] = int(_b, 16)
+check('run_game inject: $D000-$D018, $D01A, $D01B-$D01D and $D020-$D02E are restored with the saved values', all(_wr.get(0xD000 + r) == _vic[r] for r in list(range(0x00, 0x19)) + [0x1A, 0x1B, 0x1C, 0x1D] + list(range(0x20, 0x2F))), sorted(set(range(0x2F)) - {r - 0xD000 for r in _wr}))
+check('run_game inject: the interrupt flags $D019 and the collision latches $D01E / $D01F are NOT written (a write clears the flags; a read clears the latches)', not any(a in _wr for a in (0xD019, 0xD01E, 0xD01F)), sorted(hex(a) for a in _wr))
+check('run_game: importing the module starts nothing (main runs only as a script)', hasattr(_rgm, 'inject') and hasattr(_rgm, 'main'))
+
 # ---- code_to_bytes.py: instructions the export read from data go back to .byte rows -------------------------------------------------------------------------------
 d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'src'))
 with open(os.path.join(d, 'project.config'), 'w') as f: f.write('SRC_MAIN="src/m.asm"\n')

@@ -23,6 +23,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'vice'))
 from _common import parser, config
 
+def vic_restore_commands(vic):
+    """The monitor commands that write the saved VIC-II registers back (vic: the 64 register values of the state file). Everything the game CONFIGURES is restored: $D000-$D018 (positions, mode, raster,
+    colours' bases, sprite enable and y-expand), $D01A (interrupt mask), $D01B-$D01D (sprite priority, multicolour, x-expand) and $D020-$D02E (colours). Not restored: $D019 (interrupt flags: a write
+    CLEARS them) and $D01E / $D01F (collision latches, cleared by a read). $D01C was once left out, so a game that sets its sprites multicolour only before the hand-off showed hires streaks."""
+    h = lambda lo, hi: ' '.join('%02x' % b for b in vic[lo:hi + 1])
+    return ['> d000 ' + h(0x00, 0x18), '> d01a %02x' % vic[0x1a], '> d01b ' + h(0x1b, 0x1d), '> d020 ' + h(0x20, 0x2e)]
+
 def inject(cfg, root, vice_cmd, prg, shot, seconds):
     from vice_monitor import Monitor
     port = int(cfg.get('VICE_MONITOR_PORT', 6510)) + 1
@@ -43,9 +50,7 @@ def inject(cfg, root, vice_cmd, prg, shot, seconds):
         m.cmd('bank cpu'); m.cmd('> 0001 37')                          # I/O visible for the hardware steps
         if os.path.exists(state) and os.path.getsize(state) >= 65536 + 64 + 1024 + 1:
             s = open(state, 'rb').read(); vic = s[65536:65536 + 64]; col = s[65600:65600 + 1024]
-            m.cmd('> d000 ' + ' '.join('%02x' % b for b in vic[:0x19]))
-            m.cmd('> d020 ' + ' '.join('%02x' % b for b in vic[0x20:0x2f]))      # skips the raster/interrupt flags $D019-$D01F area except the enables below
-            m.cmd('> d01a %02x' % vic[0x1a])
+            for c in vic_restore_commands(vic): m.cmd(c)
             f = os.path.join(tmp, 'col.bin'); open(f, 'wb').write(col); m.cmd('bload "%s" 0 d800' % f, 2)
             m.cmd('> dd00 %02x' % s[65600 + 1024])
         for item in cfg.get('LAUNCH_POKES', '').split():
@@ -149,4 +154,4 @@ def main():
                                      timeout=600 if args.shot else None).returncode in (0, 1) else 1)
     (disk if mode == 'disk' else inject)(cfg, root, vice, prg, args.shot, int(cfg.get('SMOKE_SECONDS', 12)))
 
-main()
+if __name__ == '__main__': main()
