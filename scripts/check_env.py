@@ -28,7 +28,7 @@ def exporter():
         if x and os.path.isfile(os.path.expanduser(x)): return os.path.expanduser(x)
     return ''
 def ghidra():
-    for x in [cfg.get('GHIDRA_HOME', ''), os.environ.get('GHIDRA_HOME', '')] + glob.glob(home + '/ghidra*/ghidra_*') + glob.glob(home + '/ghidra*') + glob.glob('/opt/ghidra*'):
+    for x in [cfg.get('GHIDRA_HOME', ''), os.environ.get('GHIDRA_HOME', '')] + sorted(glob.glob(home + '/ghidra*/ghidra_*'), key=lambda d: [int(n) for n in re.findall(r'\d+', os.path.basename(d).split('_PUBLIC')[0])], reverse=True) + glob.glob(home + '/ghidra*') + glob.glob('/opt/ghidra*'):
         if x and os.path.isfile(os.path.join(os.path.expanduser(x), 'support', 'analyzeHeadless')): return os.path.join(os.path.expanduser(x), 'support', 'analyzeHeadless')
     return shutil.which('analyzeHeadless') or ''
 def mesen():

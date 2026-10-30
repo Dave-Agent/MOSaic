@@ -8,7 +8,8 @@
 set -euo pipefail
 ROOT="$(cd "${1:-.}" && pwd)"; cd "$ROOT"; HERE="$(cd "$(dirname "$0")" && pwd)"
 source ./project.config
-GH="${GHIDRA_HOME:-$(ls -d "$HOME"/ghidra*/ghidra_* 2>/dev/null | grep -v zip | head -1)}"
+# GHIDRA_HOME, else the newest Ghidra found under ~/ghidra*/ (compared by version, not by the locale's sort order)
+GH="${GHIDRA_HOME:-$(for d in "$HOME"/ghidra*/ghidra_*; do if [ -d "$d" ]; then echo "${d##*/} $d"; fi; done | sort -V | tail -1 | cut -d' ' -f2-)}"
 echo "Ghidra: $GH"
 [ -x "$GH/support/analyzeHeadless" ] || { echo "Ghidra not found: set GHIDRA_HOME (project.config or environment)"; exit 1; }
 OUT="${GHIDRA_EXPORT_DIR:-ghidra}"; NAME="${PROJECT_NAME:-project}"
