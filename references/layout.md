@@ -38,4 +38,4 @@ Name the game and release, the file(s) needed, the checksum, where the user puts
 A public mirror, if any, is one-way: edit `phase1/` or `phase2/`, commit, publish; never edit the mirror. It contains source only, under the same rule.
 
 ## Check
-`scripts/check_layout.py` lists tracked files that look like game binaries (by extension and path), checks that `.gitignore` covers the derived and supplied directories, that a `reference.sha256` is present when `reference/` exists, and that the README mentions supplying the data. Add `COMMIT_BINARIES="path path"` to `project.config` for hand-made binaries that are meant to be tracked.
+`scripts/check_layout.py` lists tracked files that look like game binaries (by extension and path), checks that `.gitignore` covers the derived and supplied directories, that a `reference.sha256` is present when `reference/` exists, and that the README mentions supplying the data. Add `COMMIT_BINARIES="path path"` (a space inside a path is written `\ `) to `project.config` for hand-made binaries that are meant to be tracked.
