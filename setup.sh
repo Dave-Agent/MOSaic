@@ -3,6 +3,7 @@
 #
 #   ./setup.sh                      ask the questions
 #   ./setup.sh --check              only check the tools
+#   ./setup.sh --link               link the skill and check the tools, no questions, no project
 #   ./setup.sh --root DIR --name "Game Name" --media FILE     no questions: create the project
 #
 # It changes only: the link ~/.claude/skills/mosaic, and the project folder you name. Nothing is installed for you.
@@ -11,14 +12,15 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_DIR="$HOME/.claude/skills"
 LINK="$SKILLS_DIR/mosaic"
-MODE_CHECK=0; ROOT=""; NAME=""; MEDIA=""
+MODE_CHECK=0; LINK_ONLY=0; ROOT=""; NAME=""; MEDIA=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --check) MODE_CHECK=1 ;;
+        --link)  LINK_ONLY=1 ;;
         --root)  ROOT="${2:-}"; shift ;;
         --name)  NAME="${2:-}"; shift ;;
         --media) MEDIA="${2:-}"; shift ;;
-        -h|--help) sed -n '2,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,/^set -e/{/^set -e/!p}' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $1 (try --help)"; exit 2 ;;
     esac
     shift
@@ -64,10 +66,10 @@ if [ "$TOOLS_OK" = 0 ]; then
     echo "Some required tools are missing (marked MISSING above, each with how to get it). Install them and run ./setup.sh again."
     echo "Kick Assembler: download it from http://theweb.dk/KickAssembler/ and put KickAss.jar in ~/tools/ ."
     echo "Ghidra: download it from https://ghidra-sre.org and unzip it in your home folder."
-    [ "$MODE_CHECK" = 1 ] && exit 1
+    [ "$MODE_CHECK" = 1 ] || [ "$LINK_ONLY" = 1 ] && exit 1
     ask "Carry on and create a project anyway?" n || exit 1
 fi
-[ "$MODE_CHECK" = 1 ] && { echo; echo "Tools OK."; exit 0; }
+{ [ "$MODE_CHECK" = 1 ] || [ "$LINK_ONLY" = 1 ]; } && { echo; echo "Tools OK."; exit 0; }
 
 # ---- 4. A project for a game
 say "Step 3 of 3: create a project for a game"

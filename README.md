@@ -30,22 +30,19 @@ The full step-by-step, from adding the game's image to a finished phase 2, is in
 
 **(a) Install the tools.** Python 3, Java 17+, [Kick Assembler](http://theweb.dk/KickAssembler/) (the jar in `~/tools/KickAss.jar`, or set `KICKASS_JAR` in `project.config`), git, [`just`](https://github.com/casey/just), VICE (`x64sc`) with its C64 ROMs, Ghidra 11+ (set `GHIDRA_HOME` if it isn't under `~/ghidra*`) and a C compiler. The Ghidra exporter script is fetched automatically on first use. Pillow is needed for pictures. Developed on Linux; macOS should work; on Windows use WSL.
 
-**(b) Get the skill and run the setup script.** It links the skill into Claude Code, checks your tools, and offers to create a project for your game, asking for its name and file:
+**(b) Get the skill and let Claude set you up.** Clone it, open Claude Code in the folder and ask:
 ```
 git clone https://github.com/Dave-Agent/MOSaic.git ~/MOSaic
 cd ~/MOSaic
-./setup.sh
+claude
 ```
-It changes only `~/.claude/skills/mosaic` and the project folder you name, and installs nothing. `./setup.sh --check` only checks the tools. The step-by-step is in [HOWTO.md](HOWTO.md).
+> Set up MOSaic for me.
 
-**(c) Check the project** it created, then continue:
-```
-cd ~/C64Projects/MyGame
-just status
-```
-The original game file was copied into the project's `originals/` folder with its SHA-256. It is never modified and never attached to an emulator directly; VICE only runs scratch copies. MOSaic creates a local git repository in the project and commits after each step. It never pushes.
+Claude links the skill, checks your tools (and tells you how to get any that are missing), asks for your game's file and name, and creates the project. It changes only `~/.claude/skills/mosaic` and the project folder you name, and installs nothing without your yes. If you prefer a terminal script, `./setup.sh` asks the same questions, and `./setup.sh --check` only checks the tools.
 
-**(d) Open Claude Code in the project folder and ask for the first stage.**
+**(c) Open Claude Code in the project folder.** Claude tells you the exact line, for example `cd ~/C64Projects/my-game && claude`. The original game file was copied into the project's `originals/` folder with its SHA-256. It is never modified and never attached to an emulator directly; VICE only runs scratch copies. MOSaic creates a local git repository in the project and commits after each step. It never pushes.
+
+**(d) Ask for the first stage.**
 > Use the MOSaic skill. Do HOWTO step 2: create a source that builds and starts this game, without stopping between its parts.
 
 The agent researches the game, extracts the files, finds the point where the game is fully loaded, derives a clean reference image, exports the disassembly from Ghidra, and builds it back byte for byte. A disk takes tens of minutes and a tape longer. VICE opens windows while it dumps memory; don't type in them.

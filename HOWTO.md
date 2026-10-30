@@ -31,10 +31,10 @@ First install these. Use your package manager where there is one.
 ```
 git clone https://github.com/Dave-Agent/MOSaic.git ~/MOSaic
 cd ~/MOSaic
-./setup.sh
+claude
 ```
 
-It links the skill, checks the tools and offers to create your first project (step 1). It installs nothing itself. `./setup.sh --check` only checks the tools.
+Then say **"Set up MOSaic for me."** Claude links the skill, checks the tools and tells you how to get any that are missing, then does step 1 with you. It installs nothing without your yes. (`./setup.sh` does the same from a terminal; `./setup.sh --check` only checks the tools.)
 
 **Done when:** the check ends with `all required tools present`.
 
@@ -44,7 +44,7 @@ It links the skill, checks the tools and offers to create your first project (st
 
 **Goal:** a project folder holding your copy of the game's disk or tape file (`.d64`, `.g64` or `.tap`; a copy with the copy protection removed is best).
 
-Run `./setup.sh` and answer **yes** to "Create a project now?". It asks for the game's file, its name and the project folder, then creates it. (Step 0 already did this if you said yes there.)
+Claude asks for it as the last part of the setup: the path of the game file, its name, and the project folder (it suggests one). Then it tells you the line to open Claude Code in the project, for example `cd ~/C64Projects/my-game && claude`, where you say "move to the next stage". If you set up with `./setup.sh` instead, it asks the same three things.
 
 Your file is copied into the project's `originals/` folder and its SHA-256 recorded. The original is never modified and never loaded into an emulator directly; VICE only runs temporary copies.
 
