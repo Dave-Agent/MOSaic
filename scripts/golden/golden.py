@@ -3,7 +3,7 @@
 
   golden.py record            run the scenarios on the current build, write <GOLDEN_DIR>/<scenario>.crc (one CRC-32 per frame) and golden.json   (exact; byte-identical builds only)
   golden.py check             run them again and compare; reports the first frame that differs (exit 1 on any difference)
-  golden.py record-t | check-t [--skew N]    the timing-tolerant set (see timing_check): for refactorings that change bytes and so cycle timing. --skew N delays the program by N cycles at the start: the quickest way to measure how tolerant a trace set and its state list are (try 500; a cell that then differs persistently is timing, not behaviour: exclude it from the tolerant state). A scenario written `name!: args` is exact-only and skipped by record-t / check-t.
+  golden.py record-t | check-t [--skew N] [--lag N]    the timing-tolerant set (see timing_check): for refactorings that change bytes and so cycle timing. --skew N delays the program by N cycles at the start: the quickest way to measure how tolerant a trace set and its state list are (try 500; a cell that then differs persistently is timing, not behaviour: exclude it from the tolerant state). A scenario written `name!: args` is exact-only and skipped by record-t / check-t.
   golden.py dump NAME FRAME [N]              print the sampled state of frames FRAME..FRAME+N-1 of one scenario as per-range hex (to compare two builds by hand)
   options: --root DIR  --phase 1|2  --only NAME[,NAME]  --prg FILE --sym FILE  (the build to run; default from project.config, see scripts/trace/c64env.py)
 
@@ -15,6 +15,7 @@ project.config keys (besides TRACE_RAM, TRACE_ENTRY, TRACE_A/X/Y/SP/P, TRACE_PRG
   GOLDEN_DIR               directory of the recordings and the two input files (default tools/golden)
   GOLDEN_SCENARIOS         scenario list (default <GOLDEN_DIR>/scenarios.txt): one `name: tracer arguments` per line, # comments. The arguments steer the run: --seed N, --chaos N,
                            --poke FRAME[+PERIOD]:ADDR=VAL (hex ADDR/VAL) ... e.g.  `demo2: --seed 2 --chaos 6`   `bonus1: --seed 1 --chaos 0 --poke 100+1500:019C=02`
+  GOLDEN_LAG               optional, default 0: check-t lets a cell match the recording at any frame within this many frames either way and counts what it forgave (--lag N overrides): a start-up wait that is a cycle-counted loop makes every later event come a frame or so late, by an amount that jitters, and positions can then stay in the tolerant state. A value that never occurs near that frame in the recording is still a difference
   GOLDEN_STATE_T           optional state file for the timing-tolerant mode (record-t / check-t) only: leave out cells that are a function of a tick phase or of loop progress (sound modulation, scroll phase, scratch of a long builder) and so differ persistently when cycle timing shifts; find them with `check-t --skew 500`. Without it GOLDEN_STATE is used.
   GOLDEN_STATE             state to sample (default <GOLDEN_DIR>/state.txt): one range per line `LO HI  comment`, hex. Either end may be a symbol name of the build (`@name`, or a name
                            that is not made only of hex digits; `name+N` allowed), so the list survives a layout change. A line `!LO HI` EXCLUDES a range from every other line: use it for
@@ -42,6 +43,30 @@ def parse_scenarios(path):
         name, _, rest = l.partition(':')
         out[name.strip()] = rest.strip()                 # `name!: args` marks a scenario EXACT-ONLY (see Golden.exact_only)
     return out
+
+def compare_cells(ref, now, n, persist, lag=0):
+    """Cell by cell comparison of two recordings of n bytes per frame: a cell that differs for fewer than `persist` consecutive frames is ignored (transient). With lag > 0 a cell also matches
+    when its value in the new run occurs in the recording at any frame within `lag` frames either way (a start-up wait that is a cycle-counted loop makes every later event come a frame or so
+    late, by an amount that jitters from event to event, so a constant shift of the whole run would not do): a value that never occurs near that frame in the recording is still a difference.
+    -> (persistent differences [(first frame, cell)], transient count, frames compared, cell-frames forgiven by the lag). A different length counts as a difference at the end."""
+    frames = min(len(ref), len(now)) // n; run_len = {}; persistent = []; transient = 0; forgiven = 0
+    for f in range(frames):
+        a, b = ref[f * n:(f + 1) * n], now[f * n:(f + 1) * n]
+        diff = set() if a == b else {i for i in range(n) if a[i] != b[i]}
+        if diff and lag:
+            lo, hi = max(0, f - lag), min(frames - 1, f + lag); keep = set()
+            for i in diff:
+                if any(ref[g * n + i] == b[i] for g in range(lo, hi + 1)): keep.add(i)
+            forgiven += len(keep); diff -= keep
+        for i in list(run_len):
+            if i not in diff:
+                if run_len[i] < persist: transient += 1
+                del run_len[i]
+        for i in diff:
+            run_len[i] = run_len.get(i, 0) + 1
+            if run_len[i] == persist: persistent.append((f - persist + 1, i))
+    if len(ref) != len(now): persistent.append((frames, -1))
+    return persistent, transient, frames, forgiven
 
 class Golden:
     def __init__(self, env):
@@ -135,31 +160,20 @@ class Golden:
     def crcs(self, data):
         n = self.frame_size(); return [zlib.crc32(data[i:i + n]) for i in range(0, len(data) - n + 1, n)]
 
-    def timing_check(self, name, extra=()):
+    def timing_check(self, name, extra=(), lag=0):
         """Timing-tolerant comparison (for refactorings that change bytes and so cycle timing): the trace is taken with --raster-entropy, so the noise does not depend on the raster, and
         compared cell by cell with the recording t_<name>.z; a cell that differs for fewer than GOLDEN_PERSIST consecutive frames is ignored (the tracer samples at raster line 0 while the
-        program updates a state in the middle of a frame). -> (persistent differences [(frame, cell)], transient cells, frames)"""
+        program updates a state in the middle of a frame). With lag > 0 a cell may match the recording within lag frames either way (compare_cells).
+        -> (persistent differences [(frame, cell)], transient cells, frames, cell-frames forgiven by the lag)"""
         zf = os.path.join(self.dir, 't_' + name + '.z')
         if not os.path.exists(zf): sys.exit('no timing-tolerant recording for scenario %s: run `golden.py record-t` (or mark the scenario exact-only with `%s!:` in the scenarios file)' % (name, name))
-        ref = zlib.decompress(open(zf, 'rb').read()); now = self.run(name, ['--raster-entropy'] + list(extra)); n = self.frame_size()
-        frames = min(len(ref), len(now)) // n; run_len = {}; persistent = []; transient = 0
-        for f in range(frames):
-            a, b = ref[f * n:(f + 1) * n], now[f * n:(f + 1) * n]
-            diff = set() if a == b else {i for i in range(n) if a[i] != b[i]}
-            for i in list(run_len):
-                if i not in diff:
-                    if run_len[i] < self.persist: transient += 1
-                    del run_len[i]
-            for i in diff:
-                run_len[i] = run_len.get(i, 0) + 1
-                if run_len[i] == self.persist: persistent.append((f - self.persist + 1, i))
-        if len(ref) != len(now): persistent.append((frames, -1))
-        return persistent, transient, frames
+        ref = zlib.decompress(open(zf, 'rb').read()); now = self.run(name, ['--raster-entropy'] + list(extra))
+        return compare_cells(ref, now, self.frame_size(), self.persist, lag)
 
 def main():
     a = parser(__doc__.split('\n')[0], write=False, phase=False)
     a.add_argument('mode', nargs='?', default='check', choices=('record', 'check', 'record-t', 'check-t', 'dump'))
-    a.add_argument('rest', nargs='*'); a.add_argument('--phase', type=int, choices=(1, 2), default=2); a.add_argument('--prg'); a.add_argument('--sym'); a.add_argument('--only'); a.add_argument('--skew', type=int, default=0)
+    a.add_argument('rest', nargs='*'); a.add_argument('--phase', type=int, choices=(1, 2), default=2); a.add_argument('--prg'); a.add_argument('--sym'); a.add_argument('--only'); a.add_argument('--skew', type=int, default=0); a.add_argument('--lag', type=int, default=None, help='check-t: a cell may match the recording at any frame within N frames either way, and the cells forgiven are counted (default GOLDEN_LAG, else 0)')
     args = a.parse_args()
     g = Golden(Env(args.root, args.phase, args.prg, args.sym)); mode = args.mode
     names = [n for n in g.scenarios if not args.only or n in args.only.split(',')]
@@ -173,16 +187,17 @@ def main():
             for lo, hi in g.ranges(): print('  %04x-%04x' % (lo, hi), data[pos:pos + hi - lo + 1].hex()); pos += hi - lo + 1
         return 0
     extra = ['--skew', str(args.skew)] if args.skew else []
+    lag = args.lag if args.lag is not None else int(g.env.cfg.get('GOLDEN_LAG', 0))
     bad = 0
     if mode in ('record-t', 'check-t'):
         for name in names:
             if mode == 'record-t':
                 open(os.path.join(g.dir, 't_' + name + '.z'), 'wb').write(zlib.compress(g.run(name, ['--raster-entropy'] + extra), 9)); print('%-8s recorded' % name)
             else:
-                pers, tr, fr = g.timing_check(name, extra)
+                pers, tr, fr, fg = g.timing_check(name, extra, lag); lagged = ', %d cell-frames matched within +-%d frames of the recording (timing only)' % (fg, lag) if fg else ''
                 if pers and pers[0][0] < g.min_clean: bad += 1; print('%-8s DIFFERS: %d persistent cells, first at frame %d (state byte %d); %d transient' % (name, len(pers), pers[0][0], pers[0][1], tr))
                 elif pers: print('%-8s OK, clean for %d frames, then drifts (timing); %d transient' % (name, pers[0][0], tr))
-                else: print('%-8s OK (%d frames, %d transient cells ignored)' % (name, fr, tr))
+                else: print('%-8s OK (%d frames, %d transient cells ignored%s)' % (name, fr, tr, lagged))
         if mode == 'check-t': print('FAIL' if bad else 'PASS')
         return 1 if bad else 0
     meta = {}

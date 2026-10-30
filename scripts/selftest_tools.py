@@ -194,6 +194,22 @@ _r = _note('check'); check('research note: a note without the NON-AUTHORITATIVE 
 open(_p, 'w').write('# Research: x\nNON-AUTHORITATIVE: leads.\n\nQuestion: q\nRead on: 2026-10-31\n\n## Priors\n- A page says the bonus is at 10,000.\n\n## Conflicts\n- none\n\n## Not found\n- none\n')
 _r = _note('check'); check('research note: a prior with no URL fails (a claim without a source is a guess)', _r.returncode == 1 and 'without a real source' in _r.stdout, _r.stdout)
 
+# ---- golden.py: the timing-tolerant comparison, with a lag allowance ------------------------------------------------------------------------------------------
+import importlib.util as _iu
+_sp = _iu.spec_from_file_location('golden_mod', os.path.join(HERE, 'golden', 'golden.py')); _gm = _iu.module_from_spec(_sp); _sp.loader.exec_module(_gm)
+_fr = lambda i: bytes([i % 256, (i * 7) % 256]); _seq = lambda ix: b''.join(_fr(i) for i in ix); _ref = _seq(range(40))
+_late = _seq([0, 0] + list(range(38))); _early = _seq(list(range(1, 40)) + [39]); _jit = _seq([max(0, i - (1 if (i // 3) % 2 else 0)) for i in range(40)])      # two frames late; one early; late by 0 or 1 in turns
+check('golden compare: identical recordings have no persistent difference', _gm.compare_cells(_ref, _ref, 2, 2)[0] == [])
+check('golden compare: a run two frames late differs persistently without a lag allowance', _gm.compare_cells(_ref, _late, 2, 2, 0)[0] != [])
+_r = _gm.compare_cells(_ref, _late, 2, 2, 3); check('golden compare --lag 3: a run two frames late passes, and the cells forgiven are counted', _r[0] == [] and _r[3] > 0, _r)
+check('golden compare --lag 3: a run one frame early passes', _gm.compare_cells(_ref, _early, 2, 2, 3)[0] == [])
+check('golden compare --lag 1: a lag of 2 frames is not forgiven', _gm.compare_cells(_ref, _late, 2, 2, 1)[0] != [])
+check('golden compare --lag 1: a lateness that jitters between 0 and 1 frames passes (a constant shift would not)', _gm.compare_cells(_ref, _jit, 2, 2, 0)[0] != [] and _gm.compare_cells(_ref, _jit, 2, 2, 1)[0] == [])
+_bad = bytearray(_late)
+for _k in range(20, 26): _bad[_k * 2:_k * 2 + 2] = b'\xaa\xbb'
+check('golden compare --lag: a value that never occurs near that frame in the recording is still a difference', _gm.compare_cells(_ref, bytes(_bad), 2, 2, 3)[0] != [])
+check('golden compare: a transient difference (fewer frames than the persistence) is ignored, as before', _gm.compare_cells(_ref, _ref[:20] + b'\xff\xff' + _ref[22:], 2, 2)[0] == [])
+
 # ---- gauge.py: a clean area is 100%, an area with an unnamed routine is not -------------------------------------------------------------------------------------
 _g = project(".pc = $0800 \"RAM\"\nStart:\n  lda #1 // [0800:a9 01    LDA #$01]\n  rts // [0802:60       RTS]\n.pc = $1000 \"RAM2\"\nSUB_1000:\n  lda #2 // [1000:a9 02    LDA #$02]\n  jsr SUB_1000 // [1002:20 00 10 JSR $1000]\n  rts // [1005:60       RTS]\n")
 _r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'gauge.py'), '--root', _g, '--main', 'main.asm', '--json'], capture_output=True, text=True)
