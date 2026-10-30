@@ -56,6 +56,8 @@ rows = [
 try:
     import PIL; pil = PIL.__version__
 except Exception: pil = ''
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'trace')); import rom_dir
+_rd = rom_dir.find(); rows.append(('VICE C64 ROMs', _rd if os.path.isfile(os.path.join(_rd, rom_dir.KERNAL)) else '', '', 'the tracer needs the C64 ROM files', 'trace', 'install VICE (its ROM folder is searched), or set VICE_ROM_DIR to the folder with kernal-901227-03.bin', None))
 rows.append(('Pillow (python)', 'python module' if pil else '', pil, 'screenshot judging (just smoke) and the image tools', 'run', 'pip install pillow (into the python3 named above)', None))
 miss_req = 0; brief_opt = []
 print('python:', sys.executable)

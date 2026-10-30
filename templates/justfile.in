@@ -2,7 +2,7 @@
 set allow-duplicate-recipes := true
 set shell := ["bash", "-euo", "pipefail", "-c"]      # the recipes use bash arrays: on Windows run just from Git Bash or WSL
 skill := env_var_or_default("MOSAIC", home_directory() / ".claude/skills/mosaic")
-rom_dir := env_var_or_default("VICE_ROM_DIR", home_directory() / ".local/share/vice/C64")
+rom_dir := shell('python3 -B "$1"', skill / "scripts/trace/rom_dir.py")
 # The phase the bare commands work on: ACTIVE_PHASE in project.config (1 until phase 2 starts; set it to 2 then). Every command below takes the phase as its argument: `just verify`, `just verify 2`.
 active_phase := `bash -c 'source project.config 2>/dev/null; echo "${ACTIVE_PHASE:-1}"'`
 import 'framework/recipes.just'
@@ -78,7 +78,9 @@ seeds:
     : > build/trace/seed_runs.txt
     for s in $(seq 1 "${SEED_RUNS:-6}"); do
         # shellcheck disable=SC2086  # SEED_EXTRA is a list of arguments on purpose
-        build/trace/c64trace --ram dumps/handoff.bin --rom-dir {{rom_dir}} --out build/trace/cov --pc "$HANDOFF_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port 35 --frames "${SEED_FRAMES:-6000}" --seed $s --chaos 6 ${inp[@]+"${inp[@]}"} ${SEED_EXTRA:-} | tail -1 | tee -a build/trace/seed_runs.txt || true
+        out=$(build/trace/c64trace --ram dumps/handoff.bin --rom-dir {{rom_dir}} --out build/trace/cov --pc "$HANDOFF_PC" --sp "${DECRUNCH_SP:-fc}" --p "${DECRUNCH_P:-34}" --port 35 --frames "${SEED_FRAMES:-6000}" --seed $s --chaos 6 ${inp[@]+"${inp[@]}"} ${SEED_EXTRA:-} 2>&1) || true
+        case "$(echo "$out" | tail -1)" in *"distinct opcode addresses"*) ;; *) echo "$out" >&2; echo "the tracer failed (seed $s): see the message above (ROM folder: {{rom_dir}}; set VICE_ROM_DIR if that is wrong)" >&2; exit 1;; esac
+        echo "$out" | tail -1 | tee -a build/trace/seed_runs.txt
     done
     # The same address count in every run means the input never changed what the game did (stuck on a title or menu?).
     if [ "$(awk '{for(i=1;i<NF;i++) if($(i+1)=="distinct") print $i}' build/trace/seed_runs.txt | sort -u | wc -l)" = 1 ] && [ "$(wc -l < build/trace/seed_runs.txt)" -gt 2 ]; then

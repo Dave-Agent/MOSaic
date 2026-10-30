@@ -2,7 +2,7 @@
 
 project.config keys read here (all optional unless a tool needs them; paths are relative to the project root):
   TRACE_RAM         64K RAM image the runs start from (a VICE dump taken at the point the program starts; a 65538-byte file with a load address is accepted)
-  TRACE_ROM_DIR     directory with the ROM files for the tracer (default: $VICE_ROM_DIR, else ~/.local/share/vice/C64)
+  TRACE_ROM_DIR     directory with the ROM files for the tracer (default: $VICE_ROM_DIR, else the first VICE ROM folder found: Linux, Homebrew, /Applications; see rom_dir.py)
   TRACE_ENTRY       where a full run starts: a symbol name (looked up in the build's symbol file) or a hex address
   TRACE_A/X/Y/SP/P  registers at the start of a full run (hex, default 00 00 00 FF 34); TRACE_PORT: processor port ($01) value (hex; tracer default 34)
   TRACE_INIT        file of "ADDR VALUE" (hex) I/O writes applied before a full run
@@ -32,7 +32,7 @@ class Env:
         self.sym = self.path(sym or os.environ.get('C64_SYM') or c.get('TRACE_SYM_P1' if p1 else 'TRACE_SYM'))
         self.src_dir = self.path(c.get('SRC_DIR') if p1 else c.get('PHASE2_DIR'))
         self.ram_path = self.path(c.get('TRACE_RAM'))
-        self.rom_dir = os.path.expandvars(os.path.expanduser(c.get('TRACE_ROM_DIR') or os.environ.get('VICE_ROM_DIR') or '~/.local/share/vice/C64'))   # project.config is read raw: $HOME is expanded here
+        self.rom_dir = os.path.expandvars(os.path.expanduser(c.get('TRACE_ROM_DIR') or os.environ.get('VICE_ROM_DIR') or __import__('rom_dir').find()))   # project.config is read raw: $HOME is expanded here
         self.trace_bin = self.path(c.get('TRACE_BIN')) or os.path.join(self.build_dir, 'trace', 'c64trace')
         self.tracer_src = os.path.join(os.path.dirname(HERE), 'trace', 'c64trace.c')
         self._syms = None; self._base = None
