@@ -54,5 +54,9 @@ if not os.path.isdir(OUT_DIR): os.makedirs(OUT_DIR)
 env = dict(globals())
 env['__name__'] = 'kick_export_module'                       # do not trigger the exporter's own __main__ block
 env['askDirectory'] = lambda title, button: File(os.path.abspath(OUT_DIR))
+# Under PyGhidra (Ghidra 12 and later, Python 3) these differ from Jython: the script state is not a global, and `unicode` does not exist.
+if 'state' not in env: env['state'] = getState()
+try: unicode
+except NameError: env['unicode'] = str
 exec(compile(open(EXPORTER).read(), EXPORTER, 'exec'), env)
 env['KickAssemblerExporter'](currentProgram).export()

@@ -35,7 +35,7 @@ First install these. Use your package manager where there is one.
 | Kick Assembler | assembling | theweb.dk/KickAssembler: put `KickAss.jar` in `~/tools/` |
 | `just` | the project's commands | github.com/casey/just |
 | VICE (`x64sc`) with its C64 ROMs | running the game, memory dumps | your package manager |
-| Ghidra 11+ | the first disassembly | ghidra-sre.org: unzip in your home folder |
+| Ghidra 11+ | the first disassembly | ghidra-sre.org: unzip in your home folder. Ghidra 11 needs Java 17+. Ghidra 12 needs JDK 25, and once you run `support/pyghidraRun -H` and answer `y` to set up PyGhidra |
 | Claude Code | the agent you talk to | claude.com/claude-code |
 
 ```

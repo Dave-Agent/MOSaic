@@ -48,7 +48,7 @@ rows = [
  ('c1541', shutil.which('c1541') or '', '', 'reading and building .d64 disk images (ships with VICE)', 'disk', 'comes with VICE', None),
  ('exomizer', find_cmd(('exomizer', 'EXOMIZER')), '', 'packing a disk build (optional)', 'disk', 'https://bitbucket.org/magli143/exomizer', None),
  ('C compiler (cc/gcc)', shutil.which('cc') or shutil.which('gcc') or '', '', 'building the c64trace tracer', 'trace', 'apt install build-essential | xcode-select --install', None),
- ('Ghidra headless', ghidra(), '', 'importing the reference and exporting to Kick Assembler (set GHIDRA_HOME)', 'ghidra', 'https://ghidra-sre.org (needs Java 17+)', None),
+ ('Ghidra headless', ghidra(), '', 'importing the reference and exporting to Kick Assembler (set GHIDRA_HOME)', 'ghidra', 'https://ghidra-sre.org (11.x needs Java 17+; 12.x needs JDK 25 and, once, `support/pyghidraRun -H` answered y to set up PyGhidra)', None),
  ('Kick Assembler exporter for Ghidra', exporter(), '', 'KickAssemblerExport.py, run inside Ghidra by `just ghidra` (optional: when missing, `just ghidra` fetches it at a pinned commit from github.com/Dave-Agent/ghidra-kickass-export, no install needed)', 'optional', 'python3 scripts/ghidra/fetch_exporter.py', None),
  ('Mesen', mesen(), '', 'NES work only', 'nes', 'https://www.mesen.ca', None),
  ('RetroDebugger', find_cmd(('retrodebugger', 'RETRODEBUGGER_BIN')), '', 'optional alternative debugger', 'optional', 'https://github.com/slajerek/RetroDebugger', None),

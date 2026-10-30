@@ -9,6 +9,7 @@ set -euo pipefail
 ROOT="$(cd "${1:-.}" && pwd)"; cd "$ROOT"; HERE="$(cd "$(dirname "$0")" && pwd)"
 source ./project.config
 GH="${GHIDRA_HOME:-$(ls -d "$HOME"/ghidra*/ghidra_* 2>/dev/null | grep -v zip | head -1)}"
+echo "Ghidra: $GH"
 [ -x "$GH/support/analyzeHeadless" ] || { echo "Ghidra not found: set GHIDRA_HOME (project.config or environment)"; exit 1; }
 OUT="${GHIDRA_EXPORT_DIR:-ghidra}"; NAME="${PROJECT_NAME:-project}"
 GNAME="$(printf %s "$NAME" | tr -c "A-Za-z0-9._-" "_")"      # the Ghidra project name: no spaces, "!" or other characters its files and paths dislike
@@ -29,10 +30,13 @@ if [ -z "$EXP" ]; then
 fi
 case "$EXP" in /*) ;; *) EXP="$ROOT/$EXP";; esac
 [ -f "$SEEDS" ] || { echo "no seeds file $SEEDS (scripts/ghidra/make_seeds.py writes one)"; exit 1; }
+# Ghidra 12 and later has no Jython: its scripts run under PyGhidra (Python 3, needs JDK 25 for 12.2), started with `pyghidraRun -H`.
+LAUNCH=("$GH/support/analyzeHeadless")
+if [ ! -d "$GH/Ghidra/Features/Jython" ] && [ -x "$GH/support/pyghidraRun" ]; then LAUNCH=("$GH/support/pyghidraRun" -H); echo "note: this Ghidra has no Jython: running through PyGhidra (pyghidraRun -H)"; fi
 mkdir -p "$OUT"
 # remove only this project's previous Ghidra project files; ${VAR:?} stops the shell if a name is empty
 rm -rf "${GPROJ:?}/${GNAME:?}.rep" "${GPROJ:?}/${GNAME:?}.gpr"
-"$GH/support/analyzeHeadless" "$GPROJ" "$GNAME" -import "$REFERENCE_PRG" \
+"${LAUNCH[@]}" "$GPROJ" "$GNAME" -import "$REFERENCE_PRG" \
     -processor "${GHIDRA_PROCESSOR:-6502:LE:16:default}" -loader BinaryLoader -loader-baseAddr "${LOAD_ADDRESS:-0x0800}" -overwrite \
     -scriptPath "$HERE" -postScript setup.py "$SEEDS" "$LABELS" "$HOLES" "$OUT" "$EXP" 2>&1 | grep -E "Export Complete|ERROR|Exception|Traceback|seeded|File|\.asm" || true
 ls -la "$OUT"
