@@ -9,7 +9,7 @@ text    the block comment, wrapped at --width (default 124, rules.md: 128 at mos
         lines by three spaces. An `In:` / `Out:` / `Clobbers:` line is simply a paragraph of its own.
 The block goes ABOVE the label's XREF lines (rules.md); an existing block there is replaced only when it is recognisably a description (at most --max-replace=8 lines, no banner, no XREF / access notes, not another symbol's note; TODO paragraphs survive), otherwise it is KEPT, the text is added after it and a `REVIEW kept ...` line says so. XREF lines and trace comments are always kept. A label line summary
 (`Name: {  // summary`, at most 80 characters) is replaced when --summary is given.
---drop-todo (map: `-` in the fourth column) also removes the TODO paragraph(s) of the block being replaced (an answered question); without it they survive. Only a replaced block is touched: a block that is kept keeps its TODOs.
+--drop-todo (map: `-` in the fourth column) also removes the TODO paragraph(s) of the block being replaced (an answered question), and of a block that is KEPT (access notes) too, leaving the rest of it; without it they survive. On a `.label` line the block goes directly above that line (its XREF lines continue below it). Only a replaced block is touched: a block that is kept keeps its TODOs.
 --todo TEXT / the fourth map column: one or more `TODO(tag): text` paragraphs, written as their own `// TODO(tag):` lines after the text (continuation lines indented by three spaces,
 rules.md); a `TODO(tag):` written inside the text is split off the same way. `just todo` and p1_complete.py (TODO(name), TODO(block)) read them there. Without --write it prints what it would change."""
 import os, re, sys

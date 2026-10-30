@@ -9,7 +9,8 @@ SPEC.tsv, one routine per line (tab separated, '#' lines ignored):
   SUMMARY  one-line summary for the label line (`Name: {  // summary`, rules.md: at most 80 characters); empty keeps the label's own comment
   LOCALS   `old=new` pairs separated by `;` (old = the exporter's label, new = a snake_case name or `!` for an anonymous label): `LAB_088b=!;LAB_08a2=skip_charset_invert`
   INNER    optional, labels separated by `;` that sit inside the routine's range but are not local branch targets (a string or table label): they stay where they are, inside the scope
-The routine ends at its last line that carries an `[ADDR:bytes]` trace comment before the next label that is not listed as a local or inner label.
+The routine ends at its last INSTRUCTION line (`[ADDR:bytes]` trace comment) before the next label that is not listed as a local or inner label; unlabelled data rows after the last instruction stay outside the scope, the rows of an INNER label stay inside.
+A local label defined outside that range (a split routine) is an error: it cannot be scoped.
   - Local names in the routine are renamed at their definitions and uses. A use from OUTSIDE the routine is rewritten to the path `Routine.new`; for an anonymous label that is an error
     (it must stay a named label: remove it from LOCALS).
   - An anonymous label drops the XREF comment lines and blank lines directly above it. A reference becomes `!+` / `!++` (forward) or `!-` / `!--` (backward), counted over all anonymous
@@ -23,6 +24,7 @@ a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('spec')
 args = a.parse_args(); main = main_file(args); files = code_files(main)
 texts = {f: open(f).read().split('\n') for f in files}
 TRACE = re.compile(r'//\s*\[[0-9A-Fa-f]{4}[:\]]')
+TRACE_INS = re.compile(r'//\s*\[[0-9A-Fa-f]{4}:')          # an instruction line; a data row carries `[ADDR]` only
 XR = re.compile(r'^\s*//\s*(?:Ghidra\s+)?XREF|^\s+//\s+[\w. ]+\([RWcjpd]\)')
 def find_routine(name):
     for f, L in texts.items():
@@ -37,12 +39,19 @@ for row in read_tsv(args.spec):
     inner = set(x for x in (row[3] if len(row) > 3 else '').split(';') if x.strip())
     loc = dict(p.split('=', 1) for p in locs.split(';') if p.strip())
     f, i = find_routine(name); L = texts[f]
-    j = i + 1; last = i
+    j = i + 1; last = i; labelled = False
     while j < len(L):
         m = re.match(r'^([A-Za-z_]\w*):(?!\S)', L[j])
         if m and m.group(1) not in loc and m.group(1) not in inner: break
-        if TRACE.search(L[j]): last = j
+        if m and m.group(1) in inner: labelled = True                 # the rows after an INNER label (a string or table of the routine) belong to it, up to the next label
+        if TRACE_INS.search(L[j]): last = j; labelled = False         # the scope ends at the last instruction: unlabelled data rows after the RTS stay outside
+        elif labelled and TRACE.search(L[j]): last = j
         j += 1
+    for o in loc:                                                     # a local label must lie inside the routine's range (a split routine has its tail elsewhere)
+        for ff, LL in texts.items():
+            for k, l in enumerate(LL):
+                if re.match(r'^%s:(?!\S)' % re.escape(o), l) and not (ff == f and i <= k <= last):
+                    sys.exit('%s: the local label %s is defined at %s:%d, outside the routine (lines %d-%d): a split routine cannot be a scope; take %s out of LOCALS' % (name, o, os.path.basename(ff), k + 1, i + 1, last + 1, o))
     body = L[i:last + 1]
     anon_in = sum(1 for l in body if re.match(r'^!+:', l))
     if anon_in: print('WARN %s already contains %d anonymous labels: check its `!+` references (the build tells)' % (name, anon_in))

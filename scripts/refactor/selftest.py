@@ -247,6 +247,83 @@ check('records: --rule splits an event stream into one event per row (lengths fr
 r, rows, flat, t = recs(S[:-1], '--rule', RULE)
 check('records: --rule that runs past the end of the block changes nothing and says so', 'runs past the end' in r.stdout and t.strip() == rec_src(S[:-1]).strip(), r.stdout + t)
 
+# ---- 13. label-file descriptions, TODO drops, scopeify limits (found in an outside full run) ----------------------------------------------------------------
+def project_files(main, extra):
+    d = project(main)
+    for n, t in extra.items(): open(os.path.join(d, n), 'w').write(textwrap.dedent(t).lstrip('\n'))
+    return d
+def rd(d, n): return open(os.path.join(d, n)).read()
+LAB_MAIN = '''
+    #import "vars.asm"
+    .byte $00,$00  // [0300]
+    DoIt:
+      lda var_b     // [0803:ad 01 03 LDA $0301]
+      rts           // [0806:60 RTS]
+'''
+LAB_VARS = '''
+    .label var_a = $0300   // XREF[3]: 4000(R), 4003(W)
+                                                    //           4010(R)
+    .label var_b = $0301   // XREF[1]: 0803(R)
+'''
+d = project_files(LAB_MAIN, {'vars.asm': LAB_VARS}); tool('rename.py', d, tsv(d, 'm.tsv', [['var_b', 'var_b', 'The B flag.', 'TODO(name): check B']]), '--write'); t = rd(d, 'vars.asm')
+check('a description for a .label goes directly above THAT label, not between the previous label and its XREF continuation',
+      t.index('// var_b: The B flag.') > t.index('4010(R)') and t.index('// var_b: The B flag.') < t.index('.label var_b'), t)
+LAB_VARS_OLD = '''
+    .label var_a = $0300   // XREF[3]: 4000(R), 4003(W)
+    // var_b: The B flag.
+    // TODO(name): check B
+                                                    //           4010(R)
+    .label var_b = $0301   // XREF[1]: 0803(R)
+'''          # the layout older runs left: B's description above A's continuation
+d = project_files(LAB_MAIN, {'vars.asm': LAB_VARS_OLD}); tool('set_comment.py', d, 'var_b', 'Flag B.', '--write'); t = rd(d, 'vars.asm')
+check('a misplaced description (above the previous label\'s continuation) is pulled down to its own label when it is rewritten, once',
+      t.count('Flag B.') == 1 and t.count('The B flag.') == 0 and t.index('4010(R)') < t.index('Flag B.') < t.index('.label var_b'), t)
+d = project_files(LAB_MAIN, {'vars.asm': LAB_VARS_OLD}); r = tool('move_img.py', d, tsv(d, 'mv.tsv', [['var_a', 'var_a'], ['var_b', 'var_b']]), '--write'); v = rd(d, 'vars.asm'); m = rd(d, 'main.asm')
+check('move_img leaves no comment behind in the label file when the description sits above the previous label\'s continuation', not any(l.strip().startswith('//') for l in v.split('\n')) and '.label' not in v, r.stdout + r.stderr + v)
+check('move_img carries the description and the XREF continuation to the in-stream label', 'var_a:' in m and 'var_b:' in m and '// var_b: The B flag.' in m and '4010(R)' in m and m.index('// var_b: The B flag.') < m.index('var_b:'), m)
+
+NOTES_SRC = '''
+    // $d020(W): 0810 0820 0830
+    // $d021(W): 0840
+    // XREF[1]: 0803(j)
+    LAB_0803:
+      lda #$01  // [0803:a9 01 LDA #$1]
+      rts       // [0805:60 RTS]
+'''
+d = project(NOTES_SRC); tool('rename.py', d, tsv(d, 'm.tsv', [['LAB_0803', 'DoThing', '', 'TODO(name): is this right?']]), '--write')
+r = tool('set_comment.py', d, tsv(d, 's.tsv', [['DoThing', 'Does the thing.', '', '-']]), '--write'); t = text(d)
+check('set_comment `-` drops the TODO even when the block above the label is kept (access notes), and keeps the notes', 'TODO' not in t and '// $d020(W): 0810 0820 0830' in t and '// Does the thing.' in t, t + r.stdout)
+d = project(NOTES_SRC); tool('rename.py', d, tsv(d, 'm.tsv', [['LAB_0803', 'DoThing', '', 'TODO(name): is this right?']]), '--write')
+r = tool('set_comment.py', d, tsv(d, 's.tsv', [['DoThing', 'Does the thing.']]), '--write'); t = text(d)
+check('without `-` the TODO of a kept block still survives', '// TODO(name): is this right?' in t, t)
+
+SC_SRC = '''
+    Foo:
+      lda #$01       // [0800:a9 01 LDA #$1]
+      bne LAB_0804   // [0802:d0 00 BNE LAB_0804]
+    LAB_0804:
+      rts            // [0804:60 RTS]
+      .byte $01,$02  // [0805]
+      .byte $03      // [0807]
+    Bar:
+      rts            // [0808:60 RTS]
+'''
+d = project(SC_SRC); r = tool('scopeify.py', d, tsv(d, 'sc.tsv', [['Foo', 'does a thing', 'LAB_0804=skip']]), '--write'); t = text(d)
+check('scopeify: the scope ends at the last instruction; unlabelled data rows after the RTS stay outside', r.returncode == 0 and t.index('} // Foo') < t.index('.byte $01,$02') and 'skip:' in t, r.stdout + r.stderr + t)
+SC_INNER = SC_SRC.replace('      .byte $01,$02  // [0805]\n', '    Table:\n      .byte $01,$02  // [0805]\n')
+d = project(SC_INNER); r = tool('scopeify.py', d, tsv(d, 'sc.tsv', [['Foo', 'does a thing', 'LAB_0804=skip', 'Table']]), '--write'); t = text(d)
+check('scopeify: a table listed as INNER keeps all its rows inside the scope', r.returncode == 0 and t.index('Table:') < t.index('.byte $01,$02') < t.index('.byte $03') < t.index('} // Foo'), r.stdout + r.stderr + t)
+SC_SPLIT = '''
+    Foo:
+      jmp LAB_0900   // [0800:4c 00 09 JMP LAB_0900]
+    Other:
+      rts            // [0803:60 RTS]
+    LAB_0900:
+      rts            // [0900:60 RTS]
+'''
+d = project(SC_SPLIT); before = text(d); r = tool('scopeify.py', d, tsv(d, 'sc.tsv', [['Foo', 'a split routine', 'LAB_0900=tail']]), '--write')
+check('scopeify: a local label defined outside the routine\'s range is refused, naming it, and nothing is written (no `Foo.tail:`)', r.returncode != 0 and 'LAB_0900' in r.stdout + r.stderr and 'outside' in r.stdout + r.stderr and text(d) == before and 'Foo.tail:' not in text(d), r.stdout + r.stderr + text(d))
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall refactor self-tests passed')

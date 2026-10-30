@@ -14,16 +14,19 @@ MAP.tsv:  OLD<TAB>NEW[<TAB>DESCRIPTION]
   An address INSIDE an instruction (a self-modifying operand: `LAB_xxxx = $0D94` for `lda $0000,y` at $0D93) becomes the `NEW:operand` syntax on that instruction
   (`lda NEW:$0000,y`, `ldx NEW:#$00`) with a trailing `SMC` marker; write the `// SMC: <kind> patched by <routine>` line yourself (rules.md). A high-byte label
   (the second operand byte) is not moved: map it to `NEW+1` with drop_labels.py.
+A description an older run put above the previous label's XREF continuation (between the previous `.label` line and its own continuation lines) is first pulled back down to its own label, so it moves with it.
 Without --write it prints what it would do."""
 import os, re, sys, collections
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from _common import parser, main_file, code_files, read_tsv, map_code, split_comment, block_flags, wrap_comment, insert_label_lines, find_cover, INS, LABEL_FILES
+from _common import parser, main_file, code_files, read_tsv, map_code, split_comment, block_flags, wrap_comment, insert_label_lines, find_cover, pull_down_misplaced, INS, LABEL_FILES
 a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('map')
 args = a.parse_args(); main = main_file(args); files = code_files(main)
 rows = read_tsv(args.map)
 lab_files = [f for f in files if os.path.basename(f) in LABEL_FILES or not any(INS.match(l) for l in open(f))]     # label files: no instructions
 stream = [f for f in files if f not in lab_files]
 texts = {f: open(f).read().split('\n') for f in files}
+for f in lab_files:
+    for q in range(len(texts[f])): pull_down_misplaced(texts[f], q)           # a description an older run put above the previous label's XREF continuation goes back to its own label, so it moves with it
 def exporter_xref(raw):
     """XREF text lines (as found after the `//` on the label line and its continuation lines) in the layout the exporter uses above in-stream labels."""
     out = []

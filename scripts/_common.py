@@ -177,6 +177,34 @@ def block_shape(old, name, max_replace=MAX_REPLACE):
     if len(old) > max_replace: return False, '%d lines, more than %d' % (len(old), max_replace)
     return True, ''
 
+def _todo_split(old):
+    """(the lines of `old` that are not TODO paragraphs, the TODO paragraphs' lines): a paragraph is a `// TODO(tag):` line and its three-space continuation lines."""
+    rest = []; todo = []; i = 0
+    while i < len(old):
+        if re.match(r'^\s*//\s*TODO\(', old[i]):
+            e = i + 1
+            while e < len(old) and re.match(r'^\s*//   \S', old[e]): e += 1
+            todo += old[i:e]; i = e
+        else: rest.append(old[i]); i += 1
+    return rest, todo
+
+def pull_down_misplaced(L, j):
+    """In a label file the XREF lines of a `.label` line continue BELOW it (indented `//` lines), so what stands above a `.label` is the previous label's continuation. Older runs of rename.py /
+    set_comment.py put a label's description above that continuation (between the previous `.label` line and its own continuation). When L[j] is a `.label` line and such a description
+    (`// NAME:` for this label, or a `// TODO(` block) is found there, it is moved directly above L[j]. The index of the label line does not change. Returns the number of lines moved."""
+    m = re.match(r'^\s*\.label\s+([\w.]+)\s*=', L[j])
+    if not m: return 0
+    c = j
+    while c > 0 and re.match(r'^\s+//', L[c - 1]) and XREF_LINE.match(L[c - 1]): c -= 1
+    if c == j: return 0
+    t = c
+    while t > 0 and L[t - 1].startswith('//') and not XREF_LINE.match(L[t - 1]) and not TRACE_COMMENT.search(L[t - 1]): t -= 1
+    if t == c or t == 0 or not re.match(r'^\s*\.label\b', L[t - 1]) or any(_BANNER.match(x) for x in L[t:c]): return 0
+    h = _HEADER.match(L[t])
+    if not (re.match(r'^//\s*TODO\(', L[t]) or (h and h.group(1).split('.')[-1] == m.group(1).split('.')[-1])): return 0
+    L[t:j] = L[c:j] + L[t:c]
+    return c - t
+
 def set_block(L, j, text, indent=None, width=WRAP, keep=False, notes=None, max_replace=MAX_REPLACE, drop_todo=False):
     """The ONE place that decides where a label's description block goes (rename.py and set_comment.py both call it): ABOVE the label's XREF lines, which stay directly above the label
     line L[j]. An existing plain comment block there (own-line `//` lines that are neither XREF nor trace comments, up to the first blank line or code) is replaced ONLY when block_shape()
@@ -184,8 +212,10 @@ def set_block(L, j, text, indent=None, width=WRAP, keep=False, notes=None, max_r
     is appended to `notes` (a list; the callers print it) saying why: nothing is ever swallowed. The XREF lines and the trace comments are always kept. Without `indent` the block takes
     the indent of the block it replaces, else column 0 for a `.label` line or a scope opener (`Name: {`), else two spaces (an in-stream data label). keep=True always keeps the old block.
     drop_todo=True also drops the TODO paragraph(s) of the block being replaced (the question is answered). Writing the same text twice is a no-op. Mutates L; returns (number of lines written, the replaced old lines, the new index of the label line)."""
+    is_label = bool(re.match(r'^\s*\.label\b', L[j]))
+    if is_label: pull_down_misplaced(L, j)
     k = j
-    while k > 0 and XREF_LINE.match(L[k - 1]): k -= 1                        # the XREF lines directly above the label
+    while not is_label and k > 0 and XREF_LINE.match(L[k - 1]): k -= 1       # the XREF lines directly above an in-stream label; a `.label` line's XREF lines continue BELOW it, so what is above it is the previous label's
     top = k
     while top > 0 and re.match(r'^\s*//', L[top - 1]) and not XREF_LINE.match(L[top - 1]) and not TRACE_COMMENT.search(L[top - 1]): top -= 1
     if indent is not None: ind = indent
@@ -199,7 +229,12 @@ def set_block(L, j, text, indent=None, width=WRAP, keep=False, notes=None, max_r
         if not ok:
             keep = True
             if notes is not None: notes.append('kept the existing %d-line comment block above %s (%s); the new text was added after it, merge by hand: %s' % (k - top, name, why, L[top].strip()[:70]))
-    if keep: L[k:k] = new; return len(new), [], j + len(new)
+    if keep:
+        gone = []
+        if drop_todo and top < k:                                            # a kept block still loses its TODO paragraphs when asked (the question is answered); the rest of it stays
+            rest, gone = _todo_split(L[top:k])
+            if gone: L[top:k] = rest; k -= len(gone); j -= len(gone)
+        L[k:k] = new; return len(new), gone, j + len(new)
     old = L[top:k]
     keep_todo = []; i = 0                                                    # a TODO paragraph of the old block is not description: it survives unless the new text carries it
     while i < len(old):
