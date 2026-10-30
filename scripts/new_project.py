@@ -48,6 +48,9 @@ if media:                                                    # the SHA-256 of ev
     open(os.path.join(root, 'originals.sha256'), 'w').write('\n'.join(sums) + '\n'); print('recorded the SHA-256 of %d original file(s) in originals.sha256%s' % (len(media), ', files made read-only' if args.protect else ''))
 if not args.no_git and not os.path.isdir(os.path.join(root, '.git')):
     subprocess.run(['git', 'init', '-q', '-b', 'main'], cwd=root); print('git init (local)')
+    subprocess.run(['git', 'add', '-A'], cwd=root)
+    if subprocess.run(['git', 'commit', '-q', '-m', 'Project scaffold'], cwd=root, capture_output=True).returncode == 0: print('first commit: Project scaffold (the game files are git-ignored)')
+    else: print('note: no first commit made (is git user.name / user.email set?); commit the scaffold yourself before the first step')
 if not args.no_next: print('''
 Next:
   1. cd into the project and run `just env` to check the tools, then `just status` to see where you are.
