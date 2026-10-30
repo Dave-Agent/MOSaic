@@ -10,25 +10,67 @@ SPEC.tsv lines (TAB separated, `#` lines ignored):  ADDR<TAB>KIND<TAB>COUNT<TAB>
           field  COUNT records of STRIDE bytes with one address word at OFFSET in each: LAYOUT `STRIDE+OFFSET` (`8+6`; `$` for hex). The bytes around the words stay `.byte` rows,
                  each word becomes `.word name` with its own row, so the record layout shows in the source.
           lo, hi COUNT bytes: the low (high) bytes of COUNT addresses, written `.byte <(n0),<(n1),..` / `>(..)`. LAYOUT `-`.
-  NAMES   `n0,n1,..`: one expression per entry (a label, `label+N`, `label+$NN`, `Scope.label`), or `base:STEP`: base, base+STEP, base+2*STEP ... COUNT entries (a table of equal
+  NAMES   `n0,n1,..`: one expression per entry (a label, `label+N`, `label+$NN`, `Scope.label`, a library label such as `VIC.COLOR_RAM`, or arithmetic over labels and numbers: `SCREEN_RAM+3*40`, `(base+$10)*2`; + - * and parentheses, no division), or `base:STEP`: base, base+STEP, base+2*STEP ... COUNT entries (a table of equal
           records: lo/hi tables of `frames+$20*k`); or empty / `auto`: the label that sits at the address the bytes already point to (exactly one is required: add the missing labels
           first with add_label.py --map, listed by `addr_tables.py`).
 Every entry is checked: the address of the expression must equal the word (or its low / high byte) in the table now. Rows in between that carry a label or a comment inside the range are
 refused (split the spec there). Without --write it prints the new lines. Run the build comparison afterwards."""
 import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from _common import parser, main_file, reachable, read_tsv, source_labels, find_cover, ROW, write_changed
+from _common import parser, main_file, reachable, code_files, read_tsv, source_labels, find_cover, ROW, write_changed, split_comment
 
 a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('spec')
 args = a.parse_args(); main = main_file(args)
 files = reachable(main); texts = {f: open(f).read().split('\n') for f in files}
 names, stream = source_labels(main); at = {}
+
+def library_labels(lines):
+    """{`Scope.Sub.NAME`: value} of the `.label NAME = $ADDR` lines inside `Scope: { ... }` / `.namespace Scope { ... }` blocks (the hardware libraries: `VIC.COLOR_RAM`, `VIC.SPRITE.S0.X`),
+    which source_labels does not qualify. Inline blocks (`S0: { .label X=$D000; .label Y=$D001 }`) are read too."""
+    out = {}; scope = []
+    tok = re.compile(r'([A-Za-z_]\w*)\s*:\s*\{|\.namespace\s+([A-Za-z_]\w*)\s*\{|(\{)|(\})|\.label\s+([A-Za-z_]\w*)\s*=\s*(\$[0-9A-Fa-f]+|\d+)')
+    for l in lines:                                                                 # the expanded source: the libraries are imported into it
+        code = split_comment(l)[0]
+        if re.search(r'//\s*\[[0-9A-Fa-f]{4}[:\]]', l): continue                  # a code line of the source (a routine scope), not a library block
+        for m in tok.finditer(code):
+            if m.group(1) or m.group(2): scope.append(m.group(1) or m.group(2))
+            elif m.group(3): scope.append('?')
+            elif m.group(4):
+                if scope: scope.pop()
+            elif m.group(5) and scope and '?' not in scope:
+                out['.'.join(scope + [m.group(5)])] = int(m.group(6).replace('$', '0x'), 0)
+    return out
+def _imported_files():
+    """every file named by an `#import "x.asm"` of the source (the hardware libraries are imported but are not code files, so code_files / expanded_lines leave them out)."""
+    seen = []; todo = [main] + list(code_files(main))
+    while todo:
+        f = todo.pop()
+        for l in open(f).read().split('\n'):
+            m = re.match(r'^\s*#import\s+"([^"]+\.asm)"', l)
+            if m:
+                q = os.path.normpath(os.path.join(os.path.dirname(f), m.group(1)))
+                if os.path.exists(q) and q not in seen: seen.append(q); todo.append(q)
+    return seen
+_lib_lines = [l for f in _imported_files() for l in open(f).read().split('\n')]
+for _k, _v in library_labels(_lib_lines).items(): names.setdefault(_k, _v)
 for n, ad in names.items():
     if '.' not in n or n in stream: at.setdefault(ad, []).append(n)
 
 def value(expr):
     m = re.match(r'^([A-Za-z_][\w.]*)\s*(?:([+-])\s*(\$?[0-9A-Fa-f]+))?$', expr.strip())
-    if not m: sys.exit('cannot evaluate %r (a label, label+N or label+$NN)' % expr)
+    if not m:                                                                       # an arithmetic expression: labels, numbers ($hex, 0xhex, decimal), + - * and parentheses
+        e = expr.strip()
+        if '/' in e or '%' in e: sys.exit('cannot evaluate %r: division is not supported (Kick may not give an integer): write the entries out' % expr)
+        def num(t):
+            s = t.group(0)
+            if s[0].isalpha() or s[0] == '_':
+                if s not in names: sys.exit('unknown label %r in %r' % (s, expr))
+                return str(names[s])
+            return str(int(s.replace('$', '0x'), 0))
+        py = re.sub(r'[A-Za-z_][\w.]*|\$[0-9A-Fa-f]+|0[xX][0-9A-Fa-f]+|\d+', num, e)
+        if not re.fullmatch(r'[\d\s+\-*()]+', py): sys.exit('cannot evaluate %r (labels, numbers, + - * and parentheses)' % expr)
+        try: return int(eval(py, {'__builtins__': {}}, {}))
+        except (SyntaxError, ZeroDivisionError): sys.exit('cannot evaluate %r' % expr)
     if m.group(1) not in names: sys.exit('unknown label %r in %r' % (m.group(1), expr))
     off = int(m.group(3).replace('$', ''), 16 if m.group(3).startswith('$') or re.search('[A-Fa-f]', m.group(3)) else 10) if m.group(3) else 0
     return names[m.group(1)] + (-off if m.group(2) == '-' else off)
@@ -100,7 +142,7 @@ for p in read_tsv(args.spec):
     elif kind in ('lo', 'hi'):
         sym = '<' if kind == 'lo' else '>'
         for c, grp in enumerate(chunks(ex)):
-            new.append('%s.byte %s // [%04x] %s' % (ind, ','.join('%s(%s)' % (sym, e) if re.search(r'[+-]', e) else sym + e for e in grp), ad0 + 8 * c, ' '.join(grp)[:60]))
+            new.append('%s.byte %s // [%04x] %s' % (ind, ','.join('%s(%s)' % (sym, e) if re.search(r'[+\-*()]', e) else sym + e for e in grp), ad0 + 8 * c, ' '.join(grp)[:60]))
     else:
         pos = 0
         for r in range(count):

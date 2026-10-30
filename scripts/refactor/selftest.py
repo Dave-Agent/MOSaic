@@ -324,6 +324,42 @@ SC_SPLIT = '''
 d = project(SC_SPLIT); before = text(d); r = tool('scopeify.py', d, tsv(d, 'sc.tsv', [['Foo', 'a split routine', 'LAB_0900=tail']]), '--write')
 check('scopeify: a local label defined outside the routine\'s range is refused, naming it, and nothing is written (no `Foo.tail:`)', r.returncode != 0 and 'LAB_0900' in r.stdout + r.stderr and 'outside' in r.stdout + r.stderr and text(d) == before and 'Foo.tail:' not in text(d), r.stdout + r.stderr + text(d))
 
+# ---- 14. table_words: arithmetic names and library labels (found in an outside full run) ---------------------------------------------------------------------
+TW_MAIN = '''
+    #import "constants.asm"
+    #import "vic_lib.asm"
+    .byte $78,$04,$a0,$04  // [0900] x...
+    .byte $00,$d8,$00,$04  // [0904] ....
+    .byte $78,$a0          // [0908] x.
+    Code:
+      rts                  // [090a:60 RTS]
+'''
+TW_CONST = '''
+    .label SCREEN_RAM = $0400
+'''
+TW_LIB = '''
+    VIC: {
+        .label COLOR_RAM = $D800
+        S0: { .label X=$D000; .label Y=$D001 }
+    }
+'''
+def tw(rows, write=True):
+    d = project_files(TW_MAIN, {'constants.asm': TW_CONST, 'vic_lib.asm': TW_LIB}); r = tool('table_words.py', d, tsv(d, 'tw.tsv', rows), *(['--write'] if write else [])); return d, r
+d, r = tw([['0900', 'word', '2', '-', 'SCREEN_RAM+3*40,SCREEN_RAM+4*40']]); t = text(d)
+check('table_words: names may be arithmetic over labels (SCREEN_RAM+3*40), checked against the bytes', r.returncode == 0 and '.word SCREEN_RAM+3*40,SCREEN_RAM+4*40' in t, r.stdout + r.stderr + t)
+d, r = tw([['0904', 'word', '2', '-', 'VIC.COLOR_RAM,SCREEN_RAM']]); t = text(d)
+check('table_words: a library label (VIC.COLOR_RAM) is a name', r.returncode == 0 and '.word VIC.COLOR_RAM,SCREEN_RAM' in t, r.stdout + r.stderr + t)
+d, r = tw([['0908', 'lo', '2', '-', 'SCREEN_RAM+3*40,SCREEN_RAM+$a0']]); t = text(d)
+check('table_words: lo / hi tables write `<(expr)` for an expression with * or +', r.returncode == 0 and '.byte <(SCREEN_RAM+3*40),<(SCREEN_RAM+$a0)' in t, r.stdout + r.stderr + t)
+d, r = tw([['0900', 'word', '2', '-', 'SCREEN_RAM+3*40,SCREEN_RAM+5*40']]); before = text(d)
+check('table_words: an expression whose value is not what the table holds is refused, nothing written', r.returncode != 0 and 'would change a byte' in r.stdout + r.stderr and '.word' not in text(d), r.stdout + r.stderr)
+d, r = tw([['0900', 'word', '2', '-', 'SCREEN_RAM+240/2,SCREEN_RAM']])
+check('table_words: division is refused with a reason (not silently integer)', r.returncode != 0 and 'division' in r.stdout + r.stderr, r.stdout + r.stderr)
+d, r = tw([['0900', 'word', '2', '-', 'SCREEN_RAM+nosuch,SCREEN_RAM']])
+check('table_words: an unknown label in an expression is named in the error', r.returncode != 0 and 'nosuch' in r.stdout + r.stderr, r.stdout + r.stderr)
+d, r = tw([['0900', 'word', '1', '-', '__import__("os")']])
+check('table_words: an expression is never executed as code (refused: not labels, numbers and + - * ( ))', r.returncode != 0 and ('cannot evaluate' in r.stdout + r.stderr or 'unknown label' in r.stdout + r.stderr) and 'Traceback' not in r.stderr, r.stdout + r.stderr)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall refactor self-tests passed')
