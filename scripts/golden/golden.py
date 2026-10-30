@@ -4,6 +4,7 @@
   golden.py record            run the scenarios on the current build, write <GOLDEN_DIR>/<scenario>.crc (one CRC-32 per frame) and golden.json   (exact; byte-identical builds only)
   golden.py check             run them again and compare; reports the first frame that differs (exit 1 on any difference)
   golden.py record-t | check-t [--skew N] [--lag N]    the timing-tolerant set (see timing_check): for refactorings that change bytes and so cycle timing. --skew N delays the program by N cycles at the start: the quickest way to measure how tolerant a trace set and its state list are (try 500; a cell that then differs persistently is timing, not behaviour: exclude it from the tolerant state). A scenario written `name!: args` is exact-only and skipped by record-t / check-t.
+  golden.py variance [FILE FILE ..]        compare the dumps (default dumps/at_dump_*.bin) block by block: every byte that is not the same in all of them, in which block it lies, whether the golden state samples it, and a GOLDEN_PIN line for all of them
   golden.py dump NAME FRAME [N]              print the sampled state of frames FRAME..FRAME+N-1 of one scenario as per-range hex (to compare two builds by hand)
   options: --root DIR  --phase 1|2  --only NAME[,NAME]  --prg FILE --sym FILE  (the build to run; default from project.config, see scripts/trace/c64env.py)
 
@@ -15,6 +16,7 @@ project.config keys (besides TRACE_RAM, TRACE_ENTRY, TRACE_A/X/Y/SP/P, TRACE_PRG
   GOLDEN_DIR               directory of the recordings and the two input files (default tools/golden)
   GOLDEN_SCENARIOS         scenario list (default <GOLDEN_DIR>/scenarios.txt): one `name: tracer arguments` per line, # comments. The arguments steer the run: --seed N, --chaos N,
                            --poke FRAME[+PERIOD]:ADDR=VAL (hex ADDR/VAL) ... e.g.  `demo2: --seed 2 --chaos 6`   `bonus1: --seed 1 --chaos 0 --poke 100+1500:019C=02`
+  GOLDEN_PIN               optional: `ADDR=VAL ...` (hex): cells set at frame 0 of every scenario (--poke 0:ADDR=VAL). Cells that are only machine state and differ from dump to dump (the KERNAL jiffy clock $A2) get a fixed value, so the exact traces come out the same from any dump; `golden.py variance` lists the candidates. Record the exact set again after changing it
   GOLDEN_LAG               optional, default 0: check-t lets a cell match the recording at any frame within this many frames either way and counts what it forgave (--lag N overrides): a start-up wait that is a cycle-counted loop makes every later event come a frame or so late, by an amount that jitters, and positions can then stay in the tolerant state. A value that never occurs near that frame in the recording is still a difference
   GOLDEN_STATE_T           optional state file for the timing-tolerant mode (record-t / check-t) only: leave out cells that are a function of a tick phase or of loop progress (sound modulation, scroll phase, scratch of a long builder) and so differ persistently when cycle timing shifts; find them with `check-t --skew 500`. Without it GOLDEN_STATE is used.
   GOLDEN_STATE             state to sample (default <GOLDEN_DIR>/state.txt): one range per line `LO HI  comment`, hex. Either end may be a symbol name of the build (`@name`, or a name
@@ -68,12 +70,37 @@ def compare_cells(ref, now, n, persist, lag=0):
     if len(ref) != len(now): persistent.append((frames, -1))
     return persistent, transient, frames, forgiven
 
+def pin_args(spec):
+    """GOLDEN_PIN `ADDR=VAL ADDR=VAL ...` (hex, spaces or commas) -> tracer arguments that set those cells at frame 0 of every scenario: `--poke 0:ADDR=VAL`. The cells of a dump that are only
+    machine state and differ from dump to dump (the KERNAL jiffy clock at $A2, ...) are given a fixed value, so every dump gives the same traces and the dependency is written down."""
+    out = []
+    for t in re.split(r'[,\s]+', (spec or '').strip()):
+        if not t: continue
+        m = re.fullmatch(r'\$?([0-9A-Fa-f]{1,4})=\$?([0-9A-Fa-f]{1,2})', t)
+        if not m: sys.exit('GOLDEN_PIN: %r is not ADDR=VAL (hex, e.g. 00A2=41)' % t)
+        out += ['--poke', '0:%04x=%02x' % (int(m.group(1), 16), int(m.group(2), 16))]
+    return out
+
+def variance(dumps):
+    """{address: [value in each dump]} of the bytes that are not the same in every dump (the dumps are 64 KB RAM images)."""
+    n = min(len(d) for d in dumps)
+    return {a: [d[a] for d in dumps] for a in range(n) if any(d[a] != dumps[0][a] for d in dumps)}
+
+def block_of(a, image=None):
+    """a name for the block an address is in (for the variance report): zero page, stack, system pages, the program image, I/O, other RAM."""
+    if image and image[0] <= a <= image[1]: return 'program image'
+    if a < 0x100: return 'zero page'
+    if a < 0x200: return 'stack'
+    if a < 0x400: return 'system pages $0200-$03FF'
+    if 0xD000 <= a < 0xE000: return 'I/O area'
+    return 'other RAM'
+
 def ram_note(recorded, now):
     """The warning for an exact `check` against a different RAM image than the one the traces were recorded on ('' when they are the same, or when nothing was recorded): the trace starts from that
     image, and a byte of it that is only machine state (the KERNAL jiffy clock $A2, a cursor timer, stack leftovers) differs from one dump to the next, so a difference can be the dump, not the game."""
     if not recorded or not now or recorded == now: return ''
     return ('WARNING: these exact traces were recorded against a RAM image with SHA-256 %s..., this run uses %s...: the dump differs. A difference below may come from the dump\'s volatile bytes '
-            '(the KERNAL jiffy clock at $A2, a cursor timer, stack leftovers; a depacking step removes them) and not from the game: record the traces again on this image, or use check-t.' % (recorded[:12], now[:12]))
+            '(the KERNAL jiffy clock at $A2, a cursor timer, stack leftovers; a depacking step removes them) and not from the game: pin those cells (`golden.py variance` lists them, GOLDEN_PIN sets them), record the traces again on this image, or use check-t.' % (recorded[:12], now[:12]))
 
 class Golden:
     def __init__(self, env):
@@ -82,7 +109,7 @@ class Golden:
         self.scen_file = env.path(c.get('GOLDEN_SCENARIOS')) or os.path.join(self.dir, 'scenarios.txt')
         self.state_file = env.path(c.get('GOLDEN_STATE')) or os.path.join(self.dir, 'state.txt')
         self.frames = int(c.get('GOLDEN_FRAMES', 6000)); self.min_clean = int(c.get('GOLDEN_MIN_CLEAN', 500)); self.persist = int(c.get('GOLDEN_PERSIST', 4))
-        self.flags = c.get('GOLDEN_TRACE_FLAGS', '').split(); self.entropy = c.get('GOLDEN_ENTROPY_ROUTINES', '').split()
+        self.flags = c.get('GOLDEN_TRACE_FLAGS', '').split(); self.pins = pin_args(c.get('GOLDEN_PIN', '')); self.entropy = c.get('GOLDEN_ENTROPY_ROUTINES', '').split()
         raw = parse_scenarios(self.scen_file)
         self.exact_only = {n.rstrip('!') for n in raw if n.endswith('!')}           # `name!: args`: a free-running scenario (attract / idle mode) that is exact-compatible but cannot be timing-tolerant: record-t / check-t skip it
         self.scenarios = {n.rstrip('!'): v for n, v in raw.items()}
@@ -164,7 +191,7 @@ class Golden:
             open(d + '/in.bin', 'wb').write(env.base_ram())
             rf = d + '/ranges.txt'; open(rf, 'w').write(''.join('%04x %04x\n' % r for r in self.ranges()))
             if '--raster-entropy' in extra: extra += ['--site-map', self.site_map()]
-            cmd = [env.trace_bin] + env.base_args(d + '/in.bin') + ['--frames', str(self.frames), '--out', d + '/o', '--sample-set', d + '/s.bin', rf] + self.scenarios[name].split() + self.flags + extra
+            cmd = [env.trace_bin] + env.base_args(d + '/in.bin') + ['--frames', str(self.frames), '--out', d + '/o', '--sample-set', d + '/s.bin', rf] + self.scenarios[name].split() + self.flags + self.pins + extra
             r = subprocess.run(cmd, capture_output=True, text=True)
             if r.returncode or not os.path.exists(d + '/s.bin'):
                 sys.exit('the tracer failed in scenario %s (exit %d): %s\n  (scenario arguments: frame numbers in --poke / --joy*-at are DECIMAL, addresses and values hex)' % (name, r.returncode, (r.stderr or r.stdout).strip()[-400:]))
@@ -185,7 +212,7 @@ class Golden:
 
 def main():
     a = parser(__doc__.split('\n')[0], write=False, phase=False)
-    a.add_argument('mode', nargs='?', default='check', choices=('record', 'check', 'record-t', 'check-t', 'dump'))
+    a.add_argument('mode', nargs='?', default='check', choices=('record', 'check', 'record-t', 'check-t', 'dump', 'variance'))
     a.add_argument('rest', nargs='*'); a.add_argument('--phase', type=int, choices=(1, 2), default=2); a.add_argument('--prg'); a.add_argument('--sym'); a.add_argument('--only'); a.add_argument('--skew', type=int, default=0); a.add_argument('--lag', type=int, default=None, help='check-t: a cell may match the recording at any frame within N frames either way, and the cells forgiven are counted (default GOLDEN_LAG, else 0)')
     args = a.parse_args()
     g = Golden(Env(args.root, args.phase, args.prg, args.sym)); mode = args.mode
@@ -193,6 +220,27 @@ def main():
     if mode in ('record-t', 'check-t'):
         g.tolerant = True; skipped = [n for n in names if n in g.exact_only]; names = [n for n in names if n not in g.exact_only]
         if skipped: print('exact-only (skipped here): %s' % ', '.join(skipped))
+    if mode == 'variance':
+        import glob
+        files = sorted(glob.glob(os.path.join(g.env.root, 'dumps', 'at_dump_*.bin'))) if not args.rest else args.rest
+        if len(files) < 2: sys.exit('variance needs two or more dumps: dumps/at_dump_*.bin (just dumps), or name the files after `variance`')
+        dumps = [open(f, 'rb').read() for f in files]; var = variance(dumps)
+        cells = set(); [cells.update(range(lo, hi + 1)) for lo, hi in g.ranges()]
+        ref = g.env.cfg.get('REFERENCE_PRG'); img = None
+        try:
+            ra = os.path.getsize(g.env.path(ref)) if ref else 0; la = int(str(g.env.cfg.get('LOAD_ADDRESS', '0x0801')), 0); img = (la, la + max(ra - 2, 0) - 1) if ra and g.env.cfg.get('REFERENCE_IS_RAW', 'true') == 'false' else None
+        except (OSError, ValueError, TypeError): img = None
+        print('%d dumps compared (%s); %d byte(s) are not the same in all of them' % (len(dumps), ', '.join(os.path.basename(f) for f in files), len(var)))
+        by = {}
+        for a in sorted(var): by.setdefault(block_of(a, img), []).append(a)
+        for b, addrs in by.items():
+            print('\n%s: %d byte(s)' % (b, len(addrs)))
+            for a in addrs: print('  $%04X  %s%s' % (a, ' '.join('%02X' % v for v in var[a]), '   <- inside the golden state' if a in cells else ''))
+        if var:
+            pins = [a for a in sorted(var) if a > 1 and not (img and img[0] <= a <= img[1])]
+            print('\nEvery one of these bytes is dump noise, whether or not the golden state samples it: a game that READS one diverges later (a cell outside the state still changes what the game does).')
+            print('Pin them to the first dump\'s values (the processor port $00 / $01 is set by TRACE_PORT, not pinned), add to project.config, and record the exact set again:\n  GOLDEN_PIN="%s"' % ' '.join('%04X=%02X' % (a, dumps[0][a]) for a in pins))
+        return 0
     if mode == 'dump':
         name, frame = args.rest[0], int(args.rest[1]); count = int(args.rest[2]) if len(args.rest) > 2 else 1; data = g.run(name); n = g.frame_size()
         for f in range(frame, frame + count):

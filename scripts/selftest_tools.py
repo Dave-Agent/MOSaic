@@ -213,6 +213,14 @@ check('golden compare: a transient difference (fewer frames than the persistence
 check('golden ram_note: same image, nothing recorded, or no image: no warning', _gm.ram_note('abc', 'abc') == '' and _gm.ram_note('', 'abc') == '' and _gm.ram_note('abc', '') == '')
 _w = _gm.ram_note('a' * 64, 'b' * 64); check('golden ram_note: a different image warns, naming both hashes, the jiffy clock and what to do', 'WARNING' in _w and 'a' * 12 in _w and 'b' * 12 in _w and '$A2' in _w and 'check-t' in _w, _w)
 
+check('golden pin_args: ADDR=VAL pairs (hex, spaces or commas, $ allowed) become --poke 0:ADDR=VAL', _gm.pin_args('00A2=41, $01e7=7d') == ['--poke', '0:00a2=41', '--poke', '0:01e7=7d'] and _gm.pin_args('') == [])
+try: _gm.pin_args('00A2'); _ok = False
+except SystemExit as _e: _ok = 'ADDR=VAL' in str(_e)
+check('golden pin_args: a malformed entry is refused with the format', _ok)
+_d1 = bytearray(256); _d2 = bytearray(256); _d2[0xa2] = 7; _d2[0x1e0 % 256] = 9; _v = _gm.variance([bytes(_d1), bytes(_d2), bytes(_d1)])
+check('golden variance: lists the bytes that are not the same in every dump, with the value in each', sorted(_v) == [0xa2, 0xe0] and _v[0xa2] == [0, 7, 0], _v)
+check('golden variance: blocks (zero page, stack, system pages, program image, I/O, other)', [_gm.block_of(a, (0x0801, 0xCD00)) for a in (0xa2, 0x1e7, 0x300, 0x900, 0xD020, 0xCE00)] == ['zero page', 'stack', 'system pages $0200-$03FF', 'program image', 'I/O area', 'other RAM'])
+
 # ---- gauge.py: a clean area is 100%, an area with an unnamed routine is not -------------------------------------------------------------------------------------
 _g = project(".pc = $0800 \"RAM\"\nStart:\n  lda #1 // [0800:a9 01    LDA #$01]\n  rts // [0802:60       RTS]\n.pc = $1000 \"RAM2\"\nSUB_1000:\n  lda #2 // [1000:a9 02    LDA #$02]\n  jsr SUB_1000 // [1002:20 00 10 JSR $1000]\n  rts // [1005:60       RTS]\n")
 _r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'gauge.py'), '--root', _g, '--main', 'main.asm', '--json'], capture_output=True, text=True)
