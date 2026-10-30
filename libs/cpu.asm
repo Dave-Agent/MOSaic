@@ -8,12 +8,13 @@ CPU: {
     MOS6510: {
         // 6510 CPU integrated I/O port — not present on standard 6502
         .label PORT_DIR = $0000     // data direction register (1=output, 0=input per bit)
-        .label PORT     = $0001     // banking control (bits 0-2):
-                                    //   bit 2: 1=KERNAL ROM ($E000), 0=RAM
-                                    //   bit 1: 1=BASIC ROM  ($A000), 0=RAM
-                                    //   bit 0: 1=CHAREN (I/O/$D000), 0=charset ROM
-                                    //   common: $07=full ROM+I/O, $06=charset ROM visible,
-                                    //           $05=KERNAL+I/O (no BASIC, allows RAM at $A000-$BFFF)
+        .label PORT     = $0001     // memory map (bits 0-2; the higher bits drive the cassette):
+                                    //   bit 0 LORAM:  with HIRAM = 1, BASIC ROM at $A000 (otherwise RAM)
+                                    //   bit 1 HIRAM:  1 = KERNAL ROM at $E000 (otherwise RAM); 0 also takes BASIC out
+                                    //   bit 2 CHAREN: 1 = I/O at $D000, 0 = character ROM there (when LORAM or HIRAM is 1; both 0 = RAM)
+                                    //   common: $07 = BASIC + KERNAL + I/O, $06 = KERNAL + I/O (no BASIC),
+                                    //           $05 = I/O only, RAM everywhere else (the vectors at $FFFA are RAM),
+                                    //           $03 = BASIC + KERNAL + character ROM, $00 = all RAM
     }
 
     VECTORS: {
