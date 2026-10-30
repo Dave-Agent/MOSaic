@@ -360,6 +360,52 @@ check('table_words: an unknown label in an expression is named in the error', r.
 d, r = tw([['0900', 'word', '1', '-', '__import__("os")']])
 check('table_words: an expression is never executed as code (refused: not labels, numbers and + - * ( ))', r.returncode != 0 and ('cannot evaluate' in r.stdout + r.stderr or 'unknown label' in r.stdout + r.stderr) and 'Traceback' not in r.stderr, r.stdout + r.stderr)
 
+# ---- 15. table_words: a table that is already part converted can be finished ---------------------------------------------------------------------------------
+HALF = '''
+    .byte $01,$02            // [0900] ..
+    .word L0                 // [0902] L0
+    .byte $03,$04,$10,$0a    // [0904] ....
+    .byte $05,$06,$20,$0a    // [0908] ....
+    L0:
+      rts                    // [0a00:60 RTS]
+    L1:
+      rts                    // [0a10:60 RTS]
+    L2:
+      rts                    // [0a20:60 RTS]
+'''
+def half(main, rows):
+    d = project(main); r = tool('table_words.py', d, tsv(d, 'tw.tsv', rows), '--write'); return d, r
+d, r = half(HALF, [['0900', 'field', '3', '4+2', 'auto']]); t = text(d)
+check('table_words field: a half-converted table (a word already written as `.word L0`) is finished', r.returncode == 0 and '.word L0' in t and '.word L1' in t and '.word L2' in t and '$10,$0a' not in t and '$20,$0a' not in t, r.stdout + r.stderr + t)
+check('table_words field: the converted word is kept once, in its place, and the bytes around the words stay', t.count('.word L0') == 1 and '.byte $01,$02' in t and '.byte $03,$04' in t and '.byte $05,$06' in t and t.index('.word L0') < t.index('.word L1') < t.index('.word L2'), t)
+d, r = half(HALF, [['0900', 'field', '3', '4+2', 'L0,L1,L2']]); again = text(d)
+d2 = project(again); r2 = tool('table_words.py', d2, tsv(d2, 'tw2.tsv', [['0900', 'field', '3', '4+2', 'L0,L1,L2']]), '--write')
+check('table_words field: running it again on a finished table changes nothing (idempotent)', r2.returncode == 0 and text(d2) == again, r2.stdout + r2.stderr)
+WORDS = '''
+    .word L0,L1,L2           // [0900] L0 L1 L2
+    L0:
+      rts                    // [0a00:60 RTS]
+    L1:
+      rts                    // [0a10:60 RTS]
+    L2:
+      rts                    // [0a20:60 RTS]
+'''
+d, r = half(WORDS, [['0902', 'word', '2', '-', 'L1,L2']]); t = text(d)
+check('table_words: a range that starts at an entry boundary of an already converted `.word` row keeps the first entry as `.word`', r.returncode == 0 and '.word L0 ' in t and '.word L1,L2' in t, r.stdout + r.stderr + t)
+d, r = half(WORDS, [['0901', 'word', '1', '-', 'L1']]); before = text(d)
+check('table_words: a range that starts inside a converted entry is refused, nothing written', r.returncode != 0 and 'inside' in r.stdout + r.stderr and text(d) == before, r.stdout + r.stderr)
+LOHI = '''
+    .byte <L0,<L1            // [0900] L0 L1
+    .byte $10                // [0902] .
+    L0:
+      rts                    // [0a00:60 RTS]
+    L1:
+      rts                    // [0a10:60 RTS]
+'''
+d, r = half(LOHI, [['0900', 'lo', '3', '-', 'L0,L1,L1']])
+t = text(d)
+check('table_words: a half-converted lo table (`.byte <L0,<L1` rows then a raw byte) is read back from its names and finished', r.returncode == 0 and '$10' not in t and t.count('<L1') == 2 and '<L0' in t, r.stdout + r.stderr + t)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall refactor self-tests passed')

@@ -13,6 +13,7 @@ SPEC.tsv lines (TAB separated, `#` lines ignored):  ADDR<TAB>KIND<TAB>COUNT<TAB>
   NAMES   `n0,n1,..`: one expression per entry (a label, `label+N`, `label+$NN`, `Scope.label`, a library label such as `VIC.COLOR_RAM`, or arithmetic over labels and numbers: `SCREEN_RAM+3*40`, `(base+$10)*2`; + - * and parentheses, no division), or `base:STEP`: base, base+STEP, base+2*STEP ... COUNT entries (a table of equal
           records: lo/hi tables of `frames+$20*k`); or empty / `auto`: the label that sits at the address the bytes already point to (exactly one is required: add the missing labels
           first with add_label.py --map, listed by `addr_tables.py`).
+A table may already be part converted: the rows can be raw `.byte $xx` rows, `.word name` rows or `.byte <name` / `>name` rows in any mix; each is read back from its names (so every name must be known) and the whole range is written again from the spec. A row that is cut by the range is written again in its own form for the part outside it; a range that starts or ends INSIDE a converted entry (the second byte of a `.word`) is refused: start it at the entry.
 Every entry is checked: the address of the expression must equal the word (or its low / high byte) in the table now. Rows in between that carry a label or a comment inside the range are
 refused (split the spec there). Without --write it prints the new lines. Run the build comparison afterwards."""
 import os, re, sys
@@ -81,20 +82,79 @@ def plus(base, k):
 def row(ind, bs, ad):
     return ind + '.byte ' + ','.join('$%02x' % b for b in bs) + ' // [%04x] ' % ad + ''.join(chr(b) if 32 <= b < 127 else '.' for b in bs)
 
+def lohi_text(sym, e):
+    """`<(expr)` for an expression with an operator or parentheses, `<name` for a plain name."""
+    return '%s(%s)' % (sym, e) if re.search(r'[+\-*()]', e) else sym + e
+
+# A source row, whatever form it is in, is a list of ENTRIES (size in bytes, what it holds, the text it is written as): a raw `.byte $xx,..` row has one-byte entries, a converted
+# `.word e1,e2` row two-byte entries, a converted `.byte <(e),>(e)` row one-byte entries. So a table that is already part converted is read back from its names, and the part of a row
+# outside the table is written out again in the SAME form.
+WORD_ROW = re.compile(r'^(\s*)\.word\s+(.+?)\s*//\s*\[([0-9a-fA-F]{4})\]')
+LOHI_ROW = re.compile(r'^(\s*)\.byte\s+([<>].+?)\s*//\s*\[([0-9a-fA-F]{4})\]')
+
+def split_top(t):
+    out = []; depth = 0; cur = ''
+    for c in t:
+        if c == ',' and depth == 0: out.append(cur.strip()); cur = ''; continue
+        depth += (c == '(') - (c == ')'); cur += c
+    return out + [cur.strip()]
+
+def parse_row(line):
+    """(kind, indent, address, entries) of a data row with a `// [addr]` comment, or None. Entries are (size, spec, text, note); spec is a byte, or ('w', expr) / ('<', expr) / ('>', expr) to evaluate."""
+    m = ROW.match(line)
+    if m: return 'byte', m.group(1), int(m.group(3), 16), [(1, int(x[1:], 16), x, '') for x in m.group(2).split(',')]
+    m = WORD_ROW.match(line)
+    if m: return 'word', m.group(1), int(m.group(3), 16), [(2, ('w', e), e, e) for e in split_top(m.group(2))]
+    m = LOHI_ROW.match(line)
+    if m:
+        ents = []
+        for e in split_top(m.group(2)):
+            q = re.fullmatch(r'([<>])\s*(?:\((.*)\)|(.+))', e)
+            if not q: return None
+            ents.append((1, (q.group(1), q.group(2) or q.group(3)), e, q.group(2) or q.group(3)))
+        return 'lohi', m.group(1), int(m.group(3), 16), ents
+    return None
+
+def ent_bytes(ent):
+    spec = ent[1]
+    if isinstance(spec, int): return [spec]
+    v = value(spec[1]) & 0xFFFF
+    return [v & 255, v >> 8] if spec[0] == 'w' else [v & 255 if spec[0] == '<' else v >> 8]
+
+def render(kind, ind, ad, ents):
+    if kind == 'byte': return row(ind, [e[1] for e in ents], ad)
+    if kind == 'word': return '%s.word %s // [%04x] %s' % (ind, ','.join(e[2] for e in ents), ad, ' '.join(e[3] for e in ents)[:60])
+    return '%s.byte %s // [%04x] %s' % (ind, ','.join(e[2] for e in ents), ad, ' '.join(e[3] for e in ents)[:60])
+
+def find_row(addr):
+    """(file, line index) of the data row that covers the original address, in any form."""
+    for f, L in texts.items():
+        for i, l in enumerate(L):
+            if '// [' not in l: continue
+            r = parse_row(l)
+            if r and r[2] <= addr < r[2] + sum(e[0] for e in r[3]): return f, i
+    return None
+
 def take(f, i, ad0, need):
-    """consume `need` bytes starting at original address ad0 from the .byte rows at line i of file f: (bytes, first line, last line, text before, text after, indent)"""
+    """consume `need` bytes starting at original address ad0 from the data rows at line i of file f (raw, or already converted to `.word` / `<()` rows): (bytes, first line, last line, text before,
+    text after, indent). The parts of the first and last row outside the range are written again in the row's own form; a range that starts or ends INSIDE a converted entry is refused."""
     L = texts[f]; buf = []; j = i; before = []; after = []; ind = ''
     while len(buf) < need:
-        m = ROW.match(L[j])
-        if not m: sys.exit('line %d of %s is not a .byte row (a label or comment lies inside the range at $%04X): split the spec there' % (j + 1, os.path.basename(f), ad0 + len(buf)))
-        ind = m.group(1); ad = int(m.group(3), 16); bs = [int(x[1:], 16) for x in m.group(2).split(',')]
+        r = parse_row(L[j]) if j < len(L) else None
+        if not r: sys.exit('line %d of %s is not a data row with a `// [addr]` comment (a label or a comment lies inside the range at $%04X): split the spec there' % (j + 1, os.path.basename(f), ad0 + len(buf)))
+        kind, ind, ad, ents = r
         if j == i:
-            skip = ad0 - ad
-            if skip: before = [row(ind, bs[:skip], ad)]; bs = bs[skip:]; ad = ad0
+            skip = ad0 - ad; k = 0; off = 0
+            while off < skip and k < len(ents): off += ents[k][0]; k += 1
+            if off != skip: sys.exit('$%04X is inside the converted entry `%s` of line %d of %s: start the spec at the entry' % (ad0, ents[k - 1][2], j + 1, os.path.basename(f)))
+            if k: before = [render(kind, ind, ad, ents[:k])]; ents = ents[k:]; ad = ad0
         elif ad != ad0 + len(buf): sys.exit('the rows are not contiguous at line %d' % (j + 1))
-        room = need - len(buf)
-        if len(bs) > room: after = [row(ind, bs[room:], ad + room)]; bs = bs[:room]
-        buf += bs; j += 1
+        room = need - len(buf); used = 0; k = 0
+        while k < len(ents) and used + ents[k][0] <= room: used += ents[k][0]; k += 1
+        if used < room and k < len(ents) and used + ents[k][0] > room: sys.exit('the range ends inside the converted entry `%s` of line %d of %s: end the spec at the entry' % (ents[k][2], j + 1, os.path.basename(f)))
+        if k < len(ents): after = [render(kind, ind, ad + used, ents[k:])]
+        for e in ents[:k]: buf += ent_bytes(e)
+        j += 1
     return buf, i, j - 1, before, after, ind
 
 def chunks(items, n=8):
@@ -112,9 +172,9 @@ for p in read_tsv(args.spec):
     elif kind == 'word': need = 2 * count
     elif kind in ('lo', 'hi'): need = count
     else: sys.exit('unknown KIND %r (word, field, lo, hi)' % kind)
-    hit = find_cover(ad0, files, texts)
-    if not hit or hit[2] != 'row': sys.exit('$%04X is not in a .byte data row' % ad0)
-    f, i, _, _ = hit
+    hit = find_row(ad0)
+    if not hit: sys.exit('$%04X is not in a data row with a `// [addr]` comment' % ad0)
+    f, i = hit
     buf, i0, j0, before, after, ind = take(f, i, ad0, need)
     if kind == 'field': current = [buf[r * stride + off] | buf[r * stride + off + 1] << 8 for r in range(count)]
     elif kind == 'word': current = [buf[2 * k] | buf[2 * k + 1] << 8 for k in range(count)]
@@ -142,7 +202,7 @@ for p in read_tsv(args.spec):
     elif kind in ('lo', 'hi'):
         sym = '<' if kind == 'lo' else '>'
         for c, grp in enumerate(chunks(ex)):
-            new.append('%s.byte %s // [%04x] %s' % (ind, ','.join('%s(%s)' % (sym, e) if re.search(r'[+\-*()]', e) else sym + e for e in grp), ad0 + 8 * c, ' '.join(grp)[:60]))
+            new.append('%s.byte %s // [%04x] %s' % (ind, ','.join(lohi_text(sym, e) for e in grp), ad0 + 8 * c, ' '.join(grp)[:60]))
     else:
         pos = 0
         for r in range(count):
