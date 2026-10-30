@@ -1,21 +1,30 @@
 # @NAME@ (C64): reconstructed source
 
-A Kick Assembler reconstruction of this Commodore 64 game. Status: **phase 1, just started.** It follows the shared process in the MOSaic skill (`references/new_game.md`).
+A Kick Assembler reconstruction of this Commodore 64 game: the original program as readable, commented source that assembles back to the original's bytes. `just status` shows how far the work has got.
 
-**No game binary is in this repository by default** (`reference.sha256` holds the SHA-256 the build is checked against). You supply the original media and derive the reference yourself. MOSaic keeps the game's files out of git because the game belongs to its rights holders, and a public repository would redistribute it. That is a recommendation, not a rule: it is your repository, and some people want a self-contained one. If you commit them, do it knowingly, and remove `/originals/`, `/dumps/` and `/reference/` from `.gitignore`.
+## Build and run
+    just build        # assemble phase 1 into build/@SLUG@_game.prg
+    just launch       # build it and start it in VICE
+    just build 2      # the same for phase 2 (once phase2/src exists)
+    just launch 2
+In a new project there is nothing to build until `phase1/src` holds its first source: `just status` says what comes next.
+Needs Java 17+, Kick Assembler, VICE (`x64sc`) with its C64 ROMs, `just` and Python 3; `just env` checks them. Building needs nothing from the original game.
 
-## What you need
-Linux or macOS; Java 17+ and Kick Assembler; VICE with its C64 ROMs and `c1541`; `just`; Python 3; `gcc`; Ghidra 11+ (the Kick Assembler exporter script is fetched automatically, pinned, on first use); the MOSaic skill (`~/.claude/skills/mosaic`, or set `MOSAIC`). `just env` checks them.
+## The two sources
+- **`phase1/src` is phase 1: the original, named and commented.** It assembles to exactly the original's bytes, so it is a faithful record of how the game works. Read it to understand the game.
+- **`phase2/src` is phase 2: the same game split into files** (`game/`, `platform/`, `data/`) behind a written platform interface, relocatable, with dead code removed. The behaviour is the same; the bytes differ only where code was removed. Change it, or port from it.
 
-## Supplying the data
-Put the media in `originals/` (read-only, with their SHA-256 in `originals.sha256`; **never attach an original to an emulator directly**: VICE writes disk images back).
+## Checking it
+    just verify       # phase 1: byte for byte against the original
+    just verify 2     # phase 2: identical except inside the approved removals
+    just check        # the gate: build, routine tests, golden traces
+    just smoke        # start it headless in VICE and compare the title screen
+`just --list` shows everything. Background research: `docs/background.md`; boot analysis: `docs/boot_analysis.md`; the names the owner confirmed: `docs/user_answers.md`.
 
-## Deriving the reference and building
-    just derive      # dumps from a scratch copy of the medium, vote out loader noise, decrunch in the tracer, write reference/
-    just verify      # assemble phase1/src and check it is byte-identical to the reference
-    just seeds       # coverage run in the tracer, then Ghidra seeds from what executed
-    just ghidra      # import into Ghidra and export to ghidra/ (the landing zone; phase1/src is hand-edited from the first seeding on)
-`just --list` shows everything. Background research: `docs/background.md`; boot analysis: `docs/boot_analysis.md`.
+## The original game's files
+`verify` and `check` compare with the original, and a game that launches by restoring a memory dump (`LAUNCH_MODE` in `project.config`) needs it too. **No game binary is in this repository by default** (`reference.sha256` holds the SHA-256 the build is checked against): MOSaic keeps the game's files out of git because the game belongs to its rights holders, and a public repository would redistribute it. That is a recommendation, not a rule: it is your repository, and some people want a self-contained one. If you commit them, do it knowingly, and remove `/originals/`, `/dumps/` and `/reference/` from `.gitignore`.
+
+To supply them, put the media in `originals/` (read-only, SHA-256 in `originals.sha256`; **never attach an original to an emulator directly**: VICE writes disk images back), then `just derive` (`just reference-prg` when the target is a PRG file). Deriving also needs `c1541`, `gcc` and, for the Ghidra export, Ghidra 11+; the Kick Assembler exporter script is fetched automatically, pinned, on first use. The MOSaic skill (`~/.claude/skills/mosaic`, or set `MOSAIC`) provides the scripts the `just` recipes call.
 
 ---
 
