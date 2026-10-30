@@ -68,7 +68,7 @@ def main():
     if not os.path.exists(prg): sys.exit('no %s: build first (just experiment)' % prg)
     pc = cfg.get('HANDOFF_PC') or sys.exit('set HANDOFF_PC in project.config')
     cfg['HANDOFF_PC'] = pc
-    vice = [cfg.get('VICE_BIN') or shutil.which('x64sc') or 'x64sc', '+confirmonexit', '-jamaction', '5']     # 5 = continue after a JAM (the game may jam on purpose or by a bug: the screenshot decides)
+    vice = [cfg.get('VICE_BIN') or shutil.which('x64sc') or 'x64sc', '+confirmonexit', '-jamaction', '1']     # 1 = continue after a JAM (the game may jam on purpose or by a bug: the screenshot decides). NOT 5: that is Quit Emulator in VICE 3.7 and the window just vanishes
     sym = os.path.join(root, args.symbols or cfg.get('VICE_SYMBOLS', ''))
     if not args.no_symbols and (args.symbols or cfg.get('VICE_SYMBOLS')) and os.path.exists(sym): vice += ['-moncommands', sym]
     assert '-default' not in vice
