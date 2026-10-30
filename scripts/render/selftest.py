@@ -73,5 +73,25 @@ def main():
         p = run(tmp, '--chars', '00:07', '--charset', '$2000', '--rows', '2', '--label', 'a', '--out', 'o', '--hires'); a = Image.open(os.path.join(tmp, 'o', 'chars_a_hires.png'))
         p = run(tmp, '--chars', '00:07', '--charset', '$2000', '--label', 'b', '--out', 'o', '--hires'); b = Image.open(os.path.join(tmp, 'o', 'chars_b_hires.png'))
         check(a.width < b.width and a.height > b.height, '--chars --rows 2 lays the range out 2 per row (narrower and taller than the default)')
+        # --sprites-on-screen: the enabled sprite is drawn at its register position (X 24 / Y 50 = the picture's top left), the plain screen.png is unchanged
+        st = bytearray(make_state({0: (0x80, False, 5)})); st[65536 + 0] = 24 + 10; st[65536 + 1] = 50 + 5     # sprite 0 at picture pixel (10, 5); hires block 0x80 = bit 6 set: its pixel 1 of every byte
+        open(os.path.join(tmp, 'state.bin'), 'wb').write(st); open(os.path.join(tmp, 'ram.bin'), 'wb').write(bytes(st[:65536]))
+        p = run(tmp, '--charset', '$3000', '--sprites-on-screen', '--out', 'sc'); check(p.returncode == 0, 'default render with --sprites-on-screen runs: ' + p.stderr[-200:])
+        a = Image.open(os.path.join(tmp, 'sc', 'screen.png')).convert('RGB'); b = Image.open(os.path.join(tmp, 'sc', 'screen_with_sprites.png')).convert('RGB')
+        check(b.getpixel((22, 10)) == RGB[5] and a.getpixel((22, 10)) == RGB[0], 'sprite pixel at (11, 5) of the picture is its own colour 5; the plain screen.png has none')
+        check(b.getpixel((20, 10)) == RGB[0] and b.getpixel((22, 8)) == RGB[0], 'transparent sprite pixels leave the screen showing through')
+        check('sprite 0: pointer $80, X 34 Y 55, hires' in open(os.path.join(tmp, 'sc', 'index.md')).read(), 'index.md says which sprites were drawn, where')
+        # screen_regions.py: boxes, one colour per label, the codes of each region counted
+        ram = bytearray(65536)
+        for x in range(2): ram[0x400 + x] = 0x07
+        ram[0x400 + 40] = 0x09; ram[0x400 + 41] = 0x07
+        open(os.path.join(tmp, 'ram2.bin'), 'wb').write(bytes(ram)); Image.new('RGB', (640, 400), (30, 30, 30)).save(os.path.join(tmp, 'pic.png'))
+        p = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'screen_regions.py'), '--root', tmp, '--ram', os.path.join(tmp, 'ram2.bin'), '--in', os.path.join(tmp, 'pic.png'), '--out', os.path.join(tmp, 'reg.png'),
+                            '0,0,2,2,A', '10,10,12,11,B', '20,20,22,21,A'], capture_output=True, text=True)
+        check(p.returncode == 0 and '| A | (0,0)-(1,1) (20,20)-(21,20) | $07 (3), $00 (2), $09 (1) |' in p.stdout and '| B | (10,10)-(11,10) | $00 (2) |' in p.stdout, 'screen_regions: the table lists each region\'s cells and screen-RAM codes with counts (a shared label is one row): ' + p.stdout + p.stderr)
+        r = Image.open(os.path.join(tmp, 'reg.png')).convert('RGB'); y = r.getpixel((0, 0))
+        check(y != (30, 30, 30) and r.getpixel((20 * 16, 20 * 16)) == y and r.getpixel((10 * 16, 10 * 16)) != y, 'screen_regions: the label box is drawn in the region\'s colour; both regions with label A share it; B has another')
+        p = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'screen_regions.py'), '--root', tmp, '--ram', os.path.join(tmp, 'ram2.bin'), '--in', os.path.join(tmp, 'pic.png'), '--out', os.path.join(tmp, 'reg.png'), '0,0,41,2,A'], capture_output=True, text=True)
+        check(p.returncode != 0 and 'cells run' in p.stderr + p.stdout, 'screen_regions: a region outside the 40 x 25 cells is refused')
     print('selftest: %s' % ('FAILED (%d)' % len(fails) if fails else 'all passed')); sys.exit(1 if fails else 0)
 main()

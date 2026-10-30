@@ -88,6 +88,9 @@ Applies to: every project.
 ## Pictures live in one place
 Every generated picture (sprites, characters, screens, tracer-state renders, record sheets) is written in `docs/gfx/` (committed), never `build/`, `dumps/`, `/tmp` or the project root; a state render defaults to `docs/gfx/<state name>/`. Tracer-state renders live in git-ignored subfolders `docs/gfx/<state name>/`; a picture that backs a name or an owner answer is copied up into `docs/gfx/` with a descriptive name. Do not invent another folder: `--out` is `docs/gfx/` or a subfolder of it.
 
+## Owner questions about graphics
+A question about graphics shows an in-play screen with its sprites, with the regions numbered and the region-to-code table beside it, and asks one short question per region; never a single tile code, never a sheet of 256. The picture is named by its content and its path is given. What the code can answer is answered first. Method and tools: `graphics.md`, "Asking the owner about graphics".
+
 ## Addresses are never numbers
 A lo/hi pair that builds the address of a named variable or an image label (`lda #$66 / sta ptr / lda #$04 / sta ptr+1`) is a raw operand in disguise: `#<name` / `#>name`. `addr_immediates.py` reports it (also for variables below the image) and `p1_complete.py` blocks on a pair that names a variable; two plain values that merely look like a pair are waived with `// NOT-ADDRESS: reason`. A pointer table is complete: `table_tails.py` flags symbolic `.word` rows continued as raw `.byte` rows.
 

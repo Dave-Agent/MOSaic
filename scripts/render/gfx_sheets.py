@@ -13,6 +13,7 @@ says what each picture shows and which addresses and colours were used:
                                    the character set, screen RAM or bitmap (--all-blocks renders them too). A block a sprite points at NOW is marked with that sprite
                                    number (and takes its colour) in the index
   screen.png                       the screen as the VIC shows it: text mode (hires, multicolour, ECM) with colour RAM, or bitmap mode (hires or multicolour)
+  screen_with_sprites.png          with --sprites-on-screen: the same with the enabled sprites drawn on it, as a player sees it (an owner recognises a scene by its player and its digits)
 
 WHERE THE VIC SETTINGS COME FROM (first one that has a value wins): command line (--bank --charset --screen --bitmap --palette ...), project.config (GFX_BANK, GFX_CHARSET,
 GFX_SCREEN, GFX_BITMAP, GFX_PALETTE, GFX_MC), dumps/handoff_state.bin (65536 RAM + 64 VIC registers + 1024 colour RAM + $DD00: bank, $D018 screen / charset / bitmap
@@ -375,6 +376,21 @@ def ranges(lst):
     if s is not None: out.append((s, p))
     return ', '.join('$%02X' % a if a == b else '$%02X-$%02X' % (a, b) for a, b in out)
 
+def overlay_sprites(st, im):
+    """The enabled sprites drawn onto a 320x200 screen picture (border not drawn: sprite X 24 / Y 50 is its top left corner), at the positions, pointers, modes, colours and expansion of the
+    live VIC state. Lower sprite numbers are in front. Returns (picture, one line per sprite drawn). The priority against the characters ($D01B) is not modelled: a sprite is always on top."""
+    v = st.vic; out = im.copy(); lines = []
+    for n in range(7, -1, -1):
+        if not v[0x15] >> n & 1: continue
+        x = v[2 * n] | ((v[0x10] >> n & 1) << 8); y = v[2 * n + 1]; ptr = st.ram[(st.screen + 0x3f8 + n) & 0xffff]; mc = bool(st.smc[n])
+        d = st.ram[st.base + ptr * 64: st.base + ptr * 64 + 63]
+        pix = decode([d[i:i + 3] for i in range(0, 63, 3)], 3, mc, st.sprite_cols(n), 2); w = len(pix[0]); h = len(pix)
+        spr = Image.new('RGBA', (w, h), (0, 0, 0, 0)); spr.putdata([(0, 0, 0, 0) if c is None else tuple(c) + (255,) for l in pix for c in l])
+        if st.xe[n] or st.ye[n]: spr = spr.resize((w * (2 if st.xe[n] else 1), h * (2 if st.ye[n] else 1)), Image.NEAREST)
+        out.paste(spr, (x - 24, y - 50), spr)
+        lines.append('sprite %d: pointer $%02X, X %d Y %d, %s%s%s' % (n, ptr, x, y, 'multicolour' if mc else 'hires', ', wide' if st.xe[n] else '', ', tall' if st.ye[n] else ''))
+    return out, lines[::-1]
+
 def render_screen(st, args, out, idx):
     scale = 2
     colsrc = 'colour RAM live (state file)' if st.col else ('per-character table (%s)' % st.char_tab_src if st.char_tab else 'NO colour RAM: every cell drawn in colour %d (guess)' % (st.char_colour if st.char_colour is not None else 1))
@@ -409,6 +425,11 @@ def render_screen(st, args, out, idx):
         how = 'text mode%s%s, screen RAM $%04X, charset $%04X' % (', multicolour' if mc_screen else '', ', ECM' if st.ecm else '', st.screen, st.charset)
     save(im.resize((320 * scale, 200 * scale), Image.NEAREST), out, 'screen.png', idx, 'the screen at the hand-off (border not drawn)', how,
          'mode bits: %s; background colours: %s; cell colours: %s' % ('live ($D011 / $D016)' if st.vic else 'defaults / CLI', st.bg_src, colsrc))
+    if args.sprites_on_screen:
+        if not st.vic: print('  screen_with_sprites.png skipped: sprite positions need the live VIC state (a state file, dumps/handoff_state.bin)'); return
+        im2, lines = overlay_sprites(st, im)
+        save(im2.resize((320 * scale, 200 * scale), Image.NEAREST), out, 'screen_with_sprites.png', idx, 'the same screen with the enabled sprites drawn on it (what a player sees; border not drawn)', how + '; ' + ('; '.join(lines) if lines else 'no sprite is enabled'),
+             'sprite positions, pointers, modes and colours live from the state file; the priority against the characters ($D01B) is not modelled')
 
 # ------------------------------------------------------------------ custom renders
 def render_sprites_range(st, args, out, idx):
@@ -683,6 +704,7 @@ def main():
     ap.add_argument('--label', help='name part of the files of a custom render')
     ap.add_argument('--mc', action='store_true', help='render the multicolour variant only')
     ap.add_argument('--hires', action='store_true', help='render the hires variant only')
+    ap.add_argument('--sprites-on-screen', action='store_true', help='also write screen_with_sprites.png: the screen picture with the enabled sprites drawn on it (needs the live VIC state)')
     ap.add_argument('--all', action='store_true', help='also run the default render next to a custom one')
     ap.add_argument('--all-blocks', action='store_true', help='render sprite blocks that overlap the charset / screen / bitmap too')
     ap.add_argument('--scale', type=int, default=3, help='pixel scale of sheets (default 3)')
