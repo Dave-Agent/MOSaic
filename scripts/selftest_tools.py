@@ -227,6 +227,15 @@ _u0 = _unref('HANDOFF_PC="0800"\n'); _u1 = _unref('HANDOFF_PC="0800"\nLAUNCH_PC=
 check('unreferenced: a label at LAUNCH_PC is reached from outside (the launcher), like the one at HANDOFF_PC; a dead one is still listed', 'ColdStart' in _u0 and 'ColdStart' not in _u1 and 'Start' not in _u1.replace('ColdStart', '') and 'Dead' in _u1, _u0 + '|' + _u1)
 check('launch.sh: the SYS address is LAUNCH_PC, then HANDOFF_PC', 'LAUNCH_PC:-${HANDOFF_PC' in open(os.path.join(HERE, '..', 'framework', 'scripts', 'launch.sh')).read())
 
+# ---- status.py: a project that starts by injecting machine state, with no recorded contract, is warned ---------------------------------------------------------------
+def _st(cfg_extra, contract=False):
+    d = project('Start:\n  rts  // [0800:60 RTS]\n'); open(os.path.join(d, 'project.config'), 'a').write(cfg_extra)
+    if contract: os.makedirs(os.path.join(d, 'docs'), exist_ok=True); open(os.path.join(d, 'docs', 'start_contract.md'), 'w').write('# Start contract\n')
+    return subprocess.run([sys.executable, '-B', os.path.join(HERE, 'status.py'), '--root', d], capture_output=True, text=True, env=dict(os.environ, MOSAIC_NO_UPDATE_CHECK='1')).stdout
+check('status: LAUNCH_MODE=inject with no docs/start_contract.md prints the start warning, naming the setting', 'WARNING start' in _st('LAUNCH_MODE="inject"\n') and 'LAUNCH_MODE=inject' in _st('LAUNCH_MODE="inject"\n'))
+check('status: disk mode, SMOKE_MODE=inject and LAUNCH_POKES each warn', all('WARNING start' in _st(x) for x in ('LAUNCH_MODE="disk"\n', 'SMOKE_MODE="inject"\n', 'LAUNCH_POKES="d01c=ff"\n')))
+check('status: a recorded start contract silences it, and sys mode (or no key) never warns', 'WARNING start' not in _st('LAUNCH_MODE="inject"\n', contract=True) and 'WARNING start' not in _st('LAUNCH_MODE="sys"\n') and 'WARNING start' not in _st(''))
+
 # ---- code_to_bytes.py: instructions the export read from data go back to .byte rows -------------------------------------------------------------------------------
 d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'src'))
 with open(os.path.join(d, 'project.config'), 'w') as f: f.write('SRC_MAIN="src/m.asm"\n')

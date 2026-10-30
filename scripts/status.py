@@ -82,5 +82,8 @@ src1 = cfg.get('SRC_MAIN', ''); src2 = cfg.get('PHASE2_MAIN', '')
 if smoke and src1: print('Launch phase 1:  just launch 1      source: %s' % src1)
 if p2 and src2 and os.path.exists(P(src2)): print('Launch phase 2:  just launch 2      source: %s' % src2)
 print('(skip = no evidence found for that stage, but a later stage is done: its files may be regenerable and git-ignored)\nIf the user told you to go on, announce this step and start it; the work is steps 2, 3, 4 and 5; step 2 (parts 2.1 to 2.7) and step 4 (parts 4.1 to 4.4) are runs: do not ask inside a run. If you have just finished a stage on your own, report and ask whether to continue (SKILL.md, "Stages").')
+_inj = [k for k, v in (('LAUNCH_MODE=%s' % cfg.get('LAUNCH_MODE'), cfg.get('LAUNCH_MODE') in ('inject', 'disk')), ('SMOKE_MODE=%s' % cfg.get('SMOKE_MODE'), cfg.get('SMOKE_MODE') in ('inject', 'disk')), ('LAUNCH_POKES', bool(cfg.get('LAUNCH_POKES', '').strip()))) if v]
+if _inj and not os.path.exists(P('docs', 'start_contract.md')):       # the no-launcher rule (references/new_game.md, section 4): a fallback must be recorded, never hidden in settings
+    print('WARNING start: the build is started by injecting machine state (%s) and docs/start_contract.md does not exist. The aim is a point in the game\'s own code that starts with a plain boot (LAUNCH_MODE="sys", LAUNCH_PC); if there is none, list what is injected and why the game cannot set it itself in docs/start_contract.md and tell the user (references/new_game.md, section 4; rule self-contained-start). Phase 2 never injects.' % ', '.join(_inj))
 try: from version_check import notice; _n = notice(); print(_n) if _n else None      # a newer MOSaic release exists (one line, cached for a day, never updates anything)
 except Exception: pass
