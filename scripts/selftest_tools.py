@@ -235,6 +235,45 @@ def _st(cfg_extra, contract=False):
 check('status: LAUNCH_MODE=inject with no docs/start_contract.md prints the start warning, naming the setting', 'WARNING start' in _st('LAUNCH_MODE="inject"\n') and 'LAUNCH_MODE=inject' in _st('LAUNCH_MODE="inject"\n'))
 check('status: disk mode, SMOKE_MODE=inject and LAUNCH_POKES each warn', all('WARNING start' in _st(x) for x in ('LAUNCH_MODE="disk"\n', 'SMOKE_MODE="inject"\n', 'LAUNCH_POKES="d01c=ff"\n')))
 check('status: a recorded start contract silences it, and sys mode (or no key) never warns', 'WARNING start' not in _st('LAUNCH_MODE="inject"\n', contract=True) and 'WARNING start' not in _st('LAUNCH_MODE="sys"\n') and 'WARNING start' not in _st(''))
+# ---- platform.py: the descriptor is valid, and it says what the code it will replace does today ------------------------------------------------------------------------
+import platform as _pyplat; del _pyplat      # (the stdlib module; ours is imported by file below)
+import importlib.util as _iu2
+_ps = _iu2.spec_from_file_location('mosaic_platform', os.path.join(HERE, 'platform.py')); _pf = _iu2.module_from_spec(_ps); _ps.loader.exec_module(_pf)
+_c64 = _pf.load('c64')
+check('platform c64: the descriptor is valid', _pf.validate(_c64) == [], _pf.validate(_c64))
+check('platform: `platform.py check` passes on every descriptor', subprocess.run([sys.executable, '-B', os.path.join(HERE, 'platform.py'), 'check'], capture_output=True, text=True).returncode == 0)
+def _oracle(a, b):      # the memory map as scripts/trace/c64trace.c reads it (its read path): BASIC needs LORAM and HIRAM, the D000 area needs LORAM or HIRAM (I/O with CHAREN, else character ROM), the KERNAL needs HIRAM
+    if 0xA000 <= a < 0xC000 and (b & 3) == 3: return 'BASIC ROM'
+    if 0xD000 <= a < 0xE000 and (b & 3): return 'I/O area' if b & 4 else 'character ROM'
+    if a >= 0xE000 and (b & 2): return 'KERNAL ROM'
+    return None
+_bad = [(hex(a), hex(b), _pf.visible_at(_c64, a, b)) for b in range(256) for a in (0x0002, 0x0400, 0x9FFF, 0xA000, 0xBFFF, 0xC000, 0xCFFF, 0xD000, 0xDFFF, 0xE000, 0xFFFA, 0xFFFF)
+        if (lambda o, v: (o or ('ram' if v == 'ram' else v)) != v or (o is None and v not in ('ram', 'default screen', 'program RAM', 'zero page', 'upper RAM')))(_oracle(a, b), _pf.visible_at(_c64, a, b))]
+check('platform c64: the banking rules give, for every value of $01 and a probe in each region, what the tracer\'s memory map gives', not _bad, _bad[:5])
+check('platform c64: a game that runs with $01 = $35 has the KERNAL and BASIC out and the I/O area in (its interrupts use the RAM vectors)', _pf.visible_at(_c64, 0xE000, 0x35) == 'ram' and _pf.visible_at(_c64, 0xA000, 0x35) == 'ram' and _pf.visible_at(_c64, 0xD000, 0x35) == 'I/O area')
+_mir = lambda a: next((lo + (a - lo) % st for lo, hi, st in ((0xD000, 0xD3FF, 0x40), (0xD400, 0xD7FF, 0x20), (0xDC00, 0xDCFF, 0x10), (0xDD00, 0xDDFF, 0x10)) if lo <= a <= hi), a)       # apply_libs.py's mirror()
+check('platform c64: the chip mirror steps equal apply_libs.py\'s table for every address of the I/O area', all(_pf.mirror(_c64, a) == _mir(a) for a in range(0xD000, 0xE000)))
+_src = lambda p: open(os.path.join(HERE, '..', p)).read()
+_roms = _c64['memory']['rom_images'].values()
+_kn = _c64['memory']['rom_images']['kernal']
+check('platform c64: the ROM image names are the tracer\'s (all three), and the KERNAL\'s is the one check_env and rom_dir look for (they check only that file)', all(r in _src('scripts/trace/c64trace.c') for r in _roms) and _kn in _src('scripts/trace/rom_dir.py') and _kn in _src('scripts/trace/rom_dir.py'), list(_roms))
+check('platform c64: the PAL raster geometry is the tracer\'s', ('#define CYCLES_PER_LINE %d' % _c64['video']['standard']['pal']['cycles_per_line']) in _src('scripts/trace/c64trace.c') and ('#define LINES %d' % _c64['video']['standard']['pal']['lines']) in _src('scripts/trace/c64trace.c'))
+check('platform c64: the vectors, the KERNAL jump table and the I/O chips are the libraries\' and port_scan\'s', all(('$%s' % v) in _src('libs/cpu.asm') for v in _c64['cpu']['vectors'].values()) and 'FF81' in _src('scripts/port_scan.py') and 'FFF5' in _src('scripts/port_scan.py') and all(re.search(r'^%s: \{' % c['scope'], _src('libs/' + c['lib']), re.M) for c in _c64['chips'] if c.get('lib')))
+_used = [u for sec in _c64.values() if isinstance(sec, dict) for u in sec.get('used_by', [])]
+check('platform c64: every file or folder a `used_by` names exists (the migration map has not drifted)', all(os.path.exists(os.path.join(HERE, '..', u)) for u in _used) and len(_used) > 15, [u for u in _used if not os.path.exists(os.path.join(HERE, '..', u))])
+import copy as _cp
+def _mut(f):
+    d = _cp.deepcopy(_c64); f(d); return _pf.validate(d)
+check('platform validate: overlapping regions, a gap, a bad hex value, a chip outside the I/O area, an unknown bit in a banking expression and a missing section are all refused',
+      any('overlaps' in p for p in _mut(lambda d: d['memory']['regions'][1].__setitem__('lo', '0080'))) and any('tile' in p for p in _mut(lambda d: d['memory']['regions'].pop(3))) and any('hex' in p for p in _mut(lambda d: d['cpu']['vectors'].__setitem__('nmi', 'XYZ')))
+      and any('not inside an io region' in p for p in _mut(lambda d: d['chips'][0].__setitem__('lo', '0400'))) and any('may use only' in p for p in _mut(lambda d: d['memory']['banking']['visible'][0].__setitem__('when', 'FOO and LORAM'))) and any('no `media`' in p for p in _mut(lambda d: d.pop('media'))))
+_pp = project('Start:\n  rts  // [0800:60 RTS]\n')
+check('platform for_project: a project with no PLATFORM key is the c64', _pf.for_project(_pp)['id'] == 'c64')
+open(os.path.join(_pp, 'project.config'), 'a').write('PLATFORM="nes"\n')
+_r = subprocess.run([sys.executable, '-B', '-c', 'import sys; sys.path.insert(0, %r); import platform as p; print(1)' % HERE], capture_output=True, text=True)
+try: _pf.for_project(_pp); _ok = False
+except SystemExit as _e: _ok = 'no platform' in str(_e) and 'c64' in str(_e)
+check('platform for_project: an unknown PLATFORM names the platforms there are', _ok)
 
 # ---- code_to_bytes.py: instructions the export read from data go back to .byte rows -------------------------------------------------------------------------------
 d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'src'))

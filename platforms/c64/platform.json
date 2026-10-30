@@ -1,0 +1,120 @@
+{
+  "_doc": "The Commodore 64 as data (issue #39). Every value is what a tool of this skill assumes today; the 'used_by' notes name the code that will read it instead. Addresses are hex strings without a prefix. Schema and rules: references/platform_descriptor.md.",
+  "schema": 1,
+  "id": "c64",
+  "name": "Commodore 64",
+  "family": "6502",
+
+  "cpu": {
+    "variant": "6510",
+    "assembler": {"kick": "_6502", "kick_without_illegal_opcodes": "_6502NoIllegals"},
+    "decimal_mode": true,
+    "illegal_opcodes": "the common undocumented ones are modelled by the tracer",
+    "onchip_port": {"direction": "0000", "data": "0001", "lib": "cpu.asm", "scope": "CPU.MOS6510"},
+    "vectors": {"nmi": "FFFA", "reset": "FFFC", "irq": "FFFE"},
+    "used_by": ["scripts/trace/c64trace.c", "scripts/sim/c64sim.py", "scripts/apply_libs.py", "scripts/trace/entry_points.py", "scripts/ghidra/make_seeds.py"]
+  },
+
+  "memory": {
+    "size": 65536,
+    "regions": [
+      {"name": "zero page",         "lo": "0000", "hi": "00FF", "kind": "ram"},
+      {"name": "stack",             "lo": "0100", "hi": "01FF", "kind": "ram"},
+      {"name": "system pages",      "lo": "0200", "hi": "03FF", "kind": "ram"},
+      {"name": "default screen",    "lo": "0400", "hi": "07FF", "kind": "ram"},
+      {"name": "program RAM",       "lo": "0800", "hi": "9FFF", "kind": "ram"},
+      {"name": "BASIC ROM",         "lo": "A000", "hi": "BFFF", "kind": "rom", "under": "ram"},
+      {"name": "upper RAM",         "lo": "C000", "hi": "CFFF", "kind": "ram"},
+      {"name": "I/O area",          "lo": "D000", "hi": "DFFF", "kind": "io", "under": "ram", "alternate": "character ROM"},
+      {"name": "KERNAL ROM",        "lo": "E000", "hi": "FFFF", "kind": "rom", "under": "ram"}
+    ],
+    "banking": {
+      "register": "0001",
+      "bits": {"0": "LORAM", "1": "HIRAM", "2": "CHAREN"},
+      "visible": [
+        {"region": "BASIC ROM",      "when": "LORAM and HIRAM"},
+        {"region": "KERNAL ROM",     "when": "HIRAM"},
+        {"region": "I/O area",       "when": "(LORAM or HIRAM) and CHAREN"},
+        {"region": "character ROM",  "at": "D000-DFFF", "when": "(LORAM or HIRAM) and not CHAREN"}
+      ],
+      "doc": "Only the low three bits of $01 select the memory map (a game that runs with $01 = $35 has everything but I/O out, so its interrupts use the RAM vectors under the KERNAL). Writes always go to the RAM under a ROM."
+    },
+    "rom_images": {"kernal": "kernal-901227-03.bin", "basic": "basic-901226-01.bin", "character": "chargen-901225-01.bin"},
+    "used_by": ["scripts/trace/c64trace.c", "scripts/trace/rom_dir.py", "scripts/check_env.py", "scripts/raw_refs.py"]
+  },
+
+  "chips": [
+    {"name": "VIC-II", "lib": "vic.asm", "scope": "VIC", "lo": "D000", "hi": "D3FF", "mirror_step": "40", "registers": "D000-D02E"},
+    {"name": "SID",    "lib": "sid.asm", "scope": "SID", "lo": "D400", "hi": "D7FF", "mirror_step": "20", "registers": "D400-D418"},
+    {"name": "colour RAM", "lo": "D800", "hi": "DBFF", "kind": "ram", "doc": "4 bits per cell; the VIC-II reads it, the CPU sees it in the I/O area"},
+    {"name": "CIA 1",  "lib": "cia.asm", "scope": "CIA", "lo": "DC00", "hi": "DCFF", "mirror_step": "10", "registers": "DC00-DC0F", "role": "keyboard, joysticks, timers, IRQ"},
+    {"name": "CIA 2",  "lib": "cia.asm", "scope": "CIA", "lo": "DD00", "hi": "DDFF", "mirror_step": "10", "registers": "DD00-DD0F", "role": "VIC bank, serial bus, user port, NMI"}
+  ],
+  "libs": ["vic.asm", "sid.asm", "cia.asm", "cpu.asm"],
+
+  "video": {
+    "chip": "VIC-II",
+    "standard": {"pal": {"lines": 312, "cycles_per_line": 63}, "ntsc": {"lines": 263, "cycles_per_line": 65}},
+    "modelled_standard": "pal",
+    "text": {"columns": 40, "rows": 25, "default_screen": "0400"},
+    "sprites": {"count": 8, "pointer_offset": "03F8", "bytes_per_sprite": 64, "origin": {"x": 24, "y": 50}},
+    "banks": {"count": 4, "size": 16384, "register": "DD00", "bits": "0-1", "inverted": true},
+    "character_set": {"rom": "character", "visible_to_vic_at": ["1000-1FFF", "9000-9FFF"]},
+    "palette": "pepto",
+    "used_by": ["scripts/render/gfx_sheets.py", "scripts/render/screen_regions.py", "scripts/trace/c64trace.c"]
+  },
+
+  "input": {
+    "joysticks": 2,
+    "keyboard": {"matrix": "8x8", "select": "DC00", "read": "DC01"},
+    "used_by": ["scripts/trace/c64trace.c"]
+  },
+
+  "boot": {
+    "load_address": "0801",
+    "basic_stub": true,
+    "hand_off": "the moment the game is in RAM and its loader jumps into it",
+    "cartridge_cold_start": "8000",
+    "used_by": ["scripts/launcher/run_game.py", "scripts/vice/vice_handoff.py", "scripts/new_project.py"]
+  },
+
+  "media": {
+    "types": ["d64", "g64", "d71", "d81", "t64", "tap", "prg", "crt"],
+    "prg_header_bytes": 2,
+    "tools": {"disk": "c1541", "tape": "scripts/tape", "basic": "petcat"},
+    "used_by": ["scripts/disk/extract_files.py", "scripts/tape", "scripts/new_project.py", "scripts/check_env.py"]
+  },
+
+  "emulator": {
+    "name": "VICE",
+    "binary": "x64sc",
+    "unattended_flags": ["+confirmonexit", "-drive8truedrive", "-drive8type", "1541", "-jamaction", "2"],
+    "monitor": "remote text monitor",
+    "never_attach_originals": true,
+    "used_by": ["scripts/vice", "scripts/launcher", "scripts/check_env.py"]
+  },
+
+  "dump_noise": {
+    "doc": "Bytes of a RAM dump that are machine state and differ from dump to dump; the candidates `golden.py variance` / GOLDEN_PIN deal with.",
+    "cells": [
+      {"lo": "00A0", "hi": "00A2", "what": "KERNAL jiffy clock", "seen": "a game that reads $A2 diverges"},
+      {"lo": "00CC", "hi": "00CF", "what": "cursor blink timers"},
+      {"lo": "0100", "hi": "01FF", "what": "stack leftovers"}
+    ],
+    "port": "0001"
+  },
+
+  "hardware_markers": {
+    "doc": "What port_scan and platform_deps look for.",
+    "kernal_jump_table": {"lo": "FF81", "hi": "FFF5"},
+    "raster_register": "D012",
+    "interrupt_flags": ["D019", "DC0D", "DD0D"],
+    "used_by": ["scripts/port_scan.py", "scripts/platform_deps.py", "scripts/reloc_hazards.py"]
+  },
+
+  "tracer": {
+    "model": "scripts/trace/c64trace.c",
+    "start": {"sp": "FC", "p": "34", "port": "35"},
+    "used_by": ["scripts/trace", "scripts/sim", "scripts/golden"]
+  }
+}

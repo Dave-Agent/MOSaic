@@ -63,6 +63,8 @@ JUDGE_CROP=""                   # X0,Y0,X1,Y1 of something static on the start s
 SLICE_REVIEW="off"
 # The most names the reviewer tests per slice (0 = no cap): it bounds the cost, about 30,000 + 4,000 per name (12 names: about 80,000 tokens). `just review-risk NAME` shows what a slice would cost before any tokens are spent.
 SLICE_REVIEW_MAX_CLAIMS="12"
+# The platform (platforms/<id>/platform.json, references/platform_descriptor.md). Only c64 exists; a project without this key is the c64.
+#PLATFORM="c64"
 ACTIVE_PHASE="1"
 # Phase 2 safety net: the scenarios of the timing-tolerant golden set (comma separated; the others are exact-only). Empty = all.
 GOLDEN_T_SET=""
