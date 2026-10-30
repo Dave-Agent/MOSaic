@@ -4,12 +4,22 @@ Five steps after setup. Steps 2 and 4 are big jobs that the agent does in the ba
 
 **How it works.** You tell Claude what to do, or run the setup script, and it does the work. You can always just say **"move to the next stage"**. `just status` in the project tells you where you are.
 
-**The agent asks you a question at four points only**, when a step ends, and each message says how to launch what you have and which file to read:
-after **step 2** ("Raw disassembly complete: start phase 1?"), after **step 3** ("Named monolith complete: start the phase 2 refactoring?"), after **step 4** ("Refactoring done: review the dead-code list?") and after **step 5** ("Phase 2 complete: play it"). In between it just works, and asks earlier only if it needs something from you.
+**The agent asks you a question at four points only**, when a step ends:
 
-**Words used below.**
-**Reference:** a memory image of the game alone (no loader, no crack); every build is checked against it. **Hand-off:** the moment the game is fully loaded and about to start. **Byte-identical:** the source assembles to exactly the same bytes as the reference. **Slice:** one region of the source worked on in a scratch copy, merged back when its checks pass. **Agent:** the Claude session doing the work, in Claude Code inside the project folder.
-**Phase 1** is the named, commented source that is byte-identical to the original. **Phase 2** is the same game split into files, separated from the C64 hardware, and relocatable.
+- **step 2** ("Raw disassembly complete: start phase 1?")
+- **step 3** ("Named monolith complete: start the phase 2 refactoring?")
+- **step 4** ("Refactoring done: review the dead-code list?")
+- **step 5** ("Phase 2 complete: play it").
+
+**Glossary**
+
+- **Reference:** a memory image of the game alone (no loader, no crack); every build is checked against it.
+- **Hand-off:** the moment the game is fully loaded and about to start.
+- **Byte-identical:** the source assembles to exactly the same bytes as the reference.
+- **Slice:** one region of the source worked on in a scratch copy, merged back when its checks pass.
+- **Agent:** the Claude session doing the work, in Claude Code inside the project folder.
+- **Phase 1** is the named, commented source that is byte-identical to the original.
+- **Phase 2** is the same game split into files, separated from the C64 hardware, and relocatable.
 
 ---
 
@@ -54,7 +64,7 @@ Your file is copied into the project's `originals/` folder and its SHA-256 recor
 
 ## Step 2. Create a source that builds and starts
 
-**Goal:** an `.asm` source that assembles byte for byte to the original game and starts. This is one job in seven parts (research, extracting the files, the clean reference, the Ghidra export, the first build, naming the hardware registers, starting the game; see Appendix A), and there is no point at which you would want to stop in the middle.
+**Goal:** an `.asm` source that assembles byte for byte to the original game and starts. This is one job in seven parts (research, extracting the files, the clean reference, the Ghidra export, the first build, naming the hardware registers, starting the game; see Appendix A).
 
 Open Claude Code in the project folder and say **"move to the next stage"**, or, to be explicit:
 
@@ -70,7 +80,7 @@ The agent tells you each part as it starts and stops early only if it needs some
 
 ## Step 3. Name every routine (phase 1)
 
-**Goal:** every routine named and commented, no raw address operands, no placeholder names, still byte-identical.
+**Goal:** every routine named and commented, no raw address operands, no placeholder names, still builds byte-identical to the original.
 
 Say "yes" to the question after step 2, or:
 
