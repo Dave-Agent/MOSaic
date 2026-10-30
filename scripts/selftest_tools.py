@@ -275,6 +275,12 @@ try: _pf.for_project(_pp); _ok = False
 except SystemExit as _e: _ok = 'no platform' in str(_e) and 'c64' in str(_e)
 check('platform for_project: an unknown PLATFORM names the platforms there are', _ok)
 
+# ---- layout_plan.py: every tool is classified (shared / cpu / platform / backend), and the plan agrees with the disk ----------------------------------------------------
+_r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_plan.py'), 'check'], capture_output=True, text=True)
+check('layout plan: every file under scripts/ has a row in references/tool_layout.tsv, every row exists (a new script must be classified)', _r.returncode == 0, _r.stdout)
+_pl = [l.split('\t') for l in open(os.path.join(HERE, '..', 'references', 'tool_layout.tsv')) if l.strip() and not l.startswith('#')]
+check('layout plan: the platform and CPU axes carry a reason for every tool that moves, and the targets are inside platforms/c64/tools or cpu/6502', all(r[3].strip() for r in _pl if r[1] in ('platform/c64', 'cpu/6502')) and all(r[2].startswith('../platforms/c64/tools/') for r in _pl if r[1] == 'platform/c64') and all(r[2].startswith('cpu/6502/') for r in _pl if r[1] == 'cpu/6502'))
+
 # ---- code_to_bytes.py: instructions the export read from data go back to .byte rows -------------------------------------------------------------------------------
 d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'src'))
 with open(os.path.join(d, 'project.config'), 'w') as f: f.write('SRC_MAIN="src/m.asm"\n')

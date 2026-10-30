@@ -1,0 +1,117 @@
+# Where every tool under scripts/ lives (issue #39). Columns: path (today, relative to scripts/), axis, target (relative to scripts/), why.
+# axis: shared = neither a CPU nor a platform (the process, the source text, the checks); cpu/6502 = parses instructions and addressing modes; platform/c64 = machine behaviour: a model, an emulator, a chip's graphics, a medium's format; backend/ghidra = the disassembler backend.
+# The rule: a tool is placed by what it cannot do without. Parameters (a mirror step, a vector, a ROM name) come from the platform descriptor and keep a tool shared; BEHAVIOUR moves it.
+_common.py	shared	_common.py	
+add_label.py	shared	add_label.py	
+addr_immediates.py	cpu/6502	cpu/6502/addr_immediates.py	finds lo/hi immediate pairs: 8-bit immediates building 16-bit addresses
+addr_tables.py	shared	addr_tables.py	
+align_comments.py	shared	align_comments.py	
+anon_labels.py	shared	anon_labels.py	
+apply_libs.py	shared	apply_libs.py	
+build_compare.sh	shared	build_compare.sh	
+check_env.py	shared	check_env.py	
+check_layout.py	shared	check_layout.py	
+comment_check.py	shared	comment_check.py	
+coverage/README.md	shared	coverage/README.md	
+coverage/raw_executed.py	shared	coverage/raw_executed.py	
+coverage/run_scenarios.py	shared	coverage/run_scenarios.py	
+coverage/unexecuted.py	shared	coverage/unexecuted.py	
+cut_section.py	shared	cut_section.py	
+disasm/dis6502.py	cpu/6502	cpu/6502/dis6502.py	a 6502 disassembler
+disk/extract_files.py	platform/c64	../platforms/c64/tools/media/disk/extract_files.py	reads a C64 disk image (c1541)
+framework_sync.py	shared	framework_sync.py	
+gauge.py	shared	gauge.py	
+ghidra/fetch_exporter.py	backend/ghidra	ghidra/fetch_exporter.py	the Ghidra backend (stays: already its own directory)
+ghidra/find_ghidra.py	backend/ghidra	ghidra/find_ghidra.py	the Ghidra backend (stays: already its own directory)
+ghidra/make_seeds.py	backend/ghidra	ghidra/make_seeds.py	the Ghidra backend (stays: already its own directory)
+ghidra/run.sh	backend/ghidra	ghidra/run.sh	the Ghidra backend (stays: already its own directory)
+ghidra/setup.py	backend/ghidra	ghidra/setup.py	the Ghidra backend (stays: already its own directory)
+golden/README.md	shared	golden/README.md	
+golden/golden.py	shared	golden/golden.py	
+hi_byte_names.py	shared	hi_byte_names.py	
+justfile_sync.py	shared	justfile_sync.py	
+launcher/README.md	platform/c64	../platforms/c64/tools/emulator/launcher/README.md	the VICE launcher
+launcher/run_game.py	platform/c64	../platforms/c64/tools/emulator/launcher/run_game.py	starts the game in VICE the way the hand-off did
+launcher/smoke.py	platform/c64	../platforms/c64/tools/emulator/launcher/smoke.py	headless start test in VICE
+layout_fuzz.py	shared	layout_fuzz.py	
+layout_plan.py	shared	layout_plan.py	
+magic_scan.py	shared	magic_scan.py	
+new_project.py	shared	new_project.py	
+optable.py	cpu/6502	cpu/6502/optable.py	the 6510 decode table: opcodes and addressing modes
+p1_complete.py	shared	p1_complete.py	
+platform.py	shared	platform.py	
+platform_deps.py	shared	platform_deps.py	
+port_scan.py	shared	port_scan.py	
+questions.py	shared	questions.py	
+raw_refs.py	cpu/6502	cpu/6502/raw_refs.py	parses 6502 operands to find raw addresses
+refactor/README.md	shared	refactor/README.md	
+refactor/alias.py	shared	refactor/alias.py	
+refactor/bitskip.py	cpu/6502	cpu/6502/bitskip.py	the BIT-skip trick: an instruction hidden in another
+refactor/bytes_to_code.py	cpu/6502	cpu/6502/bytes_to_code.py	decodes bytes into instructions with the opcode table
+refactor/code_to_bytes.py	cpu/6502	cpu/6502/code_to_bytes.py	the reverse: instructions to bytes
+refactor/drop_labels.py	shared	refactor/drop_labels.py	
+refactor/move_img.py	shared	refactor/move_img.py	
+refactor/note.py	shared	refactor/note.py	
+refactor/records.py	shared	refactor/records.py	
+refactor/rename.py	shared	refactor/rename.py	
+refactor/replace_imm.py	shared	refactor/replace_imm.py	
+refactor/replace_raw.py	shared	refactor/replace_raw.py	
+refactor/scopeify.py	shared	refactor/scopeify.py	
+refactor/selftest.py	shared	refactor/selftest.py	
+refactor/set_comment.py	shared	refactor/set_comment.py	
+refactor/table_words.py	shared	refactor/table_words.py	
+refactor/uses.py	shared	refactor/uses.py	
+reference/dump_diff.py	shared	reference/dump_diff.py	
+reference/file_coverage.py	shared	reference/file_coverage.py	
+reference/make_reference.py	shared	reference/make_reference.py	
+reference/vote_dumps.py	shared	reference/vote_dumps.py	
+release_bump.py	shared	release_bump.py	
+reloc_hazards.py	cpu/6502	cpu/6502/reloc_hazards.py	reads instructions and operands for relocation hazards
+reloc_scan.py	cpu/6502	cpu/6502/reloc_scan.py	reads addressing modes (indirect, indexed) to find what breaks if code moves
+render/README.md	platform/c64	../platforms/c64/tools/video/README.md	the VIC-II renderer
+render/gfx_sheets.py	platform/c64	../platforms/c64/tools/video/gfx_sheets.py	renders VIC-II graphics
+render/gfx_sprites.py	platform/c64	../platforms/c64/tools/video/gfx_sprites.py	same tool, custom renders
+render/screen_regions.py	platform/c64	../platforms/c64/tools/video/screen_regions.py	numbered regions on a text-mode screen (40 x 25 cells)
+render/selftest.py	platform/c64	../platforms/c64/tools/video/selftest.py	self-test of the VIC-II renderer
+research/check_pokes.py	shared	research/check_pokes.py	
+research/note.py	shared	research/note.py	
+research/pdf_pages.py	shared	research/pdf_pages.py	
+review.py	shared	review.py	
+rules_table.py	shared	rules_table.py	
+scan_offsets.py	cpu/6502	cpu/6502/scan_offsets.py	label+offset uses in operands
+section_coverage.py	shared	section_coverage.py	
+selftest_tools.py	shared	selftest_tools.py	
+sentinel_scan.py	shared	sentinel_scan.py	
+sim/README.md	shared	sim/README.md	
+sim/c64sim.py	platform/c64	../platforms/c64/tools/trace/c64sim.py	runs a routine in the machine model
+sim/example_test.py	platform/c64	../platforms/c64/tools/trace/example_test.py	an example routine test on the machine model
+sim/run_tests.py	shared	sim/run_tests.py	
+sim/symbols.py	shared	sim/symbols.py	
+slice.py	shared	slice.py	
+smc_list.py	cpu/6502	cpu/6502/smc_list.py	self-modifying sites in instruction lines
+split_all.py	shared	split_all.py	
+split_section.py	shared	split_section.py	
+status.py	shared	status.py	
+symbols_tidy.py	shared	symbols_tidy.py	
+table_counts.py	shared	table_counts.py	
+table_tails.py	shared	table_tails.py	
+tape/selftest.py	platform/c64	../platforms/c64/tools/media/tape/selftest.py	self-test of the tape reader
+tape/tap_extract.py	platform/c64	../platforms/c64/tools/media/tape/tap_extract.py	reads a C64 tape image (KERNAL encoding)
+todo_list.py	shared	todo_list.py	
+trace/README.md	shared	trace/README.md	
+trace/c64env.py	platform/c64	../platforms/c64/tools/trace/c64env.py	the machine model's environment (ROMs, start state, build)
+trace/c64trace.c	platform/c64	../platforms/c64/tools/trace/c64trace.c	the machine model and the 6510 core
+trace/entry_points.py	shared	trace/entry_points.py	
+trace/hit_counts.py	shared	trace/hit_counts.py	
+trace/layout_compare.py	shared	trace/layout_compare.py	
+trace/report.py	shared	trace/report.py	
+trace/rom_dir.py	platform/c64	../platforms/c64/tools/trace/rom_dir.py	where VICE keeps the ROM images
+trace/sample_report.py	shared	trace/sample_report.py	
+trace/selftest.py	platform/c64	../platforms/c64/tools/trace/selftest.py	the trust test of the 6510 core in c64trace.c
+unreferenced.py	shared	unreferenced.py	
+version_check.py	shared	version_check.py	
+vice/judge_screenshot.py	platform/c64	../platforms/c64/tools/emulator/vice/judge_screenshot.py	judges a VICE screenshot
+vice/vice_handoff.py	platform/c64	../platforms/c64/tools/emulator/vice/vice_handoff.py	VICE driver: run to the hand-off and dump RAM
+vice/vice_monitor.py	platform/c64	../platforms/c64/tools/emulator/vice/vice_monitor.py	VICE monitor protocol
+vice/vice_symbols.py	platform/c64	../platforms/c64/tools/emulator/vice/vice_symbols.py	VICE monitor labels
+zp_namespace.py	shared	zp_namespace.py	
