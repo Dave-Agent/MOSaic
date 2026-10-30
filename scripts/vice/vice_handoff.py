@@ -45,16 +45,20 @@ def main():
     tmo = args.timeout or float(cfg.get('HANDOFF_TIMEOUT', 300)); port = args.port or int(cfg.get('VICE_MONITOR_PORT', 6510))
     vice = args.vice or cfg.get('VICE_BIN') or 'x64sc'
     if not os.path.exists(media): sys.exit('media not found: ' + media)
-    proc = start_vice(vice, media, port, warp=not args.no_warp, limit_cycles=args.limit_cycles, display=cfg.get('VICE_DISPLAY')); ok = True
+    proc = start_vice(vice, media, port, warp=not args.no_warp, limit_cycles=args.limit_cycles, display=cfg.get('VICE_DISPLAY'), defer=True); ok = True
     try:
         m = Monitor(port); m.read(1)
+        started = []
+        def go():                                                  # the first `go` of a PRG run starts the program (the breakpoint is armed already); every other one continues
+            if proc.deferred and not started: started.append(1); return m.cmd(proc.deferred, 0.5)
+            return m.cmd('x', 0.2)
         for st in args.step:
             at, _, cs = st.partition('='); at = '%04x' % hexa(at)
-            m.cmd('break ' + at); seen = m.cmd('x', 0.2)            # keep the reply of `x`: a breakpoint hit within 0.2 s is reported in it
+            m.cmd('break ' + at); seen = go()            # keep the reply of `x`: a breakpoint hit within 0.2 s is reported in it
             if not m.wait_stop(tmo, at, seen): sys.exit('step %s: breakpoint not reached within %ds' % (at, tmo))
             m.cmd('delete')
             for c in split_cmds(cs): m.cmd(c, 0.3)
-        m.cmd('break ' + hand); seen = m.cmd('x', 0.2); feed = split_cmds(args.feed); hit = False; t0 = time.time()
+        m.cmd('break ' + hand); seen = go(); feed = split_cmds(args.feed); hit = False; t0 = time.time()
         if not feed: hit = m.wait_stop(tmo, hand, seen)
         elif 'Stop on' in seen and hand in seen.lower(): hit = True
         while feed and time.time() - t0 < tmo and not hit:

@@ -77,15 +77,19 @@ def display_wrap(cmd, mode=None):
         sys.stderr.write('VICE_DISPLAY=xvfb but xvfb-run is not installed (apt install xvfb): using minimized\n')
     return cmd[:1] + ['-minimized'] + cmd[1:]
 
-def start_vice(vice_bin, media, port=6510, warp=True, limit_cycles=None, extra=(), display=None):
-    """Start VICE with the remote text monitor open and the media autostarted from a scratch COPY (see scratch_copy); returns the Popen (kill it when done, and rmtree proc.scratch_dir)."""
-    scratch = None
-    if media.lower().endswith(DISK_MEDIA): media, scratch = scratch_copy(media)
+def start_vice(vice_bin, media, port=6510, warp=True, limit_cycles=None, extra=(), display=None, defer=False):
+    """Start VICE with the remote text monitor open and the media autostarted from a scratch COPY (see scratch_copy); returns the Popen (kill it when done, and rmtree proc.scratch_dir).
+    defer=True, for a PRG: VICE is started WITHOUT the program and proc.deferred holds the monitor command that starts it (`autostart "FILE"`). Send it AFTER arming the first breakpoint:
+    a PRG is loaded through VICE's virtual drive (even with a true drive set) and autostart runs at warp speed, so the program is past its first instructions (a BASIC stub's SYS target)
+    well before a monitor client has connected and set a breakpoint there. A disk loads slowly enough that this never mattered."""
+    scratch = None; deferred = None
+    if media.lower().endswith(DISK_MEDIA + ('.prg',)): media, scratch = scratch_copy(media)      # a PRG too: VICE mounts its folder as drive 8, writable
+    if defer and media.lower().endswith('.prg'): deferred = 'autostart "%s"' % media; media = None   # see the docstring
     a = [vice_bin] + (['-warp'] if warp else []) + ['+confirmonexit', '-drive8truedrive', '-drive8type', '1541', '-jamaction', '2', '-remotemonitor',
-        '-remotemonitoraddress', 'ip4://127.0.0.1:%d' % port] + (['-limitcycles', str(limit_cycles)] if limit_cycles else []) + list(extra) + ['-autostart', media]
+        '-remotemonitoraddress', 'ip4://127.0.0.1:%d' % port] + (['-limitcycles', str(limit_cycles)] if limit_cycles else []) + list(extra) + (['-autostart', media] if media else [])
     assert '-default' not in a
     a = display_wrap(a, display)
-    proc = subprocess.Popen(a, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); proc.scratch_dir = scratch
+    proc = subprocess.Popen(a, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); proc.scratch_dir = scratch; proc.deferred = deferred
     import atexit, shutil
     if scratch: atexit.register(shutil.rmtree, scratch, True)
     return proc
