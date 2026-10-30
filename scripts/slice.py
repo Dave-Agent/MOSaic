@@ -3,7 +3,7 @@
 
   slice.py check [--root DIR] [--phase 1|2] [--range LO-HI] [--allow-marked]
   slice.py start NAME [--root DIR]                 scratch copy of the project for an agent (or yourself) to work in
-  slice.py merge NAME [--root DIR]                 take the scratch repo's commits into the real project, then run the checks there
+  slice.py merge NAME [--root DIR] [--skip-review REASON]   take the scratch repo's commits into the real project, then run the checks there; with SLICE_REVIEW="required" only with a passing Challenger review record for the diff (review.py, references/challenger.md)
   slice.py status [NAME]                           what a slice (or every slice) has done so far: commits, uncommitted changes, the agent's progress notes, how long since anything moved
   slice.py note NAME TEXT...                       append a progress note (the slice's agent runs this at every milestone: see references/slice_brief.md)
 
@@ -29,7 +29,7 @@ import argparse, os, re, shutil, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 p.add_argument('cmd', choices=('check', 'start', 'merge', 'status', 'note')); p.add_argument('name', nargs='?'); p.add_argument('text', nargs='*'); p.add_argument('--root', default='.'); p.add_argument('--phase', type=int, default=1)
-p.add_argument('--range'); p.add_argument('--allow-marked', action='store_true')
+p.add_argument('--range'); p.add_argument('--allow-marked', action='store_true'); p.add_argument('--skip-review', metavar='REASON', help='merge without a Challenger review record, saying why (recorded in docs/reviews/)')
 args = p.parse_args(); root = os.path.abspath(args.root)
 SCRATCH = os.environ.get('SLICE_SCRATCH', os.path.join(tempfile.gettempdir(), 'mosaic-slices'))
 def run(cmd, cwd=None): return subprocess.run(cmd, cwd=cwd or root, capture_output=True, text=True)
@@ -111,6 +111,24 @@ pdir = os.path.join(SCRATCH, args.name, 'patches'); shutil.rmtree(pdir, ignore_e
 r = run(['git', 'format-patch', '-o', pdir, base + '..HEAD'], dst)
 patches = sorted(os.listdir(pdir)) if os.path.isdir(pdir) else []
 if not patches: sys.exit('no commits in the scratch repo since the base: nothing to merge')
+HERE_ = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE_)
+from _common import config as _config
+mode = _config(root).get('SLICE_REVIEW', 'off').lower()                  # an existing project has no such key: no change for it
+rv = [sys.executable, '-B', os.path.join(HERE_, 'review.py')]
+if mode == 'required' and not args.skip_review:
+    r = run(rv + ['check', args.name, '--root', root])
+    if r.returncode: print((r.stdout + r.stderr).strip()); sys.exit('merge refused: no passing Challenger review for this diff (SLICE_REVIEW="required"). Review it: just review-brief %s (give it to a read-only agent), just review-record %s FILE, then merge again; or --skip-review "reason"' % (args.name, args.name))
+    print(r.stdout.strip())
+if mode == 'required' and args.skip_review:
+    print('REVIEW SKIPPED: %s (diff %s)' % (args.skip_review, run(rv + ['hash', args.name]).stdout.strip()))
 a = run(['git', 'am'] + [os.path.join(pdir, x) for x in patches])
 if a.returncode: run(['git', 'am', '--abort']); sys.exit('git am failed and was aborted (the real project changed since the base?):\n' + a.stderr[-600:])
-print('merged %d commit(s)' % len(patches)); sys.exit(0 if check(root) else 1)
+print('merged %d commit(s)' % len(patches))
+if mode == 'required':                                                    # the record (or the reason it was skipped) is committed with the merge
+    h = run(rv + ['hash', args.name]).stdout.strip(); rec = os.path.join(root, 'docs', 'reviews', '%s-%s.md' % (args.name, h))
+    if args.skip_review:
+        os.makedirs(os.path.dirname(rec), exist_ok=True); rec = rec[:-3] + '-skipped.md'
+        open(rec, 'w').write('# Review of slice %s SKIPPED\nDiff: %s\nReason: %s\n' % (args.name, h, args.skip_review))
+    if os.path.exists(rec):
+        run(['git', 'add', '--', os.path.relpath(rec, root)]); run(['git', 'commit', '-q', '-m', 'Review record for slice %s (diff %s)' % (args.name, h), '--', os.path.relpath(rec, root)]); print('committed %s' % os.path.relpath(rec, root))
+sys.exit(0 if check(root) else 1)

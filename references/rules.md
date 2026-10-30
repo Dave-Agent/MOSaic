@@ -52,6 +52,7 @@ Every rule has a short name that says what is wrong and does not change when rul
 | `golden-state-no-addresses` | review | a reviewer | none | State that holds an address is not behaviour: it stays out of the golden-trace state. |
 | `emulator-tests-unattended` | review | a reviewer | none | Emulator tests run unattended and are judged by screenshot, not by a PC sample; the emulator never takes the desktop focus. |
 | `originals-never-attached` | review | a reviewer | none | An original is never attached to an emulator directly: VICE runs scratch copies. |
+| `slice-reviewed` | check | `review.py`, `slice.py` | SLICE_REVIEW="off" in project.config, or `slice-merge --skip-review "reason"` (recorded in docs/reviews/) | A slice is reviewed by a second agent (the Challenger) before it merges: a record for the slice's current diff, answering every review rule, with VERDICT: PASS. |
 
 <!-- RULES-TABLE:END -->
 

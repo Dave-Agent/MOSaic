@@ -150,6 +150,18 @@ research-check:
 slice-check *args:
     python3 -B {{skill}}/scripts/slice.py check --root . {{args}}
 
+# The brief for the Challenger, a read-only agent that reviews a slice's diff before it merges (references/challenger.md): just review-brief NAME
+review-brief name:
+    python3 -B {{skill}}/scripts/review.py brief {{name}} --root .
+
+# Validate the Challenger's record and store it as docs/reviews/NAME-<diff hash>.md: just review-record NAME FILE
+review-record name file:
+    python3 -B {{skill}}/scripts/review.py record {{name}} {{file}} --root .
+
+# The merge gate's check on its own: is there a passing review record for the slice's current diff? just review-check NAME
+review-check name:
+    python3 -B {{skill}}/scripts/review.py check {{name}} --root .
+
 # Scratch copy of the project for a slice (an agent works there): just slice-start NAME
 slice-start name:
     python3 -B {{skill}}/scripts/slice.py start {{name}} --root .

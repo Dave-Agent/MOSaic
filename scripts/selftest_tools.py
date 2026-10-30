@@ -97,6 +97,58 @@ with open(os.path.join(real, 'main.asm'), 'w') as f: f.write(clean)      # undo 
 r = slice_('merge', 'one', '--root', real, env=env)      # the gates after the merge may fail without an assembler: only the merge itself is tested
 check('slice merge: the scratch commit lands in the real project', 'merged 1 commit' in r.stdout and 'slice work' in git(real, 'log', '--format=%s').stdout and '// a comment added in the scratch copy' in text(real), r.stdout + r.stderr)
 
+# ---- review.py: the Challenger's brief and record, and the merge gate -------------------------------------------------------------------------------------------
+def rev(*a, env=None): return subprocess.run([sys.executable, '-B', os.path.join(HERE, 'review.py'), *a], capture_output=True, text=True, stdin=subprocess.DEVNULL, env=env or GENV)
+with open(os.path.join(real, 'project.config'), 'a') as f: f.write('SLICE_REVIEW="required"\n')
+git(real, 'add', 'project.config'); git(real, 'commit', '-q', '-m', 'require a review')
+renv = dict(GENV, SLICE_SCRATCH=scratch)
+r = slice_('start', 'two', '--root', real, env=renv); proj2 = os.path.join(scratch, 'two', 'project')
+with open(os.path.join(proj2, 'main.asm'), 'a') as f: f.write('Reviewed:\n  rts  // [0900:60 RTS]\n')
+git(proj2, 'add', 'main.asm'); git(proj2, 'commit', '-q', '-m', 'slice two work')
+h1 = rev('hash', 'two', env=renv).stdout.strip()
+check('review hash: 12 hex digits, the same twice', re.fullmatch(r'[0-9a-f]{12}', h1) and rev('hash', 'two', env=renv).stdout.strip() == h1, h1)
+b = rev('brief', 'two', env=renv).stdout
+check('review brief: the diff hash, the base, the review rules (not the script rules), the names the diff introduces, and the independence rule', h1 in b and 'names-need-proof' in b and 'no-raw-operands' not in b and 'Reviewed  (main.asm)' in b and 'progress.log' in b and 'READ-ONLY' in b, b[:600])
+tpl = rev('template', 'two', env=renv).stdout
+open(os.path.join(scratch, 'rec.md'), 'w').write(tpl)
+r = rev('record', 'two', os.path.join(scratch, 'rec.md'), '--root', real, env=renv)
+check('review record: the unfilled template is refused (TODO-FILL is not a verdict), nothing stored', r.returncode == 2 and 'NOT stored' in r.stdout and not os.path.exists(os.path.join(real, 'docs', 'reviews')), r.stdout + r.stderr)
+filled = re.sub(r'TODO-FILL - <[^>]*>', 'held - read the diff: nothing here concerns it (main.asm:9)', tpl)
+filled = filled.replace('- <name> (<file:line>): held - read the diff: nothing here concerns it (main.asm:9)', '- Reviewed (main.asm:9): held - tried to find a second reader or writer: none, it is a bare routine')
+open(os.path.join(scratch, 'rec.md'), 'w').write(filled)
+r = rev('record', 'two', os.path.join(scratch, 'rec.md'), '--root', real, env=renv)
+check('review record: a complete record for the current diff is stored as docs/reviews/NAME-<hash>.md', r.returncode == 0 and os.path.exists(os.path.join(real, 'docs', 'reviews', 'two-%s.md' % h1)) and 'VERDICT PASS' in r.stdout, r.stdout + r.stderr)
+r = rev('check', 'two', '--root', real, env=renv); check('review check: a passing record for the current diff is `PASS slice-reviewed`', r.returncode == 0 and 'PASS slice-reviewed: 0 places' in r.stdout, r.stdout + r.stderr)
+bad_h = filled.replace('Diff: ' + h1, 'Diff: ' + '0' * 12); open(os.path.join(scratch, 'rec2.md'), 'w').write(bad_h)
+r = rev('record', 'two', os.path.join(scratch, 'rec2.md'), '--root', real, env=renv); check('review record: a record for another diff is refused', r.returncode == 2 and 'review the current diff' in r.stdout, r.stdout)
+viol = filled.replace('- names-need-proof: held', '- names-need-proof: violated'); open(os.path.join(scratch, 'rec3.md'), 'w').write(viol)
+r = rev('record', 'two', os.path.join(scratch, 'rec3.md'), '--root', real, env=renv); check('review record: VERDICT PASS with a violated rule is refused (the record contradicts itself)', r.returncode == 2 and 'violated' in r.stdout, r.stdout)
+nofind = filled.replace('VERDICT: PASS', 'VERDICT: FAIL'); open(os.path.join(scratch, 'rec4.md'), 'w').write(nofind)
+r = rev('record', 'two', os.path.join(scratch, 'rec4.md'), '--root', real, env=renv); check('review record: VERDICT FAIL with no finding is refused', r.returncode == 2 and 'FAIL with no' in r.stdout, r.stdout)
+miss = '\n'.join(l for l in filled.split('\n') if not l.startswith('- no-guesses:')); open(os.path.join(scratch, 'rec5.md'), 'w').write(miss)
+r = rev('record', 'two', os.path.join(scratch, 'rec5.md'), '--root', real, env=renv); check('review record: a review rule left unanswered is named and refused', r.returncode == 2 and 'rule no-guesses is not answered' in r.stdout, r.stdout)
+noev = filled.replace('- no-guesses: held - read the diff: nothing here concerns it (main.asm:9)', '- no-guesses: held'); open(os.path.join(scratch, 'rec6.md'), 'w').write(noev)
+r = rev('record', 'two', os.path.join(scratch, 'rec6.md'), '--root', real, env=renv); check('review record: a verdict without evidence is refused', r.returncode == 2 and 'without evidence' in r.stdout, r.stdout)
+# the merge gate: no record for a NEW diff, then the stored one, then a skip with a reason
+with open(os.path.join(proj2, 'main.asm'), 'a') as f: f.write('// a later commit in the slice\n')
+git(proj2, 'add', 'main.asm'); git(proj2, 'commit', '-q', '-m', 'slice two, later')
+r = slice_('merge', 'two', '--root', real, env=renv)
+check('slice merge: SLICE_REVIEW="required" refuses a diff that has no passing review (any new commit needs a new review), nothing merged', r.returncode != 0 and 'merge refused' in r.stderr and 'FAIL slice-reviewed' in r.stdout and 'slice two' not in git(real, 'log', '--format=%s').stdout, r.stdout + r.stderr)
+r = slice_('merge', 'two', '--root', real, '--skip-review', 'a one-line comment, no names', env=renv)
+check('slice merge: --skip-review REASON merges, says so, and commits a record of the skip', r.returncode in (0, 1) and 'REVIEW SKIPPED: a one-line comment, no names' in r.stdout and 'slice two' in git(real, 'log', '--format=%s').stdout and any(f.endswith('-skipped.md') for f in os.listdir(os.path.join(real, 'docs', 'reviews'))), r.stdout + r.stderr)
+r = slice_('start', 'three', '--root', real, env=renv); proj3 = os.path.join(scratch, 'three', 'project')
+with open(os.path.join(proj3, 'main.asm'), 'a') as f: f.write('Third:\n  rts  // [0a00:60 RTS]\n')
+git(proj3, 'add', 'main.asm'); git(proj3, 'commit', '-q', '-m', 'slice three work')
+h3 = rev('hash', 'three', env=renv).stdout.strip(); t3 = rev('template', 'three', env=renv).stdout
+f3 = re.sub(r'TODO-FILL - <[^>]*>', 'held - looked at the added lines: nothing applies (main.asm:11)', t3).replace('- <name> (<file:line>): held - looked at the added lines: nothing applies (main.asm:11)', '- Third (main.asm:11): held - a bare routine, no second reader')
+open(os.path.join(scratch, 'rec7.md'), 'w').write(f3); rev('record', 'three', os.path.join(scratch, 'rec7.md'), '--root', real, env=renv)
+r = slice_('merge', 'three', '--root', real, env=renv)
+check('slice merge: with a passing record the slice merges and the record is committed with it', 'merged 1 commit' in r.stdout and 'Review record for slice three' in git(real, 'log', '--format=%s').stdout and git(real, 'ls-files', 'docs/reviews/three-%s.md' % h3).stdout.strip() != '', r.stdout + r.stderr)
+r = slice_('start', 'four', '--root', real, env={**renv}); 
+open(os.path.join(real, 'project.config'), 'w').write(open(os.path.join(real, 'project.config')).read().replace('SLICE_REVIEW="required"', 'SLICE_REVIEW="off"')); git(real, 'add', 'project.config'); git(real, 'commit', '-q', '-m', 'review off')
+proj4 = os.path.join(scratch, 'four', 'project'); open(os.path.join(proj4, 'main.asm'), 'a').write('// four\n'); git(proj4, 'add', 'main.asm'); git(proj4, 'commit', '-q', '-m', 'slice four work')
+r = slice_('merge', 'four', '--root', real, env=renv); check('slice merge: SLICE_REVIEW="off" (or no key, as in an existing project) merges without a review, as before', 'merged 1 commit' in r.stdout and 'merge refused' not in r.stderr, r.stdout + r.stderr)
+
 # ---- code_to_bytes.py: instructions the export read from data go back to .byte rows -------------------------------------------------------------------------------
 d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'src'))
 with open(os.path.join(d, 'project.config'), 'w') as f: f.write('SRC_MAIN="src/m.asm"\n')
