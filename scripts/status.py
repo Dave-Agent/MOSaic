@@ -52,20 +52,23 @@ reloc = os.path.exists(P('docs', 'relocation_hazards.md'))
 st.append(('Relocatable (hazards resolved, sweep run)', reloc, 'docs/relocation_hazards.md' if reloc else 'not started', 'Phase 2 step 5: just reloc 2, asserts, the layout sweep with a control variant.', 'references/phase2_split.md, step 5; testing.md'))
 rem = os.path.exists(P('docs', 'phase2_removals.md'))
 st.append(('Byte-changing removals (masked gate)', rem, 'docs/phase2_removals.md' if rem else 'not started', 'Phase 2 step 6: remove the owner-approved dead blocks without moving anything (PHASE2_ALLOWED_DIFF).', 'references/phase2_split.md, step 6'))
-STEP = {'Project scaffolded': 1, 'Original medium in originals/': 1, 'Research (stage 0b)': 2, 'Files extracted, boot chain analysed (stage 2)': 3, 'Clean reference derived (stage 3)': 4, 'Ghidra export (stage 5)': 5,
-        'First byte-identical build (phase 1 source)': 6, 'Hardware registers named (libs applied)': 7, 'Game starts (smoke reference)': 8,
-        'Phase 1 complete (every routine understood, no raw operands or placeholders)': 9, 'Phase 2 safety net (tests, golden traces)': 10, 'Phase 2 source split into files': 11,
-        'Platform interface and port contracts': 12, 'Relocatable (hazards resolved, sweep run)': 13, 'Byte-changing removals (masked gate)': 14}      # the step numbers of HOWTO.md
+STEP = {'Project scaffolded': '1', 'Original medium in originals/': '1', 'Research (stage 0b)': '2.1', 'Files extracted, boot chain analysed (stage 2)': '2.2', 'Clean reference derived (stage 3)': '2.3', 'Ghidra export (stage 5)': '2.4',
+        'First byte-identical build (phase 1 source)': '2.5', 'Hardware registers named (libs applied)': '2.6', 'Game starts (smoke reference)': '2.7',
+        'Phase 1 complete (every routine understood, no raw operands or placeholders)': '3', 'Phase 2 safety net (tests, golden traces)': '4.1', 'Phase 2 source split into files': '4.2',
+        'Platform interface and port contracts': '4.3', 'Relocatable (hazards resolved, sweep run)': '4.4', 'Byte-changing removals (masked gate)': '5'}      # the step and part numbers of HOWTO.md
+def where(n):
+    k = STEP.get(n, '?')
+    return 'HOWTO.md, Appendix A, part %s' % k if k.startswith('2.') else ('HOWTO.md, Appendix B, part %s' % k if k.startswith('4.') else 'HOWTO.md, step %s' % k)
 hi = max([i for i, x in enumerate(st) if x[1]], default=-1)       # a stage whose evidence is missing but a LATER stage is done is not what comes next (extracted/ and dumps/ are regenerable and git-ignored)
 nxt = None
 for i, (n, d, ev, w, doc) in enumerate(st):
     mark = 'done' if d else ('skip' if i < hi else '    ')
-    print('%s  step %-2s %s%s' % (mark, STEP.get(n, '?'), n, '' if not ev else '   (' + ev + ')'))
-    if not d and i > hi and nxt is None: nxt = (STEP.get(n, '?'), n, w, 'HOWTO.md, step %s; %s' % (STEP.get(n, '?'), doc))
+    print('%s  %-4s %s%s' % (mark, STEP.get(n, '?'), n, '' if not ev else '   (' + ev + ')'))
+    if not d and i > hi and nxt is None: nxt = (STEP.get(n, '?'), n, w, '%s; %s' % (where(n), doc))
 print()
 if nxt: print('NEXT: step %s: %s\n  what: %s\n  see:  %s' % nxt)
 else: print('NEXT: every step in HOWTO.md is done. Optional: compact the layout into the freed holes, or start another game.')
 src1 = cfg.get('SRC_MAIN', ''); src2 = cfg.get('PHASE2_MAIN', '')
 if smoke and src1: print('Launch phase 1:  just launch 1      source: %s' % src1)
 if p2 and src2 and os.path.exists(P(src2)): print('Launch phase 2:  just launch 2      source: %s' % src2)
-print('(skip = no evidence found for that stage, but a later stage is done: its files may be regenerable and git-ignored)\nIf the user told you to go on, announce this step and start it; the work is runs (steps 2-8, 9, 10-13, 14): do not ask inside a run. If you have just finished a stage on your own, report and ask whether to continue (SKILL.md, "Stages").')
+print('(skip = no evidence found for that stage, but a later stage is done: its files may be regenerable and git-ignored)\nIf the user told you to go on, announce this step and start it; the work is steps 2, 3, 4 and 5; step 2 (parts 2.1 to 2.7) and step 4 (parts 4.1 to 4.4) are runs: do not ask inside a run. If you have just finished a stage on your own, report and ask whether to continue (SKILL.md, "Stages").')
