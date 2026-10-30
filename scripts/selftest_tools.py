@@ -121,7 +121,7 @@ _sc2 = tempfile.mkdtemp(prefix='c64st_slices_'); _e2 = dict(GENV, SLICE_SCRATCH=
 with open(os.path.join(_sc2, 'nonames', 'project', 'main.asm'), 'a') as f: f.write('// only a comment\n')
 git(os.path.join(_sc2, 'nonames', 'project'), 'add', 'main.asm'); git(os.path.join(_sc2, 'nonames', 'project'), 'commit', '-q', '-m', 'comment only')
 _t2 = rev('template', 'nonames', env=_e2).stdout; _b2 = rev('brief', 'nonames', env=_e2).stdout
-check('review template/brief: a diff that introduces no names pre-fills `- none - the diff introduces no names` and the brief says to keep it', '- none - the diff introduces no names' in _t2 and 'keep the line' in _b2, _t2[-300:] + _b2[-500:])
+check('review template/brief: a diff with no names to test pre-fills the `- none - no names to test` line and the brief says to keep it', '- none - no names to test' in _t2 and 'keep the line' in _b2, _t2[-300:] + _b2[-500:])
 _f2 = re.sub(r'TODO-FILL - <[^>]*>', 'not-applicable - a comment-only diff: nothing here concerns it (main.asm:2)', _t2); open(os.path.join(_sc2, 'r.md'), 'w').write(_f2)
 _r2 = rev('record', 'nonames', os.path.join(_sc2, 'r.md'), '--root', _nn, env=_e2)
 check('review record: a record for a diff with no names is valid with the `none` line', _r2.returncode == 0 and 'VERDICT PASS' in _r2.stdout, _r2.stdout + _r2.stderr)
@@ -160,6 +160,25 @@ r = slice_('start', 'four', '--root', real, env={**renv});
 open(os.path.join(real, 'project.config'), 'w').write(open(os.path.join(real, 'project.config')).read().replace('SLICE_REVIEW="required"', 'SLICE_REVIEW="off"')); git(real, 'add', 'project.config'); git(real, 'commit', '-q', '-m', 'review off')
 proj4 = os.path.join(scratch, 'four', 'project'); open(os.path.join(proj4, 'main.asm'), 'a').write('// four\n'); git(proj4, 'add', 'main.asm'); git(proj4, 'commit', '-q', '-m', 'slice four work')
 r = slice_('merge', 'four', '--root', real, env=renv); check('slice merge: SLICE_REVIEW="off" (or no key, as in an existing project) merges without a review, as before', 'merged 1 commit' in r.stdout and 'merge refused' not in r.stderr, r.stdout + r.stderr)
+
+# ---- review.py risk and the cap: what a review would test and cost, from the diff alone; names the owner's answers cover are not put to the reviewer -----------------------
+_rk = project('''
+    Start:
+      rts  // [0800:60 RTS]
+'''); git(_rk, 'init', '-q'); git(_rk, 'add', 'main.asm', 'project.config'); git(_rk, 'commit', '-q', '-m', 'base')
+_sc3 = tempfile.mkdtemp(prefix='c64st_slices_'); _e3 = dict(GENV, SLICE_SCRATCH=_sc3); slice_('start', 'risky', '--root', _rk, env=_e3); _pr = os.path.join(_sc3, 'risky', 'project')
+with open(os.path.join(_pr, 'main.asm'), 'a') as f: f.write(''.join('Routine%d:\n  rts  // [09%02x:60 RTS]\n' % (i, i) for i in range(1, 6)) + '// TODO(name): was this right?\n')
+os.makedirs(os.path.join(_pr, 'docs'), exist_ok=True); open(os.path.join(_pr, 'docs', 'user_answers.md'), 'w').write('The owner said Routine3 is the jump.\n')
+git(_pr, 'add', '-A'); git(_pr, 'commit', '-q', '-m', 'five routines')
+_rr = rev('risk', 'risky', env=_e3).stdout
+check('review risk: counts the names the diff introduces, those the owner\'s answers cover, those put to the reviewer, the TODO(name) markers', 'names the diff introduces:        5' in _rr and 'covered by the owner' in _rr and ':   1 ' in _rr.split('covered by the owner')[1][:20] and 'names to put to the reviewer:     4' in _rr and '0 removed, 1 added' in _rr, _rr)
+check('review risk: the cap (12 by default) bounds the names it would test, and the estimate is the fixed part plus 4,000 each', 'names it would test:              4' in _rr and 'about 46000 tokens' in _rr, _rr)
+check('review brief: a name the owner\'s answers cover is not put to the reviewer, and the brief says why', 'Routine3' in rev('brief', 'risky', env=_e3).stdout.split('Not listed')[1] and '- Routine3  (main.asm)' not in rev('brief', 'risky', env=_e3).stdout)
+with open(os.path.join(_pr, 'project.config'), 'a') as f: f.write('SLICE_REVIEW_MAX_CLAIMS="2"\n')
+_rr2 = rev('risk', 'risky', env=_e3).stdout; _b3 = rev('brief', 'risky', env=_e3).stdout
+check('review cap: SLICE_REVIEW_MAX_CLAIMS limits the names tested, the estimate follows, and the brief says AT MOST N over the cap', 'names it would test:              2' in _rr2 and 'about 38000 tokens' in _rr2 and 'AT MOST 2' in _b3 and 'over the cap' in _b3, _rr2 + _b3[-400:])
+open(os.path.join(_pr, 'project.config'), 'a').write('SLICE_REVIEW_MAX_CLAIMS="50"\n')
+check('review brief: with the cap above the number of names there is no budget line', 'AT MOST' not in rev('brief', 'risky', env=_e3).stdout, rev('brief', 'risky', env=_e3).stdout[-500:])
 
 # ---- code_to_bytes.py: instructions the export read from data go back to .byte rows -------------------------------------------------------------------------------
 d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'src'))

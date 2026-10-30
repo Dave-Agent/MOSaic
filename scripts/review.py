@@ -3,6 +3,7 @@
 
   review.py hash NAME [--root DIR]            the hash (12 hex digits) of the slice's diff: the scratch repo's `git diff <base>..HEAD`
   review.py brief NAME [--root DIR]           the text to give the Challenger (a read-only agent): the diff, the review rules, the names to test, the record format
+  review.py risk NAME [--root DIR]            what a review of the slice would test and cost, from the diff alone (no tokens): new names, TODO(name) markers promoted, names the owner's answers cover, the cap, an estimate
   review.py template NAME [--root DIR]        the record skeleton, with the hash filled in
   review.py record NAME FILE [--root DIR]     validate FILE against the slice's current diff and store it as docs/reviews/NAME-<hash>.md in the project
   review.py check NAME [--root DIR]           the merge gate: a stored record for the CURRENT diff, valid, with VERDICT: PASS (exit 1 otherwise)
@@ -11,7 +12,7 @@ A record is for exactly one diff: any new commit in the slice changes the hash a
 evidence), list the claims tested (held / refuted / not-tested), list findings, and end in VERDICT: PASS or FAIL; a PASS with a violated rule or a refuted claim, and a FAIL with no finding, are refused."""
 import argparse, datetime, hashlib, os, re, shutil, subprocess, sys, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import load_rules, rule_line, SKILL_DIR
+from _common import load_rules, rule_line, config, SKILL_DIR
 SCRATCH = os.environ.get('SLICE_SCRATCH', os.path.join(tempfile.gettempdir(), 'mosaic-slices'))
 RULE_V = ('held', 'violated', 'not-applicable'); CLAIM_V = ('held', 'refuted', 'not-tested')
 
@@ -28,6 +29,38 @@ def diff_text(name):
     return r.stdout
 
 def diff_hash(name): return hashlib.sha256(diff_text(name).encode()).hexdigest()[:12]
+
+NONE_LINE = '- none - no names to test (the diff introduces none, or the owner\'s answers cover them)'
+FIXED_TOKENS, PER_NAME_TOKENS = 30000, 4000          # measured on two real slices (references/decisions.md): a diff with no names ~33,000; 28 names tested ~156,000
+DEFAULT_CAP = 12
+
+def cap_of(proj):
+    """SLICE_REVIEW_MAX_CLAIMS of the project (0 = no cap): how many names the reviewer tests at most. 12 when the key is absent."""
+    try: return max(0, int(config(proj).get('SLICE_REVIEW_MAX_CLAIMS', DEFAULT_CAP)))
+    except ValueError: return DEFAULT_CAP
+
+def split_claims(proj, cl):
+    """(names to put to the reviewer, names the owner's answers already cover): a name that appears as a whole word in docs/user_answers.md has the top rung of the evidence ladder (the owner confirmed it)."""
+    p = os.path.join(proj, 'docs', 'user_answers.md'); answers = open(p).read() if os.path.exists(p) else ''
+    covered = [(f, n) for f, n in cl if answers and re.search(r'(?<![\w.])%s(?![\w])' % re.escape(n.split('.')[-1]), answers)]
+    return [c for c in cl if c not in covered], covered
+
+def risk_report(name):
+    proj, base = slice_info(name); diff = diff_text(name); cl = claims(diff); todo, covered = split_claims(proj, cl); cap = cap_of(proj)
+    lines = diff.split('\n'); add = [l[1:] for l in lines if l.startswith('+') and not l.startswith('+++')]; rem = [l[1:] for l in lines if l.startswith('-') and not l.startswith('---')]
+    t_rem = sum('TODO(name)' in l for l in rem); t_add = sum('TODO(name)' in l for l in add); promoted = t_rem - t_add
+    comments = sum(1 for l in add if l.strip().startswith('//') and not re.search(r'\[[0-9A-Fa-f]{4}', l))
+    test = min(len(todo), cap) if cap else len(todo); est = FIXED_TOKENS + PER_NAME_TOKENS * test
+    return '\n'.join(['slice %s, diff %s' % (name, diff_hash(name)),
+        '  names the diff introduces:        %d' % len(cl),
+        '  covered by the owner\'s answers:   %d  (docs/user_answers.md names them: not put to the reviewer)' % len(covered),
+        '  names to put to the reviewer:     %d' % len(todo),
+        '  TODO(name) markers:               %d removed, %d added  (a removed one is a provisional name that became a claim)' % (t_rem, t_add),
+        '  comment lines added:              %d' % comments,
+        '  cap on names tested:              %s  (SLICE_REVIEW_MAX_CLAIMS)' % (cap if cap else 'none'),
+        '  names it would test:              %d' % test,
+        '  estimated cost:                   about %d tokens  (%d fixed + %d per name tested: a rough model from two measurements)' % (est, FIXED_TOKENS, PER_NAME_TOKENS),
+        '  ' + ('no names to test: the review would only answer the rules for comments and docs (about %d tokens)' % FIXED_TOKENS if not test else 'review it' if test >= 3 or promoted > 0 else 'few names: a review is cheap and optional')])
 
 def review_rules(): return [(n, r['what']) for n, r in load_rules().items() if r['kind'] == 'review']
 
@@ -60,15 +93,17 @@ VERDICT: PASS
 
 def template(name):
     _, base = slice_info(name)
-    cl = claims(diff_text(name))
-    claim_lines = ('- <name> (<file:line>): TODO-FILL - <held, refuted or not-tested, then how it was tested and what was seen>' if cl else '- none - the diff introduces no names')
+    proj, _b = slice_info(name); cl, _cv = split_claims(proj, claims(diff_text(name)))
+    claim_lines = ('- <name> (<file:line>): TODO-FILL - <held, refuted or not-tested, then how it was tested and what was seen>' if cl else NONE_LINE)
     return TEMPLATE.format(name=name, h=diff_hash(name), base=base[:12], date=datetime.date.today().isoformat(), claims=claim_lines, rules='\n'.join('- %s: TODO-FILL - <held, violated or not-applicable, then the evidence: file:line, what was run, what was seen>' % n for n, _ in review_rules()))
 
 def brief(name):
-    proj, base = slice_info(name); diff = diff_text(name); h = diff_hash(name); cl = claims(diff)
+    proj, base = slice_info(name); diff = diff_text(name); h = diff_hash(name); cl, covered = split_claims(proj, claims(diff)); cap = cap_of(proj)
     stat = run(['git', 'diff', '--shortstat', '%s..HEAD' % base], proj).stdout.strip()
     rules = '\n'.join('- %s: %s' % (n, w) for n, w in review_rules())
     names = '\n'.join('- %s  (%s)' % (n, f) for f, n in cl[:80]) + ('\n(%d more not listed: sample them)' % (len(cl) - 80) if len(cl) > 80 else '')
+    notes = ('\nNot listed, because the owner\'s answers (docs/user_answers.md) already name them (the top rung of the evidence ladder): %s.' % ', '.join(n for _, n in covered[:30])) if covered else ''
+    notes += ('\nBudget: test AT MOST %d of these names, the ones that claim a role most strongly; the rest are not-tested with the reason `over the cap`. The rules and the findings are not capped.' % cap) if cap and len(cl) > cap else ''
     return """You are the Challenger for slice %(name)s of a Commodore 64 decompilation project (MOSaic). You are a READ-ONLY reviewer: you do not edit, write or commit anything in the project. First read %(skill)s/references/challenger.md (your role), then references/phase1_method.md (the evidence ladder: how a name earns its place) and references/rules.md.
 
 Slice project (read it; run a build or a tracer experiment only on a scratch COPY of it, never in place): %(proj)s
@@ -79,13 +114,13 @@ Do NOT read progress.log or any note of the slice's agent: you judge the diff an
 %(rules)s
 
 2. Test the claims. These names are introduced by the diff (labels and .label lines). Choose the ones that claim a role, not the merely descriptive ones, and try to REFUTE each: a code shape that contradicts it, another reader or writer, a controlled tracer observation on a scratch copy. 'held' only for a name you tried to break and could not; 'refuted' with what you saw; 'not-tested' with why. The tracer's per-frame sample is RAM only: to see a VIC register (a sprite's position, enable or colour) run N frames and take a state dump (--dump FILE: RAM, the 64 VIC registers, colour RAM, $DD00), otherwise say not-tested.
-%(names)s
+%(names)s%(notes)s
 
 3. List findings (concrete, each with the rule name and file:line; none if none), then VERDICT: PASS only if no rule is violated and no claim refuted, else FAIL.
 
 Return ONLY the record, in exactly this form, with every TODO-FILL replaced by your verdict (the first lines and the section titles matter: a script validates it):
 
-%(template)s""" % dict(name=name, skill=SKILL_DIR, proj=proj, base=base, stat=stat or 'no change', h=h, rules=rules, names=names or '(the diff introduces no names: keep the line `- none - the diff introduces no names` under Claims tested as it is)', template=template(name))
+%(template)s""" % dict(name=name, skill=SKILL_DIR, proj=proj, base=base, stat=stat or 'no change', h=h, rules=rules, names=names or '(no names to test: keep the line `%s` under Claims tested as it is)' % NONE_LINE, notes=notes, template=template(name))
 
 def check_record(text, h):
     """Problems of a record for the diff with hash h ([] when it is in order) and its verdict (PASS / FAIL / None)."""
@@ -131,10 +166,11 @@ def check_record(text, h):
 def record_path(root, name, h): return os.path.join(root, 'docs', 'reviews', '%s-%s.md' % (name, h))
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.split('\n')[0]); ap.add_argument('cmd', choices=('hash', 'brief', 'template', 'record', 'check')); ap.add_argument('name'); ap.add_argument('file', nargs='?'); ap.add_argument('--root', default='.')
+    ap = argparse.ArgumentParser(description=__doc__.split('\n')[0]); ap.add_argument('cmd', choices=('hash', 'brief', 'template', 'record', 'check', 'risk')); ap.add_argument('name'); ap.add_argument('file', nargs='?'); ap.add_argument('--root', default='.')
     a = ap.parse_args(); root = os.path.abspath(a.root)
     if a.cmd == 'hash': print(diff_hash(a.name)); return 0
     if a.cmd == 'brief': print(brief(a.name)); return 0
+    if a.cmd == 'risk': print(risk_report(a.name)); return 0
     if a.cmd == 'template': print(template(a.name)); return 0
     h = diff_hash(a.name)
     if a.cmd == 'record':

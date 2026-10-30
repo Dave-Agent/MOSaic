@@ -59,6 +59,8 @@ JUDGE_CROP=""                   # X0,Y0,X1,Y1 of something static on the start s
 # The phase the bare `just` commands work on (1 = phase1/src, byte-identical; 2 = phase2/src, the split source). Every command also takes it as an argument: `just verify 1`.
 # A slice can be reviewed by a second agent (the Challenger, references/challenger.md) before it merges: required = `just slice-merge` refuses without a passing review record for the diff; off = no review (the default: OPT IN). A review costs tokens: about 30,000 for a slice that introduces no names, plus about 4,000 for each name it tests (measured: 33,000 for a small slice, 156,000 and 8 minutes for one that tested 28 names), so a project of several large slices is on the order of a million. The agent asks once, at the start of phase 1, and sets this to what the user says.
 SLICE_REVIEW="off"
+# The most names the reviewer tests per slice (0 = no cap): it bounds the cost, about 30,000 + 4,000 per name (12 names: about 80,000 tokens). `just review-risk NAME` shows what a slice would cost before any tokens are spent.
+SLICE_REVIEW_MAX_CLAIMS="12"
 ACTIVE_PHASE="1"
 # Phase 2 safety net: the scenarios of the timing-tolerant golden set (comma separated; the others are exact-only). Empty = all.
 GOLDEN_T_SET=""

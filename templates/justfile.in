@@ -154,6 +154,10 @@ slice-check *args:
 review-brief name:
     python3 -B {{skill}}/scripts/review.py brief {{name}} --root .
 
+# What a review of a slice would test and cost, from its diff alone (no tokens): just review-risk NAME
+review-risk name:
+    python3 -B {{skill}}/scripts/review.py risk {{name}} --root .
+
 # Validate the Challenger's record and store it as docs/reviews/NAME-<diff hash>.md: just review-record NAME FILE
 review-record name file:
     python3 -B {{skill}}/scripts/review.py record {{name}} {{file}} --root .
