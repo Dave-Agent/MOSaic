@@ -113,6 +113,18 @@ tpl = rev('template', 'two', env=renv).stdout
 open(os.path.join(scratch, 'rec.md'), 'w').write(tpl)
 r = rev('record', 'two', os.path.join(scratch, 'rec.md'), '--root', real, env=renv)
 check('review record: the unfilled template is refused (TODO-FILL is not a verdict), nothing stored', r.returncode == 2 and 'NOT stored' in r.stdout and not os.path.exists(os.path.join(real, 'docs', 'reviews')), r.stdout + r.stderr)
+_nn = project('''
+    Start:
+      rts  // [0800:60 RTS]
+'''); git(_nn, 'init', '-q'); git(_nn, 'add', 'main.asm', 'project.config'); git(_nn, 'commit', '-q', '-m', 'base')
+_sc2 = tempfile.mkdtemp(prefix='c64st_slices_'); _e2 = dict(GENV, SLICE_SCRATCH=_sc2); slice_('start', 'nonames', '--root', _nn, env=_e2)
+with open(os.path.join(_sc2, 'nonames', 'project', 'main.asm'), 'a') as f: f.write('// only a comment\n')
+git(os.path.join(_sc2, 'nonames', 'project'), 'add', 'main.asm'); git(os.path.join(_sc2, 'nonames', 'project'), 'commit', '-q', '-m', 'comment only')
+_t2 = rev('template', 'nonames', env=_e2).stdout; _b2 = rev('brief', 'nonames', env=_e2).stdout
+check('review template/brief: a diff that introduces no names pre-fills `- none - the diff introduces no names` and the brief says to keep it', '- none - the diff introduces no names' in _t2 and 'keep the line' in _b2, _t2[-300:] + _b2[-500:])
+_f2 = re.sub(r'TODO-FILL - <[^>]*>', 'not-applicable - a comment-only diff: nothing here concerns it (main.asm:2)', _t2); open(os.path.join(_sc2, 'r.md'), 'w').write(_f2)
+_r2 = rev('record', 'nonames', os.path.join(_sc2, 'r.md'), '--root', _nn, env=_e2)
+check('review record: a record for a diff with no names is valid with the `none` line', _r2.returncode == 0 and 'VERDICT PASS' in _r2.stdout, _r2.stdout + _r2.stderr)
 filled = re.sub(r'TODO-FILL - <[^>]*>', 'held - read the diff: nothing here concerns it (main.asm:9)', tpl)
 filled = filled.replace('- <name> (<file:line>): held - read the diff: nothing here concerns it (main.asm:9)', '- Reviewed (main.asm:9): held - tried to find a second reader or writer: none, it is a bare routine')
 open(os.path.join(scratch, 'rec.md'), 'w').write(filled)

@@ -50,7 +50,7 @@ Diff: {h}   Base: {base}   Reviewed on: {date}
 {rules}
 
 ## Claims tested
-- <name> (<file:line>): TODO-FILL - <held, refuted or not-tested, then how it was tested and what was seen>
+{claims}
 
 ## Findings
 - none
@@ -60,7 +60,9 @@ VERDICT: PASS
 
 def template(name):
     _, base = slice_info(name)
-    return TEMPLATE.format(name=name, h=diff_hash(name), base=base[:12], date=datetime.date.today().isoformat(), rules='\n'.join('- %s: TODO-FILL - <held, violated or not-applicable, then the evidence: file:line, what was run, what was seen>' % n for n, _ in review_rules()))
+    cl = claims(diff_text(name))
+    claim_lines = ('- <name> (<file:line>): TODO-FILL - <held, refuted or not-tested, then how it was tested and what was seen>' if cl else '- none - the diff introduces no names')
+    return TEMPLATE.format(name=name, h=diff_hash(name), base=base[:12], date=datetime.date.today().isoformat(), claims=claim_lines, rules='\n'.join('- %s: TODO-FILL - <held, violated or not-applicable, then the evidence: file:line, what was run, what was seen>' % n for n, _ in review_rules()))
 
 def brief(name):
     proj, base = slice_info(name); diff = diff_text(name); h = diff_hash(name); cl = claims(diff)
@@ -83,7 +85,7 @@ Do NOT read progress.log or any note of the slice's agent: you judge the diff an
 
 Return ONLY the record, in exactly this form, with every TODO-FILL replaced by your verdict (the first lines and the section titles matter: a script validates it):
 
-%(template)s""" % dict(name=name, skill=SKILL_DIR, proj=proj, base=base, stat=stat or 'no change', h=h, rules=rules, names=names or '(the diff introduces no names)', template=template(name))
+%(template)s""" % dict(name=name, skill=SKILL_DIR, proj=proj, base=base, stat=stat or 'no change', h=h, rules=rules, names=names or '(the diff introduces no names: keep the line `- none - the diff introduces no names` under Claims tested as it is)', template=template(name))
 
 def check_record(text, h):
     """Problems of a record for the diff with hash h ([] when it is in order) and its verdict (PASS / FAIL / None)."""
@@ -111,6 +113,7 @@ def check_record(text, h):
     for n in sorted(want - set(seen)): bad.append('rule %s is not answered' % n)
     refuted = 0; ncl = 0
     for l in sec.get('Claims tested', []):
+        if re.match(r'^-\s+none\b\s*[-\u2014:]?\s*\S', l): ncl += 1; continue                     # `- none - the diff introduces no names`
         mm = re.match(r'^-\s+(\S+)(?:\s+\(([^)]*)\))?:\s*([A-Za-z-]+)\b[\s,;:—-]*(.*)$', l)
         if not mm: continue
         if mm.group(1) == 'none': ncl += 1; continue
