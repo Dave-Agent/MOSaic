@@ -18,7 +18,7 @@ and writes a screenshot (sys mode: -exitscreenshot, deterministic; inject mode: 
 project.config keys: VICE_BIN, OUTPUT_PRG, VICE_SYMBOLS, HANDOFF_PC (hex) and LAUNCH_MODE (sys|inject); inject only: HANDOFF_SP (default fc), HANDOFF_P (34), LAUNCH_PORT (37: $01
 at entry), LAUNCH_LOW ("0002-07ff": the low RAM range restored from the dump), LAUNCH_POKES ("d020=0e d021=06 dc0d=7f": hex ADDR=BYTES written with I/O visible, after the state file),
 LAUNCH_PORT_PORT_DDR ($00, default 2f). Never passes -default (the 1541 ROM would not resolve); no disk drive is needed. Port for the monitor: VICE_MONITOR_PORT + 1 (inject only)."""
-import os, shutil, subprocess, sys, tempfile, time
+import glob, os, re, shutil, subprocess, sys, tempfile, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'vice'))
 from _common import parser, config
@@ -106,6 +106,23 @@ def disk(cfg, root, vice_cmd, prg, shot, seconds):
         if p.poll() is None: p.kill()
         import shutil; shutil.rmtree(scratch_dir, True)
 
+def without_lib_scopes(sym, root, cfg):
+    """Kick lists every scope as a label at the current address, so the hardware libraries' scopes (VIC, SID, CIA, CPU, S0..S7 ...) show up as a dozen names at one address in the monitor.
+    Returns a copy of the symbol file without the labels named like a scope of the libs (the register names inside them stay); the original is untouched."""
+    names = set()
+    for d in (os.path.join(root, cfg.get('SRC_DIR', 'phase1/src'), 'libs'), os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'libs')):
+        for f in glob.glob(os.path.join(d, '*.asm')):
+            for l in open(f, errors='replace'):
+                m = re.match(r'\s*([A-Za-z0-9_]+)\s*:\s*\{', l)
+                if m: names.add(m.group(1))
+    if not names: return sym
+    drop = re.compile(r'^al\s+C:[0-9a-fA-F]+\s+\.(%s)\s*$' % '|'.join(sorted(names)))
+    lines = open(sym, errors='replace').read().split('\n'); kept = [l for l in lines if not drop.match(l)]
+    if len(kept) == len(lines): return sym
+    fd, tmp = tempfile.mkstemp(prefix='vice_labels_', suffix='.vs'); os.write(fd, '\n'.join(kept).encode()); os.close(fd)
+    import atexit; atexit.register(os.remove, tmp)
+    return tmp
+
 def main():
     a = parser('Start the game in VICE (sys or inject mode)', write=False)
     a.add_argument('--prg'); a.add_argument('--mode'); a.add_argument('--shot'); a.add_argument('--cycles', type=int); a.add_argument('--no-symbols', action='store_true'); a.add_argument('--symbols', help='a VICE symbol file (default VICE_SYMBOLS): for a build that is not OUTPUT_PRG, e.g. the phase 2 one')
@@ -117,7 +134,7 @@ def main():
     cfg['HANDOFF_PC'] = pc
     vice = [cfg.get('VICE_BIN') or shutil.which('x64sc') or 'x64sc', '+confirmonexit', '-jamaction', '1']     # 1 = continue after a JAM (the game may jam on purpose or by a bug: the screenshot decides). NOT 5: that is Quit Emulator in VICE 3.7 and the window just vanishes
     sym = os.path.join(root, args.symbols or cfg.get('VICE_SYMBOLS', ''))
-    if not args.no_symbols and (args.symbols or cfg.get('VICE_SYMBOLS')) and os.path.exists(sym): vice += ['-moncommands', sym]
+    if not args.no_symbols and (args.symbols or cfg.get('VICE_SYMBOLS')) and os.path.exists(sym): vice += ['-moncommands', without_lib_scopes(sym, root, cfg)]
     assert '-default' not in vice
     if args.shot:
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'vice')); from vice_monitor import display_wrap
