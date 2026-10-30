@@ -153,14 +153,14 @@ _jar = os.path.expanduser(os.environ.get('KICKASS_JAR') or '~/tools/KickAss.jar'
 if os.path.exists(_jar) and subprocess.run(['java', '-version'], capture_output=True).returncode == 0:
     d = project('.pc = $0800 "RAM"\npad:\n  .byte 0,0,0,0,0,0,0,0 // [0800]\nA:\n  lda #1 // [0808:a9 01    LDA #$01]\n  rts // [080a:60       RTS]\ntail:\n  .byte 5,6 // [080b]\n')
     open(os.path.join(d, 'project.config'), 'a').write('KICKASS_JAR="%s"\n' % _jar)
-    ok = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_fuzz.py'), '--root', d, '--main', 'main.asm', '--label', 'A', '--take', 'pad', '--fill', 'ea', '--variant', 'A:3', '--cmd', 'test $(stat -c %s "$FUZZ_PRG") -eq 15'], capture_output=True, text=True)
+    ok = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_fuzz.py'), '--root', d, '--main', 'main.asm', '--label', 'A', '--take', 'pad', '--fill', 'ea', '--variant', 'A:3', '--cmd', 'test $(wc -c < "$FUZZ_PRG" | tr -d " ") -eq 15'], capture_output=True, text=True)
     check('layout_fuzz: --label with --take keeps the total size (3 bytes inserted before A, 3 taken from the pad: 15 bytes with the load address)', ok.returncode == 0 and '0 failed' in ok.stdout, ok.stdout + ok.stderr)
     bad = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_fuzz.py'), '--root', d, '--main', 'main.asm', '--label', 'A', '--take', 'pad', '--variant', 'A:9', '--cmd', 'true'], capture_output=True, text=True)
     check('layout_fuzz: --take of more bytes than the pad has fails the variant', bad.returncode == 1 and 'has 8 bytes' in bad.stdout, bad.stdout + bad.stderr)
     d = project('.pc = $0800 "RAM"\n#import "sub/a.asm"\n')
     os.makedirs(os.path.join(d, 'sub')); open(os.path.join(d, 'sub', 'a.asm'), 'w').write('pad:\n  .byte 0,0,0,0,0,0,0,0 // [0800]\nA:\n  lda #1 // [0808:a9 01    LDA #$01]\n  rts // [080a:60       RTS]\n')
     open(os.path.join(d, 'project.config'), 'a').write('KICKASS_JAR="%s"\n' % _jar)
-    ok = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_fuzz.py'), '--root', d, '--main', 'main.asm', '--label', 'A', '--take', 'pad', '--fill', 'ea', '--variant', 'A:3', '--cmd', 'test $(stat -c %s "$FUZZ_PRG") -eq 13 && test "$FUZZ_VARIANT" = A:3'], capture_output=True, text=True)
+    ok = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_fuzz.py'), '--root', d, '--main', 'main.asm', '--label', 'A', '--take', 'pad', '--fill', 'ea', '--variant', 'A:3', '--cmd', 'test $(wc -c < "$FUZZ_PRG" | tr -d " ") -eq 13 && test "$FUZZ_VARIANT" = A:3'], capture_output=True, text=True)
     check('layout_fuzz: labels and the pad are found in an imported file (a split source), FUZZ_VARIANT is set', ok.returncode == 0 and '0 failed' in ok.stdout, ok.stdout + ok.stderr)
 else: print('SKIP layout_fuzz: no Java / Kick Assembler')
 # ---- split_all.py ------------------------------------------------------------------------------------------------------------------------------------------

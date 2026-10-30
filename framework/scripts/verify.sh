@@ -48,9 +48,10 @@ if [ -n "${PRE_VERIFY_HOOK:-}" ]; then
 fi
 
 # The recorded hash for the reference, if any.
+REFERENCE_SHA256_FILE="${REFERENCE_SHA256_FILE:-${REF_SHA_FILE:-}}"     # make_reference.py writes REF_SHA_FILE: one name is enough
 EXPECTED_SHA=""
 if [ -n "${REFERENCE_SHA256_FILE:-}" ] && [ -f "$REFERENCE_SHA256_FILE" ]; then
-    EXPECTED_SHA=$(awk -v f="$REFERENCE_PRG" '$2 == f { print $1 }' "$REFERENCE_SHA256_FILE")
+    EXPECTED_SHA=$(awk -v f="$REFERENCE_PRG" -v b="${REFERENCE_PRG##*/}" '$2 == f || $2 == b { print $1 }' "$REFERENCE_SHA256_FILE")
 fi
 
 if [ ! -f "$REFERENCE_PRG" ] && [ -z "$EXPECTED_SHA" ]; then
@@ -101,8 +102,8 @@ if [ ! -f "$REFERENCE_PRG" ]; then
 fi
 
 # ---- reference image present: byte-level compare ----------------------------------
-REF_SIZE=$(stat -c%s "$REFERENCE_PRG")
-OUT_SIZE=$(stat -c%s "$BUILT_IMAGE")
+REF_SIZE=$(wc -c < "$REFERENCE_PRG" | tr -d " ")      # not stat: its flags differ between GNU and BSD (macOS)
+OUT_SIZE=$(wc -c < "$BUILT_IMAGE" | tr -d " ")
 
 if [ "$REF_SIZE" -ne "$OUT_SIZE" ]; then
     echo "FAIL: size mismatch. reference=$REF_SIZE bytes, built image=$OUT_SIZE bytes"
