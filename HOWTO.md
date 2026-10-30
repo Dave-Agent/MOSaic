@@ -88,6 +88,8 @@ Say "yes" to the question after step 2, or:
 
 The agent names things from evidence only (the code plus a tracer observation). It **asks you** one question at a time about what a thing is to a player, with a picture, and records each answer in `docs/user_answers.md`. It never asks what the code does.
 
+**One choice is yours: slice reviews.** Before it starts, the agent asks whether every slice should be reviewed by a second agent before it is merged. It catches wrong names and untrue comments that the automatic checks cannot, and it costs tokens (about 150,000 tokens and 8 minutes for a slice of about twenty files; a whole project is on the order of a million). It is off unless you say yes.
+
 To see how far it is, run `just gauge` in the project: a bar for each area of the source showing how much is still raw addresses or unnamed, and an overall figure (`just status` quotes the last reading). It counts references, not routines, so treat it as an estimate that moves the right way.
 
 **Done when:** the report says `VERDICT: COMPLETE`, `just verify` and `just smoke` pass. Run `git tag p1-byte-identical` and play the game once.
