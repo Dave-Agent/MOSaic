@@ -26,6 +26,8 @@ Two cases, and they are different.
 
 **You finish a stage on your own** (the work you were asked to do is done). Run `status.py`, tell the user in a few sentences what was just done and which step is next and roughly what it involves, and **ask whether to continue** (offer: continue, continue after I have looked, stop here). Do not start the next stage unasked and do not stop without offering.
 
+**An `UPDATE:` line in the output of `status.py` or `check_env.py` means a newer MOSaic release exists.** Mention it to the user once, in one sentence (the version and how far behind), and carry on. Do not update the skill yourself and do not suggest a way to: how it was installed is the user's business.
+
 **The work is four steps, and the user is asked at four points only.** (HOWTO.md numbers them; steps 2 and 4 are long jobs in several parts.)
 
 | Step | Parts | Ends when | The question you ask (fill in the launch command and source file that `status.py` prints) |

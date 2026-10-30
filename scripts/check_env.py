@@ -75,4 +75,6 @@ for name, path, v, why, role, hint, minv in rows:
     print(f'  {flag:8}{name:22}{(v or ""):12}{why}' + ('' if ok else f'\n          install: {hint}') + ('' if path or not ok else '') + (f'   [{path}]' if ok and path and path != 'python module' else ''))
 if args.brief and brief_opt: print('  optional, not installed: %s (the project still works; see references/hand_off_tools.md)' % ', '.join(brief_opt))
 print('required tools missing:', miss_req) if miss_req else print('all required tools present for roles:', ', '.join(sorted(roles)))
+try: from version_check import notice; _n = notice(); print(_n) if _n else None     # a newer MOSaic release exists
+except Exception: pass
 sys.exit(1 if miss_req else 0)

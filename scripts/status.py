@@ -82,3 +82,5 @@ src1 = cfg.get('SRC_MAIN', ''); src2 = cfg.get('PHASE2_MAIN', '')
 if smoke and src1: print('Launch phase 1:  just launch 1      source: %s' % src1)
 if p2 and src2 and os.path.exists(P(src2)): print('Launch phase 2:  just launch 2      source: %s' % src2)
 print('(skip = no evidence found for that stage, but a later stage is done: its files may be regenerable and git-ignored)\nIf the user told you to go on, announce this step and start it; the work is steps 2, 3, 4 and 5; step 2 (parts 2.1 to 2.7) and step 4 (parts 4.1 to 4.4) are runs: do not ask inside a run. If you have just finished a stage on your own, report and ask whether to continue (SKILL.md, "Stages").')
+try: from version_check import notice; _n = notice(); print(_n) if _n else None      # a newer MOSaic release exists (one line, cached for a day, never updates anything)
+except Exception: pass

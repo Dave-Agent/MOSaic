@@ -148,6 +148,20 @@ buf2:
 """
 r = tool('reloc_hazards.py', project(RH))
 check('reloc_hazards: aligned base, raw sprite pointer and an end guard on a page-aligned label are reported', 'aligned-base 1' in r.stdout and 'sprite-ptr 1' in r.stdout and 'end-guard 1' in r.stdout, r.stdout + r.stderr)
+# ---- version_check.py: how far behind, and silent when it cannot tell -----------------------------------------------------------------------------------------
+sys.path.insert(0, HERE); import version_check as _vc
+check('version_check: parse reads v1.0 and 1.2.3, refuses text', _vc.parse('v1.0') == (1, 0, 0) and _vc.parse('1.2.3') == (1, 2, 3) and _vc.parse('release-3') is None)
+check('version_check: nothing newer, nothing said', _vc.compare((1, 1, 0), [(1, 0, 0), (1, 1, 0)]) is None and _vc.compare((1, 2, 0), [(1, 1, 0)]) is None)
+_c = _vc.compare((1, 0, 0), [(1, 0, 0), (1, 1, 0), (1, 3, 1)])
+check('version_check: minor versions behind, and the count of releases since', _c and _c[1] == (1, 3, 1) and '3 minor versions behind' in _c[2] and '2 releases since' in _c[2], _c)
+_c = _vc.compare((1, 4, 0), [(1, 4, 0), (1, 4, 3)]); check('version_check: patch releases behind', _c and '3 patch releases behind' in _c[2], _c)
+_c = _vc.compare((1, 9, 0), [(2, 0, 0)]); check('version_check: a major version says to read the notes', _c and 'major version behind' in _c[2] and 'release notes' in _c[2], _c)
+_cd = tempfile.mkdtemp(prefix='c64vc_'); os.makedirs(os.path.join(_cd, 'mosaic')); json.dump({'at': __import__('time').time(), 'tags': [[1, 0, 0], [1, 4, 0]]}, open(os.path.join(_cd, 'mosaic', 'version_check.json'), 'w'))
+_r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'version_check.py'), '--line'], capture_output=True, text=True, env=dict(os.environ, XDG_CACHE_HOME=_cd, MOSAIC_NO_UPDATE_CHECK=''))
+check('version_check --line: a newer release in the cache gives one UPDATE line naming it and the notes', _r.stdout.startswith('UPDATE: MOSaic 1.4.0 is out') and '/releases' in _r.stdout and _r.stdout.count('\n') == 1, _r.stdout + _r.stderr)
+_r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'version_check.py'), '--line'], capture_output=True, text=True, env=dict(os.environ, XDG_CACHE_HOME=_cd, MOSAIC_NO_UPDATE_CHECK='1'))
+check('version_check --line: MOSAIC_NO_UPDATE_CHECK=1 silences it', _r.stdout == '', _r.stdout)
+
 # ---- gauge.py: a clean area is 100%, an area with an unnamed routine is not -------------------------------------------------------------------------------------
 _g = project(".pc = $0800 \"RAM\"\nStart:\n  lda #1 // [0800:a9 01    LDA #$01]\n  rts // [0802:60       RTS]\n.pc = $1000 \"RAM2\"\nSUB_1000:\n  lda #2 // [1000:a9 02    LDA #$02]\n  jsr SUB_1000 // [1002:20 00 10 JSR $1000]\n  rts // [1005:60       RTS]\n")
 _r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'gauge.py'), '--root', _g, '--main', 'main.asm', '--json'], capture_output=True, text=True)

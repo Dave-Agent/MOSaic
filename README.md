@@ -51,6 +51,8 @@ The agent researches the game, extracts the files, finds the point where the gam
 
 **(f) Check where you are** with `just --list` for the commands, `python3 ~/.claude/skills/mosaic/scripts/p1_complete.py --root . --phase 1` for how much of phase 1 remains, and `docs/` in the project for the research, the boot analysis and the answers recorded from you.
 
+**Updates.** `just status` and the tool check print an `UPDATE:` line when a newer release has been tagged, and say how far behind you are. It is one read-only request to the skill's git remote, at most once a day (cached in `~/.cache/mosaic/`); nothing is updated for you, and `MOSAIC_NO_UPDATE_CHECK=1` turns it off. `python3 scripts/version_check.py` shows the details. The installed version is in `VERSION`.
+
 ## See results
 
 In a project made with MOSaic (`new_project.py`), every command takes the phase: `1` is the frozen, byte-identical reconstruction, `2` is the split, refactored source. With no argument it uses `ACTIVE_PHASE` from `project.config`.
