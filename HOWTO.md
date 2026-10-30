@@ -13,7 +13,7 @@ Five steps after setup. Steps 2 and 4 are big jobs that the agent does in the ba
 
 **Glossary**
 
-- **Reference:** a memory image of the game alone (no loader, no crack); every build is checked against it.
+- **Reference:** a memory image of the game alone (no loader, no crack); every build is checked against it. For a game that is a single PRG file, the reference can be that PRG itself, header included (`new_project.py` does this when the medium is a `.prg`, or with `--target prg`): its load address then comes from the PRG's first two bytes, and the third byte of the file is the first byte at that address.
 - **Hand-off:** the moment the game is fully loaded and about to start.
 - **Byte-identical:** the source assembles to exactly the same bytes as the reference.
 - **Slice:** one region of the source worked on in a scratch copy, merged back when its checks pass.
@@ -139,7 +139,7 @@ You do not need this unless you want to know what the agent is doing. `just stat
 |---|---|---|
 | **2.1 Research** | The manual, release facts, reviews and POKE lists are read and written down as unconfirmed leads. Nothing from the web goes into the code until the code confirms it. | both files are filled in |
 | **2.2 Extract and boot chain** | Every file is extracted from the image, the boot stub is disassembled, and what loads what is worked out. A tape with a turbo loader needs a decoder written for that loader. | `docs/boot_analysis.md` names the boot chain and the hand-off address |
-| **2.3 Clean reference** | The game runs in VICE (a scratch copy); RAM is dumped at the hand-off several times, emulator noise is voted out, and loader and crack bytes are zeroed only where the tracer proves the game never touches them. | `reference.sha256` exists |
+| **2.3 Clean reference** | The game runs in VICE (a scratch copy); RAM is dumped at the hand-off several times, emulator noise is voted out, and loader and crack bytes are zeroed only where the tracer proves the game never touches them. For a PRG target, `just reference` simply copies the PRG from `originals/` and records its SHA-256; nothing is zeroed. | `reference.sha256` exists |
 | **2.4 Ghidra export** | The tracer records which addresses execute; Ghidra follows the code from them and the exporter writes Kick Assembler source. The exporter script downloads itself the first time. | `ghidra/<name>.asm` and `ghidra/<name>_Symbols.asm` exist |
 | **2.5 First byte-identical build** | The export is copied into `phase1/src/`, the project is pointed at it and the gate is run. | `just verify` prints `PASS: built image is byte-identical`; from here on it is the gate before every commit |
 | **2.6 Name the registers** | Raw register addresses become `VIC.`, `CIA.` and `SID.` names, and short local labels become anonymous. | `just verify` still passes |

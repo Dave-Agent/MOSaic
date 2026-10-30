@@ -31,6 +31,16 @@ if [ -z "$EXP" ]; then
 fi
 case "$EXP" in /*) ;; *) EXP="$ROOT/$EXP";; esac
 [ -f "$SEEDS" ] || { echo "no seeds file $SEEDS (scripts/ghidra/make_seeds.py writes one)"; exit 1; }
+# The image is loaded at LOAD_ADDRESS. A PRG reference (REFERENCE_IS_RAW="false") carries its own load address in its first two bytes (little-endian): the third
+# byte of the file is the first byte of the image, at that address. So the header is skipped and the address comes from it; a LOAD_ADDRESS that disagrees is an error.
+LOADER_OPTS=(-loader-baseAddr "${LOAD_ADDRESS:-0x0800}")
+if [ "${REFERENCE_IS_RAW:-true}" != "true" ]; then
+    PRG_BASE=$(( $(od -An -tu1 -N1 "$REFERENCE_PRG") + 256 * $(od -An -tu1 -j1 -N1 "$REFERENCE_PRG") ))
+    if [ -n "${LOAD_ADDRESS:-}" ] && [ $(( LOAD_ADDRESS )) -ne "$PRG_BASE" ]; then
+        printf 'LOAD_ADDRESS %s disagrees with the PRG header of %s ($%04X): remove it from project.config or correct it\n' "$LOAD_ADDRESS" "$REFERENCE_PRG" "$PRG_BASE" >&2; exit 1
+    fi
+    LOADER_OPTS=(-loader-baseAddr "$(printf '0x%04X' "$PRG_BASE")" -loader-fileOffset 2 -loader-length "$(printf '0x%X' $(( $(wc -c < "$REFERENCE_PRG") - 2 )))")
+fi
 # Ghidra 12 and later has no Jython: its scripts run under PyGhidra (Python 3, needs JDK 25 for 12.2), started with `pyghidraRun -H`.
 LAUNCH=("$GH/support/analyzeHeadless")
 if [ ! -d "$GH/Ghidra/Features/Jython" ] && [ -x "$GH/support/pyghidraRun" ]; then LAUNCH=("$GH/support/pyghidraRun" -H); echo "note: this Ghidra has no Jython: running through PyGhidra (pyghidraRun -H)"; fi
@@ -38,6 +48,6 @@ mkdir -p "$OUT"
 # remove only this project's previous Ghidra project files; ${VAR:?} stops the shell if a name is empty
 rm -rf "${GPROJ:?}/${GNAME:?}.rep" "${GPROJ:?}/${GNAME:?}.gpr"
 "${LAUNCH[@]}" "$GPROJ" "$GNAME" -import "$REFERENCE_PRG" \
-    -processor "${GHIDRA_PROCESSOR:-6502:LE:16:default}" -loader BinaryLoader -loader-baseAddr "${LOAD_ADDRESS:-0x0800}" -overwrite \
+    -processor "${GHIDRA_PROCESSOR:-6502:LE:16:default}" -loader BinaryLoader "${LOADER_OPTS[@]}" -overwrite \
     -scriptPath "$HERE" -postScript setup.py "$SEEDS" "$LABELS" "$HOLES" "$OUT" "$EXP" 2>&1 | grep -E "Export Complete|ERROR|Exception|Traceback|seeded|File|\.asm" || true
 ls -la "$OUT"

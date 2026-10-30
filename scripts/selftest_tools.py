@@ -148,6 +148,14 @@ buf2:
 """
 r = tool('reloc_hazards.py', project(RH))
 check('reloc_hazards: aligned base, raw sprite pointer and an end guard on a page-aligned label are reported', 'aligned-base 1' in r.stdout and 'sprite-ptr 1' in r.stdout and 'end-guard 1' in r.stdout, r.stdout + r.stderr)
+# ---- PRG target: make_seeds --prg reads the load address from the header; byte 3 of the file lands there -------------------------------------------------------
+import tempfile as _tf
+_d = _tf.mkdtemp(); _img = bytes([0xA9, 0x01, 0x4C, 0x07, 0x09, 0xEA, 0xEA, 0x60, 0x00]); open(os.path.join(_d, 'raw.bin'), 'wb').write(_img); open(os.path.join(_d, 'x.prg'), 'wb').write(bytes([0x00, 0x09]) + _img)
+_ms = os.path.join(HERE, 'ghidra', 'make_seeds.py')
+subprocess.run([sys.executable, '-B', _ms, '--root', _d, '--reference', 'raw.bin', '--base', '0900', '--out', 'a.txt', '--entry', '0900:start', '--jump-table', '0902', '0902'], capture_output=True)
+subprocess.run([sys.executable, '-B', _ms, '--root', _d, '--reference', 'x.prg', '--prg', '--out', 'b.txt', '--entry', '0900:start', '--jump-table', '0902', '0902'], capture_output=True)
+_a = open(os.path.join(_d, 'a.txt')).read() if os.path.exists(os.path.join(_d, 'a.txt')) else None; _b = open(os.path.join(_d, 'b.txt')).read() if os.path.exists(os.path.join(_d, 'b.txt')) else None
+check('make_seeds --prg: the seeds of a PRG are those of its image at the header address (byte 3 lands at the load address)', _a is not None and _a == _b and '0907' in _a, repr((_a, _b)))
 # ---- layout_fuzz.py --label / --take (needs Java and Kick Assembler; skipped without them) ------------------------------------------------------------------------
 _jar = os.path.expanduser(os.environ.get('KICKASS_JAR') or '~/tools/KickAss.jar')
 if os.path.exists(_jar) and subprocess.run(['java', '-version'], capture_output=True).returncode == 0:

@@ -17,10 +17,12 @@ Only addresses inside the image (--base ADDR and the reference length) are kept.
 import os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from _common import parser
-a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--reference', required=True); a.add_argument('--base', default='0800'); a.add_argument('--out', required=True)
+a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--reference', required=True); a.add_argument('--prg', action='store_true', help='the reference is a PRG: its first two bytes are the load address (little-endian) and the image starts at the third byte, so --base is taken from them'); a.add_argument('--base', default='0800'); a.add_argument('--out', required=True)
 a.add_argument('--entry', action='append', default=[]); a.add_argument('--vectors'); a.add_argument('--ram-vectors', action='store_true'); a.add_argument('--jump-table', nargs=2, action='append', default=[]); a.add_argument('--edges', action='append', default=[])
 a.add_argument('--executed', action='append', default=[]); a.add_argument('--lines', action='append', default=[])
-args = a.parse_args(); os.chdir(args.root); base = int(args.base, 16); ref = open(args.reference, 'rb').read(); hi = base + len(ref)
+args = a.parse_args(); os.chdir(args.root); base = int(args.base, 16); ref = open(args.reference, 'rb').read()
+if args.prg: base = ref[0] | ref[1] << 8; ref = ref[2:]     # byte 3 of the file lands at the header's address
+hi = base + len(ref)
 seeds = {}
 def add(x, why):
     if base <= x < hi: seeds.setdefault(x, why)

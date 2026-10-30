@@ -70,9 +70,13 @@ last_ad = max(data); rest_after = [x for x in range(HI + 1, last_ad + 1)]
 
 # ---- reference check -----------------------------------------------------------------------------------------------------------------------------------------
 cfg = config(args.root); ref = None
-if cfg.get('REFERENCE_PRG') and cfg.get('REFERENCE_IS_RAW', '').lower() == 'true' and cfg.get('LOAD_ADDRESS'):
+if cfg.get('REFERENCE_PRG'):
     rp = os.path.join(args.root, cfg['REFERENCE_PRG'])
-    if os.path.exists(rp): ref = (open(rp, 'rb').read(), int(cfg['LOAD_ADDRESS'], 16))
+    if os.path.exists(rp):
+        rd = open(rp, 'rb').read()
+        if cfg.get('REFERENCE_IS_RAW', '').lower() == 'true':
+            if cfg.get('LOAD_ADDRESS'): ref = (rd, int(cfg['LOAD_ADDRESS'], 16))
+        else: ref = (rd[2:], rd[0] | rd[1] << 8)      # a PRG reference: the header is the load address and the third byte lands there
 if ref:
     bad = [a_ for a_ in range(LO, HI + 1) if 0 <= a_ - ref[1] < len(ref[0]) and ref[0][a_ - ref[1]] != data[a_]]
     if bad: sys.exit('the .byte rows differ from the reference image at $%04X (and %d more): the source rows are not the reference bytes' % (bad[0], len(bad) - 1))

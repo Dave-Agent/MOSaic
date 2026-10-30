@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser
 SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--name', required=True); a.add_argument('--media', action='append', default=[])
-a.add_argument('--handoff-media', help='file name (in originals/) the dumps are taken from: the UNPROTECTED medium'); a.add_argument('--protect', action='store_true'); a.add_argument('--no-next', action='store_true', help='do not print the next steps (a wrapper script prints its own)'); a.add_argument('--no-git', action='store_true'); a.add_argument('--force', action='store_true')
+a.add_argument('--handoff-media', help='file name (in originals/) the dumps are taken from: the UNPROTECTED medium'); a.add_argument('--protect', action='store_true'); a.add_argument('--no-next', action='store_true', help='do not print the next steps (a wrapper script prints its own)'); a.add_argument('--no-git', action='store_true'); a.add_argument('--target', choices=('image', 'prg'), help='what the byte-identical build is checked against: image = a RAM image of the game alone (the default), prg = the PRG file itself, header included (the default when the medium is a .prg)'); a.add_argument('--force', action='store_true')
 args = a.parse_args(); root = os.path.abspath(args.root); os.makedirs(root, exist_ok=True)
 slug = re.sub(r'[^a-z0-9]+', '', args.name.lower()) or 'game'
 for d in ('originals', 'dumps', 'reference', 'build', 'docs', 'tools/ghidra', 'phase1/src/libs'): os.makedirs(os.path.join(root, d), exist_ok=True)
@@ -33,7 +33,15 @@ def put(rel, tpl):
     t = open(os.path.join(SKILL, 'templates', tpl)).read()
     for k, v in subs.items(): t = t.replace(k, v)
     os.makedirs(os.path.dirname(dst) or root, exist_ok=True); open(dst, 'w').write(t); print('wrote  ', rel)
-put('project.config', 'project.config.in'); put('justfile', 'justfile.in'); put('README.md', 'README.md.in'); put('.gitignore', 'gitignore.in')
+target = args.target or ('prg' if first.lower().endswith('.prg') else 'image')
+put('project.config', 'project.config.in')
+if target == 'prg':      # the reference is the PRG itself: its first two bytes are the load address and its third byte lands there, so no LOAD_ADDRESS is needed
+    cp = os.path.join(root, 'project.config'); c = open(cp).read()
+    if 'REFERENCE_IS_RAW="true"' in c:
+        c = c.replace('REFERENCE_PRG="reference/%s_ref.bin"' % slug, 'REFERENCE_PRG="reference/%s.prg"' % slug).replace('REF_OUT="reference/%s_ref.bin"' % slug, 'REF_OUT="reference/%s.prg"' % slug)
+        c = c.replace('REFERENCE_IS_RAW="true"', 'REFERENCE_IS_RAW="false"       # the reference is a PRG file, header included; the tools read its load address from the header').replace('LOAD_ADDRESS="0x0800"          # first address of the reference image; set it with REF_KEEP below', '# LOAD_ADDRESS is not set: it comes from the PRG header (if you set it, it must agree)')
+        open(cp, 'w').write(c); print('target: the PRG file itself (REFERENCE_IS_RAW="false"); `just reference` copies it from originals/')
+put('justfile', 'justfile.in'); put('README.md', 'README.md.in'); put('.gitignore', 'gitignore.in')
 put('docs/background.md', 'background.md.in'); put('docs/boot_analysis.md', 'boot_analysis.md.in'); put('tools/reference.spec', 'reference.spec.in')
 for f in glob.glob(os.path.join(SKILL, 'libs', '*.asm')):
     d = os.path.join(root, 'phase1/src/libs', os.path.basename(f))

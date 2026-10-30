@@ -56,7 +56,18 @@ decrunch:
 
 # Derive the reference: the RAM range REF_KEEP at the hand-off, patched by tools/reference.spec, with its SHA-256.
 reference:
-    python3 -B {{skill}}/scripts/reference/make_reference.py --root . --in dumps/handoff.bin --write
+    #!/usr/bin/env bash
+    set -euo pipefail
+    . ./project.config
+    if [ "${REFERENCE_IS_RAW:-true}" = "true" ]; then
+        python3 -B {{skill}}/scripts/reference/make_reference.py --root . --in dumps/handoff.bin --write
+    else
+        # PRG target: the reference is the PRG file itself (header included), copied from originals/ with its SHA-256 recorded.
+        case "$HANDOFF_MEDIA" in *.prg|*.PRG) ;; *) echo "REFERENCE_IS_RAW=false needs HANDOFF_MEDIA to be a .prg file (it is $HANDOFF_MEDIA)" >&2; exit 1;; esac
+        mkdir -p "$(dirname "$REFERENCE_PRG")"; rm -f "$REFERENCE_PRG"; cp "$HANDOFF_MEDIA" "$REFERENCE_PRG"; chmod a-w "$REFERENCE_PRG"
+        python3 -c 'import hashlib, os, sys; print("%s  %s" % (hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest(), os.path.basename(sys.argv[1])))' "$REFERENCE_PRG" > "${REF_SHA_FILE:-reference.sha256}"
+        cat "${REF_SHA_FILE:-reference.sha256}"
+    fi
 
 # The whole derivation from the medium to the reference.
 derive: dumps vote decrunch reference
@@ -86,7 +97,7 @@ seeds:
     if [ "$(awk '{for(i=1;i<NF;i++) if($(i+1)=="distinct") print $i}' build/trace/seed_runs.txt | sort -u | wc -l)" = 1 ] && [ "$(wc -l < build/trace/seed_runs.txt)" -gt 2 ]; then
         echo "WARNING: every run executed the same number of addresses: the game probably never got past a title or menu. Leave SEED_JOY1/SEED_JOY2 empty, or press what it waits for with SEED_EXTRA (--joy2-at FRAME=VALUE ...)." >&2
     fi
-    python3 -B {{skill}}/scripts/ghidra/make_seeds.py --root . --reference "$REFERENCE_PRG" --base "${LOAD_ADDRESS#0x}" --out tools/ghidra/seeds.txt --entry "$HANDOFF_PC:hand-off" --vectors dumps/handoff.bin --edges build/trace/cov.edges --executed build/trace/cov.flags
+    python3 -B {{skill}}/scripts/ghidra/make_seeds.py --root . --reference "$REFERENCE_PRG" $([ "${REFERENCE_IS_RAW:-true}" = true ] && echo "--base ${LOAD_ADDRESS#0x}" || echo --prg) --out tools/ghidra/seeds.txt --entry "$HANDOFF_PC:hand-off" --vectors dumps/handoff.bin --edges build/trace/cov.edges --executed build/trace/cov.flags
 
 # First conversion step after the first byte-identical build: name the hardware registers with the libs (names only; the gate must stay green).
 libs:
