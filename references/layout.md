@@ -22,6 +22,8 @@ build/ ghidra/ analysis/ extracted/   derived, regenerable      NOT COMMITTED
 ```
 
 ## Prefer not committing the game's binaries
+*A recommendation, not a rule. It is the skill's default and philosophy, and the project's owner decides: a self-contained repository is a reasonable wish. The reason for the default is redistribution: a public repository hands out a commercial game's bytes, and git history keeps them even after a delete. Tell a user who chooses otherwise why we default the other way, without insisting.*
+
 **Prefer not committing any ROM, disk image, tape, cartridge, memory dump or image that is the original program's bytes, or a byte-for-byte derivation of it, unless we built it ourselves from our own source.** That covers `originals/`, `dumps/`, `reference/`, an unpacked or cleaned image, and tables generated from them. We do not own that data, and a public repository must not redistribute it.
 - **Commit instead:** the source, the tools that derive the reference from the original (`make_reference.py` or equivalent), a **checksum file** (`reference.sha256`) that proves a supplied image is the right one, and the README steps to supply it (which release, where it came from, which file name, which hash).
 - **`.gitignore` lists** `/originals/`, `/dumps/`, `/reference/`, `/build/`, `/ghidra/`, `/analysis/`, `/extracted/`, any stray `/*.prg`, `__pycache__/`, `.claude/settings.local.json`, tool state (`progress.db`, `.sync-state`), editor noise, and Kick's working copies next to the source.

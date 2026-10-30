@@ -2,7 +2,7 @@
 
 A Kick Assembler reconstruction of this Commodore 64 game. Status: **phase 1, just started.** It follows the shared process in the MOSaic skill (`references/new_game.md`).
 
-**No game binary is in this repository** (`reference.sha256` holds the SHA-256 the build is checked against). You supply the original media and derive the reference yourself.
+**No game binary is in this repository by default** (`reference.sha256` holds the SHA-256 the build is checked against). You supply the original media and derive the reference yourself. MOSaic keeps the game's files out of git because the game belongs to its rights holders, and a public repository would redistribute it. That is a recommendation, not a rule: it is your repository, and some people want a self-contained one. If you commit them, do it knowingly, and remove `/originals/`, `/dumps/` and `/reference/` from `.gitignore`.
 
 ## What you need
 Linux or macOS; Java 17+ and Kick Assembler; VICE with its C64 ROMs and `c1541`; `just`; Python 3; `gcc`; Ghidra 11+ (the Kick Assembler exporter script is fetched automatically, pinned, on first use); the MOSaic skill (`~/.claude/skills/mosaic`, or set `MOSAIC`). `just env` checks them.

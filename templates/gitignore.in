@@ -1,4 +1,4 @@
-# Build output and derived data: never committed.
+# Build output and derived data: never committed. (The game's own files below are kept out by default so a public repository does not redistribute them; remove those lines if you want a self-contained repository.)
 /build/
 /ghidra/
 /analysis/
