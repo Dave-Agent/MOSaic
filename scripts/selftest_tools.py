@@ -212,6 +212,21 @@ check('run_game inject: $D000-$D018, $D01A, $D01B-$D01D and $D020-$D02E are rest
 check('run_game inject: the interrupt flags $D019 and the collision latches $D01E / $D01F are NOT written (a write clears the flags; a read clears the latches)', not any(a in _wr for a in (0xD019, 0xD01E, 0xD01F)), sorted(hex(a) for a in _wr))
 check('run_game: importing the module starts nothing (main runs only as a script)', hasattr(_rgm, 'inject') and hasattr(_rgm, 'main'))
 
+check('run_game: sys mode jumps to LAUNCH_PC (the game\'s own start), defaulting to HANDOFF_PC; inject and disk mode resume at HANDOFF_PC', _rgm.start_pc({'HANDOFF_PC': '41c0', 'LAUNCH_PC': '7fe9'}, 'sys') == '7fe9' and _rgm.start_pc({'HANDOFF_PC': '41c0'}, 'sys') == '41c0' and _rgm.start_pc({'HANDOFF_PC': '41c0', 'LAUNCH_PC': '7fe9'}, 'inject') == '41c0' and _rgm.start_pc({'HANDOFF_PC': '41c0', 'LAUNCH_PC': '7fe9'}, 'disk') == '41c0')
+_up = project('''
+    Start:
+      rts  // [0800:60 RTS]
+    ColdStart:
+      rts  // [0900:60 RTS]
+    Dead:
+      rts  // [0a00:60 RTS]
+''')
+def _unref(extra):
+    open(os.path.join(_up, 'project.config'), 'w').write('SRC_MAIN="main.asm"\n' + extra); return tool('unreferenced.py', _up).stdout
+_u0 = _unref('HANDOFF_PC="0800"\n'); _u1 = _unref('HANDOFF_PC="0800"\nLAUNCH_PC="0900"\n')
+check('unreferenced: a label at LAUNCH_PC is reached from outside (the launcher), like the one at HANDOFF_PC; a dead one is still listed', 'ColdStart' in _u0 and 'ColdStart' not in _u1 and 'Start' not in _u1.replace('ColdStart', '') and 'Dead' in _u1, _u0 + '|' + _u1)
+check('launch.sh: the SYS address is LAUNCH_PC, then HANDOFF_PC', 'LAUNCH_PC:-${HANDOFF_PC' in open(os.path.join(HERE, '..', 'framework', 'scripts', 'launch.sh')).read())
+
 # ---- code_to_bytes.py: instructions the export read from data go back to .byte rows -------------------------------------------------------------------------------
 d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, 'src'))
 with open(os.path.join(d, 'project.config'), 'w') as f: f.write('SRC_MAIN="src/m.asm"\n')

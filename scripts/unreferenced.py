@@ -6,7 +6,7 @@
 A label counts as referenced when its name appears as a whole word anywhere else in the source (code, `.word` rows, label files, `#<label` / `label+1`), comments excluded. What is left is
 a candidate for `TODO(phase2): remove? unreferenced, never executed` (rules.md, "Dead code"): the report lists each one, with its address and whether the marker is already there
 (in the comment block above the label). Without --all only the unmarked ones are listed and the exit status is 1 when there are any.
-Not listed: a label reached by the hardware or the launcher (the hand-off address, HANDOFF_PC of project.config), a label inside a scope (a local), and --ignore REGEX.
+Not listed: a label reached by the hardware or the launcher (the hand-off address HANDOFF_PC and the start address LAUNCH_PC of project.config), a label inside a scope (a local), and --ignore REGEX.
 A hint: a label reached only by a computed address (a table walked by index with no label of its own) shows up here; check the tracer flags (`trace/hit_counts.py`) before tagging it."""
 import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -16,7 +16,7 @@ args = a.parse_args(); main = main_file(args); cfg = config(args.root)
 files = code_files(main); text = {f: open(f).read().split('\n') for f in files}
 try: names = source_labels(main)[0]
 except SystemExit: names = {}
-handoff = cfg.get('HANDOFF_PC'); hand = int(handoff, 16) if handoff else None
+hand = {int(cfg[k], 16) for k in ('HANDOFF_PC', 'LAUNCH_PC') if cfg.get(k)}      # reached by the launcher or the hardware: the hand-off and the game's own start
 DEF = re.compile(r'^([A-Za-z_]\w*):\s*(\{\s*)?(//.*|\.\w+.*)?$')
 uses = {}; defs = []                                   # name -> count of word uses outside comments; (file, line, name, depth)
 WORD = re.compile(r'[A-Za-z_][\w.]*')
@@ -37,7 +37,7 @@ out = []
 for f, n, name in defs:
     if uses.get(name): continue
     if ign and ign.search(name): continue
-    if hand is not None and names.get(name) == hand: continue
+    if names.get(name) in hand: continue
     k = n - 1; block = []                                   # the comment block above the label: contiguous comment and blank lines
     while k > 0 and (text[f][k - 1].strip() == '' or text[f][k - 1].lstrip().startswith('//')) and len(block) < 80: block.append(text[f][k - 1]); k -= 1
     block = '\n'.join(block)

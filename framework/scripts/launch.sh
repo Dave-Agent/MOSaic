@@ -62,7 +62,7 @@ case "$TARGET" in
     else
         echo ">> launching VICE x64 with symbols${POKES_FILE:+ (poked PRG)}"
         # A bare image has no BASIC stub (VICE autostart types RUN, not SYS): type the SYS ourselves, to the hand-off address. The file must be the LAST argument.
-        SYS_ADDR=$(( 16#${HANDOFF_PC:-0810} ))
+        SYS_ADDR=$(( 16#${LAUNCH_PC:-${HANDOFF_PC:-0810}} ))
         "$VICE_BIN" -moncommands "$VICE_SYMBOLS" -keybuf "sys $SYS_ADDR\x0d" "$LAUNCH_PRG"
     fi
     ;;

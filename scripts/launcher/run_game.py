@@ -6,7 +6,7 @@
 Why a "launcher" is usually NOT a program: a decompiled game image is a RAM image ($0800-$FFFF is common). It has no room for a BASIC stub, VICE autostart types RUN
 (never SYS) so a PRG not at $0801 ends at READY, and a real KERNAL LOAD cannot fill $D000-$DFFF. So the launcher is a VICE command line, in one of two modes:
 
-  sys     (default, the simplest thing that works) VICE loads the bare PRG and `-keybuf "sys <HANDOFF_PC decimal>\\r"` jumps to the entry. The machine is the
+  sys     (default, the simplest thing that works) VICE loads the bare PRG and `-keybuf "sys <LAUNCH_PC decimal>\\r"` jumps to the entry (LAUNCH_PC, the game's own start; HANDOFF_PC when there is none). The machine is the
           freshly booted BASIC machine; this is enough when the game initialises what it needs itself. Try this first.
   inject  (when sys is not enough) VICE stops after boot (-initbreak), the PRG is loaded into RAM through the text monitor, the low RAM that the original loader left
           ($0002-$07FF, from dumps/handoff.bin) is written back, optional hardware state is poked (LAUNCH_POKES, and VIC registers / colour RAM / $DD00 from
@@ -22,6 +22,12 @@ import glob, os, re, shutil, subprocess, sys, tempfile, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'vice'))
 from _common import parser, config
+
+def start_pc(cfg, mode):
+    """The address the build starts at. sys mode jumps to LAUNCH_PC, the game's own start (default HANDOFF_PC); inject and disk mode resume the machine AT the hand-off, so they use HANDOFF_PC. The two are
+    different things: HANDOFF_PC is where the derivation stops and the reference is taken (the tracer starts from that state), LAUNCH_PC is where a plain boot should jump to start the game, which can be
+    EARLIER (a cartridge-style cold start that runs the KERNAL init the original loader used to cover)."""
+    return (cfg.get('LAUNCH_PC') if mode == 'sys' and cfg.get('LAUNCH_PC') else cfg.get('HANDOFF_PC'))
 
 def vic_restore_commands(vic):
     """The monitor commands that write the saved VIC-II registers back (vic: the 64 register values of the state file). Everything the game CONFIGURES is restored: $D000-$D018 (positions, mode, raster,
@@ -135,8 +141,8 @@ def main():
     prg = os.path.join(root, args.prg or cfg['OUTPUT_PRG']); mode = args.mode or (cfg.get('SMOKE_MODE') if args.shot else None) or cfg.get('LAUNCH_MODE', 'sys')   # SMOKE_MODE: the unattended run may use a faster mode than the interactive one
     if mode not in ('sys', 'inject', 'disk'): sys.exit('LAUNCH_MODE %r: this script knows sys, inject and disk' % mode)
     if not os.path.exists(prg): sys.exit('no %s: build first (just experiment)' % prg)
-    pc = cfg.get('HANDOFF_PC') or sys.exit('set HANDOFF_PC in project.config')
-    cfg['HANDOFF_PC'] = pc
+    pc = start_pc(cfg, mode) or sys.exit('set LAUNCH_PC (or HANDOFF_PC) in project.config')
+    if mode != 'sys' and not cfg.get('HANDOFF_PC'): sys.exit('set HANDOFF_PC in project.config: %s mode resumes the machine at the hand-off' % mode)
     vice = [cfg.get('VICE_BIN') or shutil.which('x64sc') or 'x64sc', '+confirmonexit', '-jamaction', '1']     # 1 = continue after a JAM (the game may jam on purpose or by a bug: the screenshot decides). NOT 5: that is Quit Emulator in VICE 3.7 and the window just vanishes
     sym = os.path.join(root, args.symbols or cfg.get('VICE_SYMBOLS', ''))
     if not args.no_symbols and (args.symbols or cfg.get('VICE_SYMBOLS')) and os.path.exists(sym): vice += ['-moncommands', without_lib_scopes(sym, root, cfg)]
