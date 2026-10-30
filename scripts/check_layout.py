@@ -3,7 +3,7 @@
 
   check_layout.py [--root DIR] [--strict]
 
-Tracked files with a ROM/disk/tape/cartridge/dump extension are listed unless they are named in COMMIT_BINARIES (space-separated paths, project.config).
+Tracked files with a ROM/disk/tape/cartridge/dump extension are listed unless they are named in COMMIT_BINARIES (space-separated paths, project.config; escape a space in a path with a backslash).
 The layout rules are a PREFERENCE (layout.md: "prefer not committing"), so every finding is a warning and the exit status is 0.
 With --strict any finding makes the exit status 2 (a distinct "preference not met"); status 1 is reserved for a real error (not a git repository)."""
 import os, re, subprocess, sys
@@ -11,7 +11,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser, config
 a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--strict', action='store_true', help='exit 2 when any preference is not met (default: always 0)'); args = a.parse_args(); root = os.path.abspath(args.root); cfg = config(root)
 EXT = ('.d64', '.d71', '.d81', '.g64', '.prg', '.bin', '.crt', '.t64', '.tap', '.sid', '.nes', '.gb', '.gbc', '.rom', '.sna', '.vsf', '.zip', '.7z', '.p00')
-allow = set(cfg.get('COMMIT_BINARIES', '').split())
+import shlex
+try: allow = set(shlex.split(cfg.get('COMMIT_BINARIES', '')))      # shell-style: write a space inside a path as backslash-space (the config reader does not allow quotes in a value)
+except ValueError: allow = set(cfg.get('COMMIT_BINARIES', '').split())
 def git(*x): return subprocess.run(['git', '-C', root] + list(x), capture_output=True, text=True)
 if git('rev-parse', '--show-toplevel').returncode: sys.exit('not a git repository: ' + root)
 prefix = git('rev-parse', '--show-prefix').stdout.strip()
