@@ -33,7 +33,7 @@ dumps:
     fi
     [ -n "${DUMP_FEED:-}" ] && args+=(--feed "$DUMP_FEED")
     for i in $(seq 1 "${DUMP_COUNT:-5}"); do
-        python3 -B {{skill}}/scripts/vice/vice_handoff.py --root . --media "$HANDOFF_MEDIA" --handoff "$DUMP_PC" --no-warp "${args[@]}" --out dumps/at_dump_$i.bin --timeout 400
+        python3 -B {{skill}}/scripts/vice/vice_handoff.py --root . --media "$HANDOFF_MEDIA" --handoff "$DUMP_PC" --no-warp ${args[@]+"${args[@]}"} --out dumps/at_dump_$i.bin --timeout 400
     done
 
 # A timing-critical loader leaves single-bit noise that differs per run in VICE: keep the value most dumps agree on.
