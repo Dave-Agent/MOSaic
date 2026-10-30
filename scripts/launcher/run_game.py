@@ -27,10 +27,12 @@ def inject(cfg, root, vice_cmd, prg, shot, seconds):
     from vice_monitor import Monitor
     port = int(cfg.get('VICE_MONITOR_PORT', 6510)) + 1
     tmp = tempfile.mkdtemp(prefix='launch_')
+    if not shot: print('run_game: starting VICE and injecting the game state (about 15 s): the window shows the BASIC screen until the game starts', flush=True)
     p = subprocess.Popen(vice_cmd + ['-initbreak', '0xe5cd', '-remotemonitor', '-remotemonitoraddress', 'ip4://127.0.0.1:%d' % port],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         m = Monitor(port); m.read(4)                                  # boot done: stopped at the KERNAL input loop
+        slow_cmd = m.cmd; m.cmd = lambda c, t=0.6: slow_cmd(c, min(t, 0.15))   # VICE runs the commands in order: the reply waits only slowed the start by ~20 s (a frozen BASIC screen)
         m.cmd('bank ram'); m.cmd('load "%s" 0' % os.path.abspath(prg), 3)   # the PRG header gives the address; bank ram = true RAM under the ROMs/I-O
         dump = os.path.join(root, 'dumps', 'handoff.bin'); state = os.path.join(root, 'dumps', 'handoff_state.bin')
         lo, hi = [int(x, 16) for x in cfg.get('LAUNCH_LOW', '0002-07ff').split('-')]
@@ -50,21 +52,66 @@ def inject(cfg, root, vice_cmd, prg, shot, seconds):
             a, v = item.split('='); m.cmd('> %s %s' % (a, ' '.join(v[i:i + 2] for i in range(0, len(v), 2))))
         m.cmd('> 0000 %s' % cfg.get('LAUNCH_DDR', '2f')); m.cmd('> 0001 %s' % cfg.get('LAUNCH_PORT', '37'))
         m.cmd('r sp=%s' % cfg.get('HANDOFF_SP', 'fc')); m.cmd('r fl=%s' % cfg.get('HANDOFF_P', '34')); m.cmd('r pc=%s' % cfg['HANDOFF_PC'])
-        m.cmd('x', 0.3)
+        m.cmd = slow_cmd; m.cmd('x', 0.3)
         if shot:
             time.sleep(seconds); m.cmd('\n', 0.5); m.cmd('screenshot "%s" 2' % os.path.abspath(shot), 2)
+            end = time.time() + 15; last = -1                               # quit only when the PNG is written: a quit during the write left an empty file
+            while time.time() < end:
+                size = os.path.getsize(shot) if os.path.exists(shot) else 0
+                if size and size == last: break
+                last = size; time.sleep(0.3)
             m.cmd('quit', 0.5)
         else:
             m.k.close(); p.wait()                                       # interactive: leave VICE running until the user closes it
     finally:
         if p.poll() is None and shot: p.kill()
 
+def disk(cfg, root, vice_cmd, prg, shot, seconds):
+    """Boot the real medium on a scratch copy with a true 1541 drive up to the hand-off (the project's DUMP_STEPS and HANDOFF_PC: the same path the dumps take),
+    then write the built image over RAM and continue. The drive-side loader the boot started stays in step with the resident loader, so the game's own disk reads and writes work."""
+    from vice_monitor import Monitor, scratch_copy
+    media = cfg.get('HANDOFF_MEDIA') or sys.exit('LAUNCH_MODE=disk needs HANDOFF_MEDIA in project.config')
+    media = media if os.path.isabs(media) else os.path.join(root, media)
+    if not os.path.exists(media): sys.exit('medium not found: ' + media)
+    hand = '%04x' % int(cfg['HANDOFF_PC'], 16); tmo = float(cfg.get('HANDOFF_TIMEOUT', 300)); port = int(cfg.get('VICE_MONITOR_PORT', 6510)) + 1
+    steps = [x for x in (cfg.get('DUMP_STEPS') or '').split(';;') if x.strip()]
+    scratch_media, scratch_dir = scratch_copy(media)                    # VICE writes disk images back: never the original
+    cmd = vice_cmd + ['-drive8truedrive', '-drive8type', '1541', '-remotemonitor', '-remotemonitoraddress', 'ip4://127.0.0.1:%d' % port, '-autostart', scratch_media]
+    print('run_game: booting the disk to the hand-off at real speed, then overlaying the build (about %s s): the window shows the loader until then' % cfg.get('LAUNCH_DISK_SECONDS', '70'), flush=True)
+    p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        m = Monitor(port); m.read(1)
+        for st in steps:
+            at, _, cs = st.partition('='); at = '%04x' % int(at, 16)
+            m.cmd('break ' + at); seen = m.cmd('x', 0.2)
+            if not m.wait_stop(tmo, at, seen): sys.exit('step %s: breakpoint not reached within %d s' % (at, tmo))
+            m.cmd('delete')
+            for c in [c.strip() for c in cs.split(';') if c.strip()]: m.cmd(c, 0.3)
+        m.cmd('break ' + hand); seen = m.cmd('x', 0.2)
+        if not m.wait_stop(tmo, hand, seen): sys.exit('hand-off $%s not reached within %d s' % (hand, tmo))
+        m.cmd('delete')
+        m.cmd('bank ram'); m.cmd('load "%s" 0' % os.path.abspath(prg), 3)   # the build over the game's RAM; zero page, stack and the drive stay as the boot left them
+        m.cmd('bank cpu'); m.cmd('x', 0.3)
+        if shot:
+            time.sleep(seconds); m.cmd('\n', 0.5); m.cmd('screenshot "%s" 2' % os.path.abspath(shot), 2)
+            end = time.time() + 15; last = -1
+            while time.time() < end:
+                size = os.path.getsize(shot) if os.path.exists(shot) else 0
+                if size and size == last: break
+                last = size; time.sleep(0.3)
+            m.cmd('quit', 0.5)
+        else:
+            m.k.close(); p.wait()
+    finally:
+        if p.poll() is None: p.kill()
+        import shutil; shutil.rmtree(scratch_dir, True)
+
 def main():
     a = parser('Start the game in VICE (sys or inject mode)', write=False)
     a.add_argument('--prg'); a.add_argument('--mode'); a.add_argument('--shot'); a.add_argument('--cycles', type=int); a.add_argument('--no-symbols', action='store_true'); a.add_argument('--symbols', help='a VICE symbol file (default VICE_SYMBOLS): for a build that is not OUTPUT_PRG, e.g. the phase 2 one')
     args = a.parse_args(); root = args.root; cfg = config(root)
-    prg = os.path.join(root, args.prg or cfg['OUTPUT_PRG']); mode = args.mode or cfg.get('LAUNCH_MODE', 'sys')
-    if mode not in ('sys', 'inject'): sys.exit('LAUNCH_MODE %r: this script knows sys and inject' % mode)
+    prg = os.path.join(root, args.prg or cfg['OUTPUT_PRG']); mode = args.mode or (cfg.get('SMOKE_MODE') if args.shot else None) or cfg.get('LAUNCH_MODE', 'sys')   # SMOKE_MODE: the unattended run may use a faster mode than the interactive one
+    if mode not in ('sys', 'inject', 'disk'): sys.exit('LAUNCH_MODE %r: this script knows sys, inject and disk' % mode)
     if not os.path.exists(prg): sys.exit('no %s: build first (just experiment)' % prg)
     pc = cfg.get('HANDOFF_PC') or sys.exit('set HANDOFF_PC in project.config')
     cfg['HANDOFF_PC'] = pc
@@ -83,6 +130,6 @@ def main():
         cmd += [prg]                                                    # the file must be the LAST argument
         sys.exit(0 if subprocess.run(cmd, stdout=subprocess.DEVNULL if args.shot else None, stderr=subprocess.DEVNULL if args.shot else None,
                                      timeout=600 if args.shot else None).returncode in (0, 1) else 1)
-    inject(cfg, root, vice, prg, args.shot, int(cfg.get('SMOKE_SECONDS', 12)))
+    (disk if mode == 'disk' else inject)(cfg, root, vice, prg, args.shot, int(cfg.get('SMOKE_SECONDS', 12)))
 
 main()
