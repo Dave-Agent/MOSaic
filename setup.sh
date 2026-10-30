@@ -113,6 +113,6 @@ fi
 
 say "Done. Next:"
 echo "  1. cd \"$ROOT\""
-echo "  2. Open Claude Code there and say:"
-echo "       Use the MOSaic skill. Do HOWTO step 2: create a source that builds and starts this game, without stopping between its parts."
-echo "  3. Afterwards, \"move to the next stage\" does the next step. The full guide is $HERE/HOWTO.md"
+echo "  2. Start Claude Code there:  claude"
+echo "  3. Say:  move to the next stage"
+echo "The full guide is $HERE/HOWTO.md"

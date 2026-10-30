@@ -20,13 +20,13 @@ media = [f for f in files('originals/*') if os.path.isfile(f)]
 st.append(('Project scaffolded', os.path.exists(P('project.config')) and os.path.isdir(P('framework')), 'project.config, framework/', 'Make the project with new_project.py (README, Getting started).', 'README.md'))
 st.append(('Original medium in originals/', bool(media) and os.path.exists(P('originals.sha256')), '%d file(s), originals.sha256 %s' % (len(media), 'present' if os.path.exists(P('originals.sha256')) else 'missing'), 'Put the disk or tape image in originals/ (new_project.py --media) so its SHA-256 is recorded.', 'references/layout.md'))
 res = size('docs', 'gameplay.md') > 900 or size('docs', 'background.md') > 900
-st.append(('Research (stage 0b)', res, 'docs/gameplay.md, docs/background.md filled' if res else 'docs still templates', 'Research the game: manual, release facts, POKE lists; write docs/gameplay.md and docs/background.md.', 'references/research.md'))
+st.append(('Research', res, 'docs/gameplay.md, docs/background.md filled' if res else 'docs still templates', 'Research the game: manual, release facts, POKE lists; write docs/gameplay.md and docs/background.md.', 'references/research.md'))
 bootdoc = size('docs', 'boot_analysis.md') > 1500 and bool(files('extracted/*'))
-st.append(('Files extracted, boot chain analysed (stage 2)', bootdoc, 'extracted/ and docs/boot_analysis.md', 'Extract the files (disk: c1541 / extract_files.py, tape: tap_extract.py), disassemble the boot stub, work out the boot chain.', 'references/new_game.md, stage 2'))
+st.append(('Files extracted, boot chain analysed', bootdoc, 'extracted/ and docs/boot_analysis.md', 'Extract the files (disk: c1541 / extract_files.py, tape: tap_extract.py), disassemble the boot stub, work out the boot chain.', 'references/new_game.md, stage 2'))
 ref = (cfg.get('REFERENCE_PRG') and os.path.exists(P(cfg['REFERENCE_PRG']))) or bool(files('reference/*.bin'))
-st.append(('Clean reference derived (stage 3)', ref and os.path.exists(P('reference.sha256')), 'reference image + reference.sha256', 'Find the hand-off, dump RAM from a scratch copy, derive the game-only reference (tools/reference.spec, just derive).', 'references/new_game.md, stages 2-3'))
+st.append(('Clean reference derived', ref and os.path.exists(P('reference.sha256')), 'reference image + reference.sha256', 'Find the hand-off, dump RAM from a scratch copy, derive the game-only reference (tools/reference.spec, just derive).', 'references/new_game.md, stages 2-3'))
 gh = bool(files('ghidra/*.asm'))
-st.append(('Ghidra export (stage 5)', gh, 'ghidra/*.asm' if gh else 'no export', 'Seed and export: just seeds, just ghidra.', 'references/new_game.md, stage 5'))
+st.append(('Ghidra export', gh, 'ghidra/*.asm' if gh else 'no export', 'Seed and export: just seeds, just ghidra.', 'references/new_game.md, stage 5'))
 src1 = bool(main1) and os.path.exists(main1p) and 'DAT_' in open(main1p, errors='replace').read(400000) or (bool(main1) and os.path.exists(main1p) and size(main1) > 0)
 ver = None
 if args.verify and src1:
@@ -52,7 +52,7 @@ reloc = os.path.exists(P('docs', 'relocation_hazards.md'))
 st.append(('Relocatable (hazards resolved, sweep run)', reloc, 'docs/relocation_hazards.md' if reloc else 'not started', 'Phase 2 step 5: just reloc 2, asserts, the layout sweep with a control variant.', 'references/phase2_split.md, step 5; testing.md'))
 rem = os.path.exists(P('docs', 'phase2_removals.md'))
 st.append(('Byte-changing removals (masked gate)', rem, 'docs/phase2_removals.md' if rem else 'not started', 'Phase 2 step 6: remove the owner-approved dead blocks without moving anything (PHASE2_ALLOWED_DIFF).', 'references/phase2_split.md, step 6'))
-STEP = {'Project scaffolded': '1', 'Original medium in originals/': '1', 'Research (stage 0b)': '2.1', 'Files extracted, boot chain analysed (stage 2)': '2.2', 'Clean reference derived (stage 3)': '2.3', 'Ghidra export (stage 5)': '2.4',
+STEP = {'Project scaffolded': '1', 'Original medium in originals/': '1', 'Research': '2.1', 'Files extracted, boot chain analysed': '2.2', 'Clean reference derived': '2.3', 'Ghidra export': '2.4',
         'First byte-identical build (phase 1 source)': '2.5', 'Hardware registers named (libs applied)': '2.6', 'Game starts (smoke reference)': '2.7',
         'Phase 1 complete (every routine understood, no raw operands or placeholders)': '3', 'Phase 2 safety net (tests, golden traces)': '4.1', 'Phase 2 source split into files': '4.2',
         'Platform interface and port contracts': '4.3', 'Relocatable (hazards resolved, sweep run)': '4.4', 'Byte-changing removals (masked gate)': '5'}      # the step and part numbers of HOWTO.md

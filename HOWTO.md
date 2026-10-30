@@ -48,7 +48,7 @@ Claude asks for it as the last part of the setup: the path of the game file, its
 
 Your file is copied into the project's `originals/` folder and its SHA-256 recorded. The original is never modified and never loaded into an emulator directly; VICE only runs temporary copies.
 
-**Done when:** `just status` says `NEXT: step 2`.
+**Done when:** `just status` says `NEXT: step 2.1`.
 
 ---
 
