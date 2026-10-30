@@ -76,7 +76,7 @@ Do NOT read progress.log or any note of the slice's agent: you judge the diff an
 1. Answer every one of these rules for the diff, one line each: held / violated / not-applicable, with evidence (file:line, what you ran, what you saw). Not-applicable needs a reason. Not finding anything is not 'held': say what you looked at.
 %(rules)s
 
-2. Test the claims. These names are introduced by the diff (labels and .label lines). Choose the ones that claim a role, not the merely descriptive ones, and try to REFUTE each: a code shape that contradicts it, another reader or writer, a controlled tracer observation on a scratch copy. 'held' only for a name you tried to break and could not; 'refuted' with what you saw; 'not-tested' with why.
+2. Test the claims. These names are introduced by the diff (labels and .label lines). Choose the ones that claim a role, not the merely descriptive ones, and try to REFUTE each: a code shape that contradicts it, another reader or writer, a controlled tracer observation on a scratch copy. 'held' only for a name you tried to break and could not; 'refuted' with what you saw; 'not-tested' with why. The tracer's per-frame sample is RAM only: to see a VIC register (a sprite's position, enable or colour) run N frames and take a state dump (--dump FILE: RAM, the 64 VIC registers, colour RAM, $DD00), otherwise say not-tested.
 %(names)s
 
 3. List findings (concrete, each with the rule name and file:line; none if none), then VERDICT: PASS only if no rule is violated and no claim refuted, else FAIL.

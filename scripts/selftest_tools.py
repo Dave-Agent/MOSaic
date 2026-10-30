@@ -108,7 +108,7 @@ git(proj2, 'add', 'main.asm'); git(proj2, 'commit', '-q', '-m', 'slice two work'
 h1 = rev('hash', 'two', env=renv).stdout.strip()
 check('review hash: 12 hex digits, the same twice', re.fullmatch(r'[0-9a-f]{12}', h1) and rev('hash', 'two', env=renv).stdout.strip() == h1, h1)
 b = rev('brief', 'two', env=renv).stdout
-check('review brief: the diff hash, the base, the review rules (not the script rules), the names the diff introduces, and the independence rule', h1 in b and 'names-need-proof' in b and 'no-raw-operands' not in b and 'Reviewed  (main.asm)' in b and 'progress.log' in b and 'READ-ONLY' in b, b[:600])
+check('review brief: the diff hash, the base, the review rules (not the script rules), the names the diff introduces, and the independence rule', h1 in b and 'names-need-proof' in b and 'no-raw-operands' not in b and 'Reviewed  (main.asm)' in b and 'progress.log' in b and 'READ-ONLY' in b and '--dump FILE' in b, b[:600])
 tpl = rev('template', 'two', env=renv).stdout
 open(os.path.join(scratch, 'rec.md'), 'w').write(tpl)
 r = rev('record', 'two', os.path.join(scratch, 'rec.md'), '--root', real, env=renv)
