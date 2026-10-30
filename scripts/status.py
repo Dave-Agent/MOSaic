@@ -28,10 +28,15 @@ st.append(('Clean reference derived', ref and os.path.exists(P('reference.sha256
 gh = bool(files('ghidra/*.asm'))
 st.append(('Ghidra export', gh, 'ghidra/*.asm' if gh else 'no export', 'Seed and export: just seeds, just ghidra.', 'references/new_game.md, stage 5'))
 src1 = bool(main1) and os.path.exists(main1p) and 'DAT_' in open(main1p, errors='replace').read(400000) or (bool(main1) and os.path.exists(main1p) and size(main1) > 0)
+stub = False       # a scaffold that .imports the reference as binary has the file and passes verify, but nothing is disassembled yet
+if src1:
+    _t = open(main1p, errors='replace').read(2000000)
+    stub = bool(re.search(r'\.import\s+binary', _t, re.I)) and len(re.findall(r'\[[0-9A-Fa-f]{4}:[0-9a-fA-F]{2}', _t)) < 20
+    src1 = src1 and not stub
 ver = None
 if args.verify and src1:
     r = run(['just', 'verify', '1']); ver = r.returncode == 0 and 'PASS' in r.stdout
-st.append(('First byte-identical build (phase 1 source)', src1 and (ver is not False), ('phase 1 main file present' + ('' if ver is None else ', just verify ' + ('PASS' if ver else 'FAIL'))) if src1 else 'no phase 1 source', 'Copy the export into phase1/src, set SRC_MAIN, get just verify byte-identical, fix the first diffs.', 'references/new_game.md, stage 5'))
+st.append(('First byte-identical build (phase 1 source)', src1 and (ver is not False), ('phase 1 main file present' + ('' if ver is None else ', just verify ' + ('PASS' if ver else 'FAIL'))) if src1 else ('phase 1 file is only a stub (.import binary of the reference): no export moved in yet' if stub else 'no phase 1 source'), 'Copy the export into phase1/src, set SRC_MAIN, get just verify byte-identical, fix the first diffs.', 'references/new_game.md, stage 5'))
 libs = src1 and bool(re.search(r'\b(VIC|CIA|SID)\.\w+', open(main1p, errors='replace').read(600000)))
 st.append(('Hardware registers named (libs applied)', libs, 'VIC./CIA./SID. names in the source' if libs else 'raw register addresses', 'just libs-apply, then just anon-apply (anonymous labels); verify after each.', 'references/new_game.md, stage 6; rules.md'))
 smoke = os.path.exists(P('tools', 'smoke_ref.png'))
