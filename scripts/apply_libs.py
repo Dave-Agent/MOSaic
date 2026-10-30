@@ -65,6 +65,11 @@ for f in files:
 print('code lines changed: %d in %d file(s); %d distinct registers renamed' % (nlines, len(changed), len(used)))
 for n, c in sorted(hits.items(), key=lambda x: -x[1])[:12]: print('   %-28s %d' % (n, c))
 if unmapped: print('$D000-$DFFF addresses used but not in any lib (left as exported; colour RAM cells $D800-$DBFF are memory, not registers: name them by hand): ' + ' '.join('$%04X(%d)' % (k, v) for k, v in sorted(unmapped.items())))
+def mirror(ad):      # the chips decode fewer address lines than their block has: VIC repeats every $40 in $D000-$D3FF, SID every $20 in $D400-$D7FF, each CIA every $10 in its page
+    for lo, hi, step in ((0xD000, 0xD3FF, 0x40), (0xD400, 0xD7FF, 0x20), (0xDC00, 0xDCFF, 0x10), (0xDD00, 0xDDFF, 0x10)):
+        if lo <= ad <= hi: return lo + (ad - lo) % step
+mir = [(k, mirror(k)) for k in sorted(unmapped) if mirror(k) in names and mirror(k) != k]
+if mir: print('of those, mirrors of a named register (the chip answers on both addresses; name them by hand after the register, with a comment): ' + ', '.join('$%04X = %s ($%04X)' % (k, names[m], m) for k, m in mir))
 if offs: print('names used with an offset (left as exported, check by hand): ' + ', '.join(sorted(offs)))
 if dup: print('addresses with more than one lib name (first kept): ' + ', '.join('$%04X %s|%s' % d for d in dup[:6]))
 # symbols file: the renamed registers' .label lines become comments that keep their XREF text; main file: imports
