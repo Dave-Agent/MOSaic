@@ -56,8 +56,9 @@ rows = [
 try:
     import PIL; pil = PIL.__version__
 except Exception: pil = ''
-rows.append(('Pillow (python)', 'python module' if pil else '', pil, 'screenshot judging and image tools (optional)', 'optional', 'pip install pillow', None))
+rows.append(('Pillow (python)', 'python module' if pil else '', pil, 'screenshot judging (just smoke) and the image tools', 'run', 'pip install pillow (into the python3 named above)', None))
 miss_req = 0; brief_opt = []
+print('python:', sys.executable)
 print('tool environment', '(project.config found)' if cfg else '(no project.config here: default locations)', '| roles:', ', '.join(sorted(roles)))
 for name, path, v, why, role, hint, minv in rows:
     need = role in roles; ok = bool(path)
