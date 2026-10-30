@@ -46,7 +46,12 @@ if src1:
     r = run([sys.executable, '-B', os.path.join(SK, 'scripts', 'p1_complete.py'), '--root', root, '--phase', '1']); v = [l for l in r.stdout.split('\n') if l.startswith('VERDICT')]
     p1 = v[0] if v else None
 done_p1 = bool(p1) and p1.startswith('VERDICT: COMPLETE')
-st.append(('Phase 1 complete (every routine understood, no raw operands or placeholders)', done_p1, p1 or 'p1_complete.py gave no verdict', 'Phase 1: work in slices (slice.py start / check / merge), ask the owner only what a thing IS after code and a tracer run, report progress.', 'references/phase1_method.md'))
+_gauge = ''
+try:      # the last `just gauge`, when there is one
+    import json as _json, time as _time
+    _gj = _json.load(open(P('build', 'gauge.json'))); _gauge = '; gauge %.0f%% clean, %s' % (_gj['overall'], 'measured ' + _time.strftime('%Y-%m-%d', _time.localtime(_gj['time'])) + '; just gauge to refresh')
+except Exception: pass
+st.append(('Phase 1 complete (every routine understood, no raw operands or placeholders)', done_p1, (p1 or 'p1_complete.py gave no verdict') + _gauge, 'Phase 1: work in slices (slice.py start / check / merge), ask the owner only what a thing IS after code and a tracer run, report progress.', 'references/phase1_method.md'))
 p2 = os.path.isdir(P('phase2', 'src'))
 st.append(('Phase 2 safety net (tests, golden traces)', p2 and bool(files('tools/tests/test_*.py')) and bool(files('tools/golden/scenarios.txt')), 'tools/tests, tools/golden', 'Phase 2 step 1: routine tests and golden traces; docs/phase2_plan.md; docs/platform_layer.md.', 'references/phase2_split.md, steps 1-2'))
 nfiles = len([f for f in files('phase2/src/**/*.asm') if '/libs/' not in f])

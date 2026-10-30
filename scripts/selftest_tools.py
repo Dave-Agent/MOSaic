@@ -2,7 +2,7 @@
 """Self-test of the analysis / workflow tools that have no project-bound test elsewhere: sentinel_scan.py, comment_check.py, unreferenced.py, slice.py (start and merge).
 Synthetic sources in temp directories, no project, no emulator, no assembler: python3 -B scripts/selftest_tools.py [-v]. Exits non-zero when a case fails.
 (The refactor tools are tested by refactor/selftest.py, the tracer by trace/selftest.py.)"""
-import os, subprocess, sys, tempfile, textwrap
+import json, os, subprocess, sys, tempfile, textwrap
 HERE = os.path.dirname(os.path.abspath(__file__)); VERBOSE = '-v' in sys.argv
 fails = []
 
@@ -148,6 +148,12 @@ buf2:
 """
 r = tool('reloc_hazards.py', project(RH))
 check('reloc_hazards: aligned base, raw sprite pointer and an end guard on a page-aligned label are reported', 'aligned-base 1' in r.stdout and 'sprite-ptr 1' in r.stdout and 'end-guard 1' in r.stdout, r.stdout + r.stderr)
+# ---- gauge.py: a clean area is 100%, an area with an unnamed routine is not -------------------------------------------------------------------------------------
+_g = project(".pc = $0800 \"RAM\"\nStart:\n  lda #1 // [0800:a9 01    LDA #$01]\n  rts // [0802:60       RTS]\n.pc = $1000 \"RAM2\"\nSUB_1000:\n  lda #2 // [1000:a9 02    LDA #$02]\n  jsr SUB_1000 // [1002:20 00 10 JSR $1000]\n  rts // [1005:60       RTS]\n")
+_r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'gauge.py'), '--root', _g, '--main', 'main.asm', '--json'], capture_output=True, text=True)
+try: _j = json.loads(_r.stdout); _ok = len(_j['areas']) == 2 and _j['areas'][0]['clean'] == 100.0 and _j['areas'][1]['clean'] < 100.0 and 0 < _j['overall'] < 100
+except Exception: _ok = False
+check('gauge: a clean area reads 100%, an area with an unnamed routine less, and the overall is in between', _ok, _r.stdout + _r.stderr)
 # ---- PRG target: make_seeds --prg reads the load address from the header; byte 3 of the file lands there -------------------------------------------------------
 import tempfile as _tf
 _d = _tf.mkdtemp(); _img = bytes([0xA9, 0x01, 0x4C, 0x07, 0x09, 0xEA, 0xEA, 0x60, 0x00]); open(os.path.join(_d, 'raw.bin'), 'wb').write(_img); open(os.path.join(_d, 'x.prg'), 'wb').write(bytes([0x00, 0x09]) + _img)

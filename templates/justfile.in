@@ -122,6 +122,10 @@ anon-apply:
 comment-check:
     python3 -B {{skill}}/scripts/comment_check.py --root . --phase 1
 
+# How far phase 1 is, per area: a bar of the clean share (raw operands, placeholder and provisional names left), about two seconds per area; saved for `just status`.
+gauge:
+    python3 -B {{skill}}/scripts/gauge.py --root . --phase 1
+
 # Stage 5b: import the reference into Ghidra, seed it, export Kick Assembler source into ghidra/ (the landing zone: never phase1/src).
 ghidra:
     bash {{skill}}/scripts/ghidra/run.sh .

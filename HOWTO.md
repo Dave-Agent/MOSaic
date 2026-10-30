@@ -88,6 +88,8 @@ Say "yes" to the question after step 2, or:
 
 The agent names things from evidence only (the code plus a tracer observation). It **asks you** one question at a time about what a thing is to a player, with a picture, and records each answer in `docs/user_answers.md`. It never asks what the code does.
 
+To see how far it is, run `just gauge` in the project: a bar for each area of the source showing how much is still raw addresses or unnamed, and an overall figure (`just status` quotes the last reading). It counts references, not routines, so treat it as an estimate that moves the right way.
+
 **Done when:** the report says `VERDICT: COMPLETE`, `just verify` and `just smoke` pass. Run `git tag p1-byte-identical` and play the game once.
 
 ---
