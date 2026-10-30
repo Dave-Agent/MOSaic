@@ -138,6 +138,14 @@ trace-run vars inputs="" frames="300":
 gfx *args:
     python3 -B {{skill}}/scripts/render/gfx_sheets.py --root . {{args}}
 
+# A research note: the skeleton of docs/research/<topic>.md for a researcher's answer to ONE specific question (references/research.md, "Research on demand"): just research-new 'scoring' 'How does the manual say extra lives are awarded?'
+research-new topic question:
+    python3 -B {{skill}}/scripts/research/note.py new --root . --topic '{{topic}}' --question '{{question}}'
+
+# Check the research notes: NON-AUTHORITATIVE header, question, date, a source on every prior, conflicts and not-found sections.
+research-check:
+    python3 -B {{skill}}/scripts/research/note.py check --root .
+
 # Every gate a slice must pass (verify, comment-check, anon-check, unreferenced, p1_complete, sentinel hints): just slice-check [--range LO-HI] [--allow-marked]
 slice-check *args:
     python3 -B {{skill}}/scripts/slice.py check --root . {{args}}

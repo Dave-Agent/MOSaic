@@ -180,6 +180,20 @@ check('release_bump: after the release commit and tag there is nothing new to re
 open(os.path.join(_d, 'README.md'), 'w').write('docs'); _git(_d, 'add', '-A'); _git(_d, 'commit', '-q', '-m', 'README: a sentence')
 check('release_bump: a push with no issue closed (documentation) is a patch release', _rel(_d).stdout.strip() == 'VERSION=1.2.1', _rel(_d).stdout)
 
+# ---- research/note.py: a note is a lead with sources, never a fact ------------------------------------------------------------------------------------------------
+_rd = tempfile.mkdtemp(prefix='c64rn_')
+def _note(*a): return subprocess.run([sys.executable, '-B', os.path.join(HERE, 'research', 'note.py')] + list(a) + ['--root', _rd], capture_output=True, text=True)
+_r = _note('new', '--topic', 'Scoring rules', '--question', 'How are extra lives awarded?'); _p = os.path.join(_rd, 'docs', 'research', 'scoring-rules.md')
+check('research note: new writes the skeleton under docs/research/', _r.returncode == 0 and os.path.exists(_p) and open(_p).read().startswith('# Research: Scoring rules') and 'How are extra lives awarded?' in open(_p).read(), _r.stdout + _r.stderr)
+check('research note: new refuses to overwrite a note', _note('new', '--topic', 'Scoring rules', '--question', 'again').returncode != 0)
+_r = _note('check'); check('research note: the unfilled skeleton fails (its placeholder source is not a source)', _r.returncode == 1 and 'without a real source' in _r.stdout, _r.stdout)
+_t = open(_p).read(); open(_p, 'w').write(_t.replace('- (what a source says, in your own words) - https://source.example/page', '- The manual says a bonus life comes at 10,000 points. - https://example.org/manual'))
+_r = _note('check'); check('research note: a note with a sourced prior and all sections passes', _r.returncode == 0 and 'ok' in _r.stdout, _r.stdout)
+_t = open(_p).read(); open(_p, 'w').write(_t.replace('NON-AUTHORITATIVE:', 'Notes:'))
+_r = _note('check'); check('research note: a note without the NON-AUTHORITATIVE header fails', _r.returncode == 1 and 'NON-AUTHORITATIVE' in _r.stdout, _r.stdout)
+open(_p, 'w').write('# Research: x\nNON-AUTHORITATIVE: leads.\n\nQuestion: q\nRead on: 2026-10-31\n\n## Priors\n- A page says the bonus is at 10,000.\n\n## Conflicts\n- none\n\n## Not found\n- none\n')
+_r = _note('check'); check('research note: a prior with no URL fails (a claim without a source is a guess)', _r.returncode == 1 and 'without a real source' in _r.stdout, _r.stdout)
+
 # ---- gauge.py: a clean area is 100%, an area with an unnamed routine is not -------------------------------------------------------------------------------------
 _g = project(".pc = $0800 \"RAM\"\nStart:\n  lda #1 // [0800:a9 01    LDA #$01]\n  rts // [0802:60       RTS]\n.pc = $1000 \"RAM2\"\nSUB_1000:\n  lda #2 // [1000:a9 02    LDA #$02]\n  jsr SUB_1000 // [1002:20 00 10 JSR $1000]\n  rts // [1005:60       RTS]\n")
 _r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'gauge.py'), '--root', _g, '--main', 'main.asm', '--json'], capture_output=True, text=True)

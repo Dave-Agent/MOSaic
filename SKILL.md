@@ -75,7 +75,7 @@ Prefer the generic primitives: **`scripts/refactor/`** (`rename`, `drop_labels`,
 ## Rules and decisions
 
 - `references/testing.md`: routine tests, golden traces, coverage and the tracer self-test: what each proves, its limits, and how a port is checked against the same cases.
-- `references/research.md`: **researching the game** (manual, wikis, tips and POKE lists; reading scanned PDFs) into `docs/gameplay.md`, the input to phase 1.
+- `references/research.md`: **researching the game** (manual, wikis, tips and POKE lists; reading scanned PDFs) into `docs/gameplay.md`, the input to phase 1; and **research on demand**: a read-only researcher answers one specific question at any time and hands back a sourced, non-authoritative note in `docs/research/` (`scripts/research/note.py`, `just research-check`; a slice leaves `TODO(research)`).
 - `references/phase1_method.md`: **how to understand unfamiliar code** (orient from tracer evidence, subsystem map, documents as hypotheses, the evidence ladder for names).
 - `references/hand_off_tools.md`: the tools for stages 2-4 of the playbook: unattended VICE hand-off dump (`scripts/vice/`), reference builder and dump diff (`scripts/reference/`), screenshot judge, symbol converter.
 - `references/new_game.md`: **starting a new game**: media, hand-off, the clean reference, launcher, Ghidra, the first byte-identical build (draft, with questions for the user).
