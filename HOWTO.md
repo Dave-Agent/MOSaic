@@ -79,7 +79,7 @@ Your file is copied into the project's `originals/` folder and its SHA-256 recor
 
 ---
 
-## Step 4. Refactor for a port (phase 2)
+## Step 4. Refactor ready for future development (phase 2)
 
 **Goal:** the named source is split into files, separated from the C64 hardware by a written interface, and proven relocatable, still byte-identical. This is one job in four parts that need nothing from you (the safety net, the split, the interface, relocation; see Appendix B). After this, every command takes the phase: `just verify 2`, `just check 2`, `just launch 2`. Background reading: `references/phase2_split.md` and `references/phase2_port.md`.
 
