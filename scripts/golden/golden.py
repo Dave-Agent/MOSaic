@@ -68,6 +68,13 @@ def compare_cells(ref, now, n, persist, lag=0):
     if len(ref) != len(now): persistent.append((frames, -1))
     return persistent, transient, frames, forgiven
 
+def ram_note(recorded, now):
+    """The warning for an exact `check` against a different RAM image than the one the traces were recorded on ('' when they are the same, or when nothing was recorded): the trace starts from that
+    image, and a byte of it that is only machine state (the KERNAL jiffy clock $A2, a cursor timer, stack leftovers) differs from one dump to the next, so a difference can be the dump, not the game."""
+    if not recorded or not now or recorded == now: return ''
+    return ('WARNING: these exact traces were recorded against a RAM image with SHA-256 %s..., this run uses %s...: the dump differs. A difference below may come from the dump\'s volatile bytes '
+            '(the KERNAL jiffy clock at $A2, a cursor timer, stack leftovers; a depacking step removes them) and not from the game: record the traces again on this image, or use check-t.' % (recorded[:12], now[:12]))
+
 class Golden:
     def __init__(self, env):
         self.env = env; c = env.cfg
@@ -112,6 +119,12 @@ class Golden:
                 out += pieces
             self._ranges = out
         return self._ranges
+    def ram_hash(self):
+        """SHA-256 of the RAM image the traces start from (TRACE_RAM)."""
+        import hashlib
+        try: return hashlib.sha256(open(self.env.ram_path, 'rb').read()).hexdigest()
+        except (OSError, AttributeError): return ''
+
     def frame_size(self): return sum(b - a + 1 for a, b in self.ranges())
 
     # ---- noise sites (timing-tolerant mode) -----------------------------------------------------------------------------
@@ -201,6 +214,11 @@ def main():
         if mode == 'check-t': print('FAIL' if bad else 'PASS')
         return 1 if bad else 0
     meta = {}
+    if mode == 'check':
+        try: _rec = json.load(open(os.path.join(g.dir, 'golden.json'))).get('ram_sha256', '')
+        except (OSError, ValueError): _rec = ''
+        _w = ram_note(_rec, g.ram_hash())
+        if _w: print(_w)
     for name in names:
         data = g.run(name, extra); c = g.crcs(data); path = os.path.join(g.dir, name + '.crc')
         if mode == 'record':
@@ -211,7 +229,7 @@ def main():
             if diff is None and len(ref) == len(c): print('%-8s OK (%d frames)' % (name, len(c)))
             else: bad += 1; print('%-8s DIFFERS at frame %s (golden %d frames, now %d): %s' % (name, diff, len(ref), len(c), g.scenarios[name]))
     if mode == 'record':
-        json.dump(dict(frames_per_scenario=g.frames, state_bytes_per_frame=g.frame_size(), scenarios=meta), open(os.path.join(g.dir, 'golden.json'), 'w'), indent=1); return 0
+        json.dump(dict(frames_per_scenario=g.frames, state_bytes_per_frame=g.frame_size(), ram_sha256=g.ram_hash(), scenarios=meta), open(os.path.join(g.dir, 'golden.json'), 'w'), indent=1); return 0
     print('FAIL' if bad else 'PASS')
     return 1 if bad else 0
 if __name__ == '__main__': sys.exit(main())

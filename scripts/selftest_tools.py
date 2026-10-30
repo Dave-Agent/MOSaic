@@ -210,6 +210,9 @@ for _k in range(20, 26): _bad[_k * 2:_k * 2 + 2] = b'\xaa\xbb'
 check('golden compare --lag: a value that never occurs near that frame in the recording is still a difference', _gm.compare_cells(_ref, bytes(_bad), 2, 2, 3)[0] != [])
 check('golden compare: a transient difference (fewer frames than the persistence) is ignored, as before', _gm.compare_cells(_ref, _ref[:20] + b'\xff\xff' + _ref[22:], 2, 2)[0] == [])
 
+check('golden ram_note: same image, nothing recorded, or no image: no warning', _gm.ram_note('abc', 'abc') == '' and _gm.ram_note('', 'abc') == '' and _gm.ram_note('abc', '') == '')
+_w = _gm.ram_note('a' * 64, 'b' * 64); check('golden ram_note: a different image warns, naming both hashes, the jiffy clock and what to do', 'WARNING' in _w and 'a' * 12 in _w and 'b' * 12 in _w and '$A2' in _w and 'check-t' in _w, _w)
+
 # ---- gauge.py: a clean area is 100%, an area with an unnamed routine is not -------------------------------------------------------------------------------------
 _g = project(".pc = $0800 \"RAM\"\nStart:\n  lda #1 // [0800:a9 01    LDA #$01]\n  rts // [0802:60       RTS]\n.pc = $1000 \"RAM2\"\nSUB_1000:\n  lda #2 // [1000:a9 02    LDA #$02]\n  jsr SUB_1000 // [1002:20 00 10 JSR $1000]\n  rts // [1005:60       RTS]\n")
 _r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'gauge.py'), '--root', _g, '--main', 'main.asm', '--json'], capture_output=True, text=True)
