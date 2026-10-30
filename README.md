@@ -36,7 +36,7 @@ git clone https://github.com/Dave-Agent/MOSaic.git ~/MOSaic
 cd ~/MOSaic
 ./setup.sh
 ```
-It changes only `~/.claude/skills/mosaic` and the project folder you name, and installs nothing. `./setup.sh --check` only checks the tools. The manual commands are in [HOWTO.md](HOWTO.md), steps 0 and 1.
+It changes only `~/.claude/skills/mosaic` and the project folder you name, and installs nothing. `./setup.sh --check` only checks the tools. The step-by-step is in [HOWTO.md](HOWTO.md).
 
 **(c) Check the project** it created, then continue:
 ```
