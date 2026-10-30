@@ -75,7 +75,7 @@ fi
 if [ "${REFERENCE_IS_RAW:-false}" = "true" ]; then
     BUILT_LOAD=$(( $(od -An -tu1 -N1 "$OUTPUT_PRG") + 256 * $(od -An -tu1 -j1 -N1 "$OUTPUT_PRG") ))
     if [ "$BUILT_LOAD" -ne $(( LOAD_ADDRESS )) ]; then
-        printf "FAIL: built PRG loads at \$%04X, expected \$%04X (LOAD_ADDRESS in project.config)\n" \
+        printf "FAIL byte-identical: built PRG loads at \$%04X, expected \$%04X (LOAD_ADDRESS in project.config)\n" \
             "$BUILT_LOAD" "$(( LOAD_ADDRESS ))"
         exit 1
     fi
@@ -93,18 +93,18 @@ IMG_SKIP=0; IMG_BASE=$(( ${LOAD_ADDRESS:-0} ))
 if [ "${REFERENCE_IS_RAW:-false}" != "true" ] && [ -f "$REFERENCE_PRG" ]; then
     IMG_SKIP=2; IMG_BASE=$(( $(od -An -tu1 -N1 "$REFERENCE_PRG") + 256 * $(od -An -tu1 -j1 -N1 "$REFERENCE_PRG") ))
     if [ -n "${LOAD_ADDRESS:-}" ] && [ $(( LOAD_ADDRESS )) -ne "$IMG_BASE" ]; then
-        printf 'FAIL: LOAD_ADDRESS %s in project.config disagrees with the PRG header of %s ($%04X)\n' "$LOAD_ADDRESS" "$REFERENCE_PRG" "$IMG_BASE"; exit 1
+        printf 'FAIL byte-identical: LOAD_ADDRESS %s in project.config disagrees with the PRG header of %s ($%04X)\n' "$LOAD_ADDRESS" "$REFERENCE_PRG" "$IMG_BASE"; exit 1
     fi
 fi
 
 # ---- no reference image: hash gate ------------------------------------------------
 if [ ! -f "$REFERENCE_PRG" ]; then
     if [ "$BUILT_SHA" = "$EXPECTED_SHA" ]; then
-        echo "PASS: built image matches the SHA-256 recorded for $REFERENCE_PRG"
+        echo "PASS byte-identical: built image matches the SHA-256 recorded for $REFERENCE_PRG"
         echo "      (${BUILT_SHA:0:16}...; reference image not present, so no byte-level diff is available)"
         exit 0
     fi
-    echo "FAIL: built image does not match the SHA-256 recorded for $REFERENCE_PRG"
+    echo "FAIL byte-identical: built image does not match the SHA-256 recorded for $REFERENCE_PRG"
     echo "      expected $EXPECTED_SHA"
     echo "      built    $BUILT_SHA"
     echo "      Supply the reference image at $REFERENCE_PRG to find the first differing address."
@@ -116,13 +116,13 @@ REF_SIZE=$(wc -c < "$REFERENCE_PRG" | tr -d " ")      # not stat: its flags diff
 OUT_SIZE=$(wc -c < "$BUILT_IMAGE" | tr -d " ")
 
 if [ "$REF_SIZE" -ne "$OUT_SIZE" ]; then
-    echo "FAIL: size mismatch. reference=$REF_SIZE bytes, built image=$OUT_SIZE bytes"
+    echo "FAIL byte-identical: size mismatch. reference=$REF_SIZE bytes, built image=$OUT_SIZE bytes"
     echo "      (a size delta usually means a missing/extra data block, not a code edit)"
     exit 1
 fi
 
 if [ "${C64_PHASE:-1}" = "2" ] && [ -n "${PHASE2_ALLOWED_DIFF:-}" ] && [ ! -f "$PHASE2_ALLOWED_DIFF" ]; then
-    echo "FAIL: PHASE2_ALLOWED_DIFF is set to '$PHASE2_ALLOWED_DIFF', which is not a file. It must be the path of a file of LO-HI hex ranges, one per line (ranges written in the variable itself are not read)."
+    echo "FAIL byte-identical: PHASE2_ALLOWED_DIFF is set to '$PHASE2_ALLOWED_DIFF', which is not a file. It must be the path of a file of LO-HI hex ranges, one per line (ranges written in the variable itself are not read)."
     exit 1
 fi
 
@@ -138,19 +138,19 @@ for l in open(rf):
     if l: lo, hi = l.replace('$', '').split('-'); rng.append((int(lo, 16), int(hi, 16)))
 bad = [load + i - skip for i in range(len(ref)) if ref[i] != new[i] and (i < skip or not any(lo <= load + i - skip <= hi for lo, hi in rng))]      # a differing header byte is never allowed
 changed = sum(1 for i in range(len(ref)) if ref[i] != new[i])
-if bad: print('FAIL: %d byte(s) differ outside the allowed ranges (%s); first at $%04X: reference %02X, built %02X' % (len(bad), rf, bad[0], ref[bad[0] - load + skip], new[bad[0] - load + skip])); sys.exit(1)
-print('PASS: identical to the reference except %d byte(s), all inside the allowed ranges (%d ranges in %s)' % (changed, len(rng), rf))
+if bad: print('FAIL byte-identical: %d byte(s) differ outside the allowed ranges (%s); first at $%04X: reference %02X, built %02X' % (len(bad), rf, bad[0], ref[bad[0] - load + skip], new[bad[0] - load + skip])); sys.exit(1)
+print('PASS byte-identical: identical to the reference except %d byte(s), all inside the allowed ranges (%d ranges in %s)' % (changed, len(rng), rf))
 PY
     exit $?
 fi
 
 if cmp -s "$REFERENCE_PRG" "$BUILT_IMAGE"; then
     if [ -n "$EXPECTED_SHA" ] && [ "$EXPECTED_SHA" != "$BUILT_SHA" ]; then
-        echo "FAIL: built image is identical to $REFERENCE_PRG, but the SHA-256 recorded in"
+        echo "FAIL byte-identical: built image is identical to $REFERENCE_PRG, but the SHA-256 recorded in"
         echo "      $REFERENCE_SHA256_FILE is different: the hash file or the reference image is stale."
         exit 1
     fi
-    echo "PASS: built image is byte-identical to $REFERENCE_PRG"
+    echo "PASS byte-identical: built image is byte-identical to $REFERENCE_PRG"
     exit 0
 fi
 
@@ -164,7 +164,7 @@ C64_ADDR=$(( IMG_BASE + IMAGE_OFFSET - IMG_SKIP ))
 ref_byte=$(od -An -tx1 -j "$IMAGE_OFFSET" -N1 "$REFERENCE_PRG" | tr -d ' ')
 out_byte=$(od -An -tx1 -j "$IMAGE_OFFSET" -N1 "$BUILT_IMAGE" | tr -d ' ')
 
-if [ "$IMAGE_OFFSET" -lt "$IMG_SKIP" ]; then echo "FAIL: the load address (the first two bytes of the PRG) differs"; else printf "FAIL: first divergence at image offset 0x%X (C64 \$%04X)\n" "$IMAGE_OFFSET" "$C64_ADDR"; fi
+if [ "$IMAGE_OFFSET" -lt "$IMG_SKIP" ]; then echo "FAIL byte-identical: the load address (the first two bytes of the PRG) differs"; else printf "FAIL: first divergence at image offset 0x%X (C64 \$%04X)\n" "$IMAGE_OFFSET" "$C64_ADDR"; fi
 printf "      reference byte: 0x%s   built byte: 0x%s\n" "$ref_byte" "$out_byte"
 echo "      grep symbols.asm for the label at or below \$$(printf '%04X' "$C64_ADDR") to localise."
 exit 1

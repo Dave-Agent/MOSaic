@@ -20,7 +20,7 @@ violations allowed per file and kind. Without one every count must be 0; with on
 --write   write the baseline (or lower it: it never raises one) from the current counts. Without --write the check only reports."""
 import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, code_files, config, block_flags, TRACE_COMMENT, XREF_LINE
+from _common import parser, main_file, code_files, config, block_flags, TRACE_COMMENT, XREF_LINE, rule_line
 a = parser(__doc__.split('\n')[0], phase=True)
 a.add_argument('--list', action='store_true'); a.add_argument('--update', action='store_true', help='alias of --write')
 a.add_argument('--wrap', type=int, default=128); a.add_argument('--hard', type=int, default=150); a.add_argument('--summary', type=int, default=80); a.add_argument('--comment', type=int, default=100); a.add_argument('--baseline'); a.add_argument('--fix', action='store_true'); a.add_argument('--wrap-to', type=int, default=124)
@@ -28,6 +28,8 @@ args = a.parse_args(); main = main_file(args); cfg = config(args.root)
 BASE = os.path.join(args.root, args.baseline or cfg.get('COMMENT_BASELINE') or 'tools/comment_baseline.tsv')
 DATA = re.compile(r'^\s+\.(byte|word|text|fill|fillword|dword)\b'); DATA_LABEL = re.compile(r'^[A-Za-z_][\w.]*:\s+\.(byte|word|text|fill|fillword|dword)\b')
 KINDS = ('wide', 'hard', 'label', 'todo', 'echo')
+RULE_OF = {'wide': 'comment-width', 'hard': 'comment-hard-limit', 'label': 'label-line-summary', 'todo': 'todo-has-headline', 'echo': 'comment-no-echo'}      # the rule each kind is (references/rules.tsv); a baseline may use either name
+KIND_OF = {v: k for k, v in RULE_OF.items()}
 ECHO = re.compile(r'^(?P<code>\s*(?:[A-Za-z_][\w.]*:\s+)?\.(?P<dir>byte|word)\s+(?P<ops>[^/]*?))\s*//\s*(?P<addr>\[[0-9a-fA-F]{4}\])\s+(?P<rest>\S.*?)\s*$')
 def echo_of(l):
     """(code, addr) when the trailing comment of a data row only repeats the row: the operand names of a `.word` row, or the ASCII dump (`.` for a non-printable byte) of a `.byte` row; else None"""
@@ -82,13 +84,13 @@ counts = {(p, k): len(v) for p, d in found.items() for k, v in d.items()}
 base = {}
 if os.path.exists(BASE):
     for l in open(BASE).read().split('\n'):
-        if l and not l.startswith('#'): f, k, c = l.split('\t'); base[(f, k)] = int(c)
+        if l and not l.startswith('#'): f, k, c = l.split('\t'); base[(f, KIND_OF.get(k, k))] = int(c)
 if args.write or args.update:
     new = {key: min(c, base.get(key, c)) for key, c in counts.items() if c or key in base}
     os.makedirs(os.path.dirname(BASE), exist_ok=True)
     with open(BASE, 'w') as f:
-        f.write('# file\tkind\tcount: the most comment-rule violations allowed; comment_check.py --write lowers it, never raises it\n')
-        for (p, k), c in sorted(new.items()): f.write('%s\t%s\t%d\n' % (p, k, c))
+        f.write('# file\trule\tcount: the most comment-rule violations allowed (the rule is a name from references/rules.tsv; the older kind names wide / hard / label / todo / echo are read too); comment_check.py --write lowers it, never raises it\n')
+        for (p, k), c in sorted(new.items()): f.write('%s\t%s\t%d\n' % (p, RULE_OF.get(k, k), c))
     print('comment-check: baseline written to %s (%d violations allowed)' % (os.path.relpath(BASE, args.root), sum(new.values()))); sys.exit(0)
 bad = 0
 for key, c in sorted(counts.items()):
@@ -97,5 +99,6 @@ if args.list or bad:
     for p, d in found.items():
         for k in KINDS:
             for n, ln, text in sorted(d[k], key=lambda x: -x[1])[:40 if args.list else 8]: print('  %s:%d [%s %d] %s' % (p, n, k, ln, text.strip()[:90]))
+for _k in KINDS: rule_line(RULE_OF[_k], sum(max(0, c - base.get((p, k), 0)) for (p, k), c in counts.items() if k == _k))
 print('comment-check: %d violation(s) in %d files (baseline %d)%s' % (sum(counts.values()), len(files), sum(base.values()), ', FAIL' if bad else ''))
 sys.exit(1 if bad else 0)

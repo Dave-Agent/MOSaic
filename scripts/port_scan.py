@@ -8,7 +8,7 @@
 A routine with a hazard and no `TODO(port)` in its header comment or body is reported as untagged. Hint list, exit 0.
   port_scan.py [--phase 2 | --main FILE] [--all]       (--all also lists the tagged ones)"""
 import sys, os; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, expanded_lines
+from _common import parser, main_file, expanded_lines, rule_line
 import re
 from collections import defaultdict
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--all', action='store_true'); args = a.parse_args(); L = expanded_lines(main_file(args))
@@ -53,6 +53,6 @@ for r, d in haz.items():
     if not t: untagged.append(r)
     if not t or args.all: rows.append((r, d, t))
 print('port_scan: %s%s' % (', '.join('%s %d' % (k, tot[k]) for k in kinds), '' if has_txs else '; stack: no `txs` in the source (the stack pointer is whatever the start left)'))
-print('%d routine(s) with a hazard, %d without a TODO(port)' % (len(haz), len(untagged)))
+print('%d routine(s) with a hazard, %d without a TODO(port)' % (len(haz), len(untagged))); rule_line('machine-dependencies-tagged', len(untagged), '(without a TODO(port))', hint=True)
 for r, d, t in sorted(rows, key=lambda x: routs[x[0]][0]):
     print('  %s%s: %s' % (r, ' [tagged]' if t else '', '; '.join('%s %s' % (kd, ' '.join(d[kd][:3]) + (' ...' if len(d[kd]) > 3 else '')) for kd in kinds if d.get(kd))))

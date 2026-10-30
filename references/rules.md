@@ -1,6 +1,60 @@
 # Rules
 Shared rules; each section says which projects and phases it applies to. Related pages: `naming.md` (all naming), `layout.md` (file tree, ROMs), `just.md` (command runner), `phase2_port.md` (the setup for a port), `kick.md` (assembler gotchas), `decisions.md` (why).
 
+
+## The rules by name
+Every rule has a short name that says what is wrong and does not change when rules are added. A check prints `FAIL <name>: <n> places`; a waiver refers to the same name. **check** = a script decides, **hint** = a script lists candidates and a reviewer decides, **review** = no script, read by a reviewer. The registry is `references/rules.tsv`; the prose of each rule follows below.
+
+<!-- RULES-TABLE:BEGIN (generated from references/rules.tsv by scripts/rules_table.py --write; do not edit) -->
+
+| Rule | Kind | Enforced by | Waiver | What it says |
+|---|---|---|---|---|
+| `byte-identical` | check | `framework/scripts/verify.sh` | phase 2 only: PHASE2_ALLOWED_DIFF (a file of approved LO-HI ranges) | The built image equals the reference byte for byte (phase 1 always; phase 2 until the approved removals). |
+| `no-raw-operands` | check | `raw_refs.py`, `p1_complete.py` | none | No hex address as a code operand: give the target a label (`#<label` / `#>label` for half an address). |
+| `no-address-pairs` | check | `addr_immediates.py`, `p1_complete.py` | `// NOT-ADDRESS: reason` on the line | No lo/hi pair of immediates that builds the address of a named variable or label. |
+| `no-placeholder-names` | check | `p1_complete.py` | none | No Ghidra placeholder name (DAT_, LAB_, SUB_, FUN_ ...) anywhere in the source, comments included. |
+| `no-provisional-names` | check | `p1_complete.py` | `TODO(name)` marker within 12 lines above (marked ones are listed, not failed, with --allow-marked) | No `unk` name, TODO(name) / TODO(block) marker or `STATUS:  unknown` banner left at the end of phase 1. |
+| `anon-labels-limit` | check | `anon_labels.py` | none | An anonymous label only in one routine, at most two steps and 40 lines from its use, nothing else referring to it. |
+| `comment-width` | check | `comment_check.py` | tools/comment_baseline.tsv (a ratchet: counts may fall, never rise) | Comment text wraps at 128 columns; a data row's comment at 100. |
+| `comment-hard-limit` | check | `comment_check.py` | tools/comment_baseline.tsv | No line longer than 150 columns. |
+| `label-line-summary` | check | `comment_check.py` | tools/comment_baseline.tsv | A label line's summary is at most 80 characters; the detail is a block comment above the label. |
+| `comment-no-echo` | check | `comment_check.py` | tools/comment_baseline.tsv | A data-row comment keeps `// [addr]` and does not repeat the row (operand names, an ASCII dump). |
+| `todo-has-headline` | check | `comment_check.py` | tools/comment_baseline.tsv | A `TODO(tag):` marker has a headline sentence after it. |
+| `unreferenced-labels` | check | `unreferenced.py` | `TODO(phase2): remove? unreferenced, never executed` above the label | A label nothing refers to is dead code or leftover data and carries the removal marker. |
+| `sections-tile-image` | check | `section_coverage.py` | none | The SECTION banners tile the image from first to last byte: no gap, no overlap. |
+| `no-game-binaries-tracked` | check | `check_layout.py` | COMMIT_BINARIES in project.config | Game binaries are not committed unless the owner chose to (a recommendation, not a ban). |
+| `data-dirs-ignored` | check | `check_layout.py` | none | originals/, dumps/, reference/ and build/ are in .gitignore when the directories exist. |
+| `originals-untouched` | check | `check_layout.py` | none | Every file in originals/ matches the SHA-256 recorded when it was gathered. |
+| `routine-tests-pass` | check | `sim/run_tests.py` | none | The routine tests (code run in the 6510 simulator against Python models) pass on the current build. |
+| `golden-traces-match` | check | `golden/golden.py` | timing-tolerant set (check-t), --lag N, GOLDEN_PIN | The per-frame state of the scenarios equals the recorded traces (exact, or timing-tolerant after a byte-changing step). |
+| `framework-in-step` | hint | `framework_sync.py` | none | The project's framework/ equals the skill's master; a local edit is moved into the skill or removed. |
+| `smc-operands-named` | hint | `smc_list.py` | none | A self-modified operand is named `label:operand`, with a `// SMC: kind patched by routine` line and a trailing SMC marker. |
+| `pointer-data-is-names` | hint | `addr_tables.py` | `// NOT-POINTERS: reason` | Pointer data is `.word label` or `#<label` / `#>label`, never a literal, so a table or block can move. |
+| `one-record-per-row` | hint | `sentinel_scan.py`, `table_tails.py`, `table_counts.py` | none | A table of fixed-size records, or a stream of events, is written one record per row with the terminator on its own row. |
+| `values-have-names` | hint | `magic_scan.py` | none | A state value ($00 / $80 / $FF), a stride or a count the code repeats gets a constant; the raw value is written once. |
+| `machine-dependencies-tagged` | hint | `port_scan.py` | none | A routine that spins on a hardware register, patches its own code, calls ROM, switches banking or relies on the stack pointer carries a TODO(port) line. |
+| `relocation-hazards-resolved` | hint | `reloc_hazards.py` | `docs/relocation_hazards.md` (documented hazards) | Nothing breaks when the image or a variable moves: indirect addressing, pointer tables, SMC, aligned bases. |
+| `names-need-proof` | review | a reviewer | `TODO(name)` until the evidence is there | A name that claims a role needs the document AND an observation (the evidence ladder); a document alone is not enough. |
+| `no-guesses` | review | a reviewer | none | What art, a sound or a game mode IS is asked of the owner after the code and a tracer run; never invented. |
+| `terminology-follows-author` | review | a reviewer | none | The original author's word is used, not a synonym, in identifiers, comments and docs alike. |
+| `local-labels-meaningful` | review | a reviewer | none | A routine with local labels is a scope, each label named for what it means; a label used elsewhere is global with a proper name. |
+| `in-stream-labels` | review | a reviewer | none | A variable or table inside the image gets an in-stream label, not a `.label X = $ADDR` line in a symbols file. |
+| `text-as-text` | review | a reviewer | none | Every string is written as readable text through the game's encoding, never as `.byte` rows. |
+| `source-references-kept` | review | a reviewer | none | Every `[ADDR:bytes MNEMONIC]` reference and the Ghidra XREF comments stay with their lines and labels. |
+| `code-in-operand-explained` | review | a reviewer | none | An instruction whose operand bytes are another instruction (the BIT-skip trick) is written `.byte $2C` with a comment saying so. |
+| `table-columns-documented` | review | a reviewer | none | Every table has a column list above its label: what it is, record count and size, who reads it, one line per field. |
+| `routine-comments-say-why` | review | a reviewer | none | The block above a routine says what it does and why; In / Out / Clobbers when not obvious; `probably` when unsure. |
+| `assumptions-asserted` | review | a reviewer | none | A layout assumption (page boundary, adjacent tables, a VIC-bank offset) is written as an `.assert` next to it. |
+| `anchors-are-absolute` | review | a reviewer | none | A hardware-fixed base is ONE absolute constant, and every anchored block is asserted against it. |
+| `original-bugs-kept` | review | a reviewer | none | A bug of the original is reproduced, recorded in docs/gameplay.md and tagged `TODO(phase2): original bug:`. |
+| `pictures-in-docs-gfx` | review | a reviewer | none | Generated pictures live in docs/gfx/, named by content, never in build/, dumps/ or /tmp. |
+| `owner-questions-about-screens` | review | a reviewer | "Skip it" is a valid answer | A question about graphics shows an in-play screen with numbered regions and one short question each, never a single tile code. |
+| `golden-state-no-addresses` | review | a reviewer | none | State that holds an address is not behaviour: it stays out of the golden-trace state. |
+| `emulator-tests-unattended` | review | a reviewer | none | Emulator tests run unattended and are judged by screenshot, not by a PC sample; the emulator never takes the desktop focus. |
+| `originals-never-attached` | review | a reviewer | none | An original is never attached to an emulator directly: VICE runs scratch copies. |
+
+<!-- RULES-TABLE:END -->
+
 ## Assembler and code
 Applies to: every project. The no-raw-address rule gates phase 1; phase 2 keeps it.
 - Kick Assembler; `.label name = $ADDR`; `//` comments.

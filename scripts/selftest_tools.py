@@ -2,7 +2,7 @@
 """Self-test of the analysis / workflow tools that have no project-bound test elsewhere: sentinel_scan.py, comment_check.py, unreferenced.py, slice.py (start and merge).
 Synthetic sources in temp directories, no project, no emulator, no assembler: python3 -B scripts/selftest_tools.py [-v]. Exits non-zero when a case fails.
 (The refactor tools are tested by refactor/selftest.py, the tracer by trace/selftest.py.)"""
-import json, os, subprocess, sys, tempfile, textwrap
+import json, os, re, subprocess, sys, tempfile, textwrap
 HERE = os.path.dirname(os.path.abspath(__file__)); VERBOSE = '-v' in sys.argv
 fails = []
 
@@ -220,6 +220,47 @@ check('golden pin_args: a malformed entry is refused with the format', _ok)
 _d1 = bytearray(256); _d2 = bytearray(256); _d2[0xa2] = 7; _d2[0x1e0 % 256] = 9; _v = _gm.variance([bytes(_d1), bytes(_d2), bytes(_d1)])
 check('golden variance: lists the bytes that are not the same in every dump, with the value in each', sorted(_v) == [0xa2, 0xe0] and _v[0xa2] == [0, 7, 0], _v)
 check('golden variance: blocks (zero page, stack, system pages, program image, I/O, other)', [_gm.block_of(a, (0x0801, 0xCD00)) for a in (0xa2, 0x1e7, 0x300, 0x900, 0xD020, 0xCE00)] == ['zero page', 'stack', 'system pages $0200-$03FF', 'program image', 'I/O area', 'other RAM'])
+
+# ---- the rule registry (references/rules.tsv): names, enforcers, the table in rules.md, and what the checks print ------------------------------------------------------
+sys.path.insert(0, HERE); import _common as _cm
+_rl = [l.rstrip('\n').split('\t') for l in open(_cm.RULES_FILE) if l.strip() and not l.startswith('#')]; _R = _cm.load_rules()
+check('rules: every row has five columns, names are unique kebab-case, kinds are check / hint / review, `review` is a kind and an enforcer together',
+      all(len(r) == 5 for r in _rl) and len({r[0] for r in _rl}) == len(_rl) and all(re.fullmatch(r'[a-z][a-z0-9]*(-[a-z0-9]+)*', r[0]) for r in _rl) and all(r[1] in ('check', 'hint', 'review') for r in _rl) and all((r[1] == 'review') == (r[2] == 'review') for r in _rl), [r[0] for r in _rl if len(r) != 5])
+_missing = [(n, e) for n, r in _R.items() for e in r['enforcer'].split(',') if e != 'review' and not (os.path.exists(os.path.join(HERE, e)) or os.path.exists(os.path.join(os.path.dirname(HERE), e)))]
+check('rules: every enforcer named in the registry exists', not _missing, _missing)
+_src = ''
+for _dp, _dn, _fn in os.walk(HERE):
+    if '__pycache__' in _dp: continue
+    for _f in _fn:
+        if _f.endswith('.py') and _f != 'selftest_tools.py' and 'selftest' not in _f: _src += open(os.path.join(_dp, _f)).read() + '\n'
+_src += open(os.path.join(os.path.dirname(HERE), 'framework', 'scripts', 'verify.sh')).read()
+_used = set(re.findall(r"rule_line\('([a-z0-9-]+)'", _src)) | set(re.findall(r"(?:FAIL|PASS) ([a-z][a-z0-9]*(?:-[a-z0-9]+)+):", _src)) | set(re.findall(r"'(?:wide|hard|label|todo|echo)': '([a-z0-9-]+)'", _src))
+check('rules: every rule name a script prints is in the registry', _used <= set(_R), sorted(_used - set(_R)))
+_unprinted = [n for n, r in _R.items() if r['kind'] != 'review' and not any(n in open(os.path.join(HERE, e) if os.path.exists(os.path.join(HERE, e)) else os.path.join(os.path.dirname(HERE), e)).read() for e in r['enforcer'].split(','))]
+check('rules: every check or hint rule is printed by one of its enforcers (a rule with no output would never be seen)', not _unprinted, _unprinted)
+_r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'rules_table.py'), '--check'], capture_output=True, text=True)
+check('rules: the table in references/rules.md is the one the registry gives (rules_table.py --write)', _r.returncode == 0, _r.stdout + _r.stderr)
+_p = project('''
+    Main:
+      lda $1234        // [0800:ad 34 12 LDA $1234]
+      rts              // [0803:60 RTS]
+''')
+_r = tool('raw_refs.py', _p); check('rules: raw_refs prints `FAIL no-raw-operands: 1 place` for a raw operand', 'FAIL no-raw-operands: 1 place' in _r.stdout, _r.stdout + _r.stderr)
+_p = project('''
+    Main:
+      lda Var          // [0800:ad 34 12 LDA Var]
+      rts              // [0803:60 RTS]
+    .label Var = $1234
+''')
+_r = tool('raw_refs.py', _p); check('rules: raw_refs prints `PASS no-raw-operands: 0 places` when there is none', 'PASS no-raw-operands: 0 places' in _r.stdout, _r.stdout + _r.stderr)
+_p = project('// ' + 'x' * 140 + '\nMain:\n  rts   // [0800:60 RTS]\n')
+_r = tool('comment_check.py', _p); check('rules: comment_check names the rule: `FAIL comment-width: 1 place`', 'FAIL comment-width: 1 place' in _r.stdout and _r.returncode == 1, _r.stdout + _r.stderr)
+_p = project('// ' + 'x' * 140 + '\nMain:\n  rts   // [0800:60 RTS]\n'); os.makedirs(os.path.join(_p, 'tools'), exist_ok=True)
+open(os.path.join(_p, 'tools', 'comment_baseline.tsv'), 'w').write('main.asm\tcomment-width\t1\n'); _r1 = tool('comment_check.py', _p)
+open(os.path.join(_p, 'tools', 'comment_baseline.tsv'), 'w').write('main.asm\twide\t1\n'); _r2 = tool('comment_check.py', _p)
+check('rules: a comment baseline may use the rule name or the old kind name (both excuse the same line)', _r1.returncode == 0 and _r2.returncode == 0 and 'PASS comment-width: 0 places' in _r1.stdout, _r1.stdout + _r2.stdout)
+_u = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'rules_table.py'), '--unenforced'], capture_output=True, text=True)
+check('rules: --unenforced lists the rules only a reviewer can check (what the Challenger would cover)', 'names-need-proof' in _u.stdout and 'no-raw-operands' not in _u.stdout, _u.stdout)
 
 # ---- gauge.py: a clean area is 100%, an area with an unnamed routine is not -------------------------------------------------------------------------------------
 _g = project(".pc = $0800 \"RAM\"\nStart:\n  lda #1 // [0800:a9 01    LDA #$01]\n  rts // [0802:60       RTS]\n.pc = $1000 \"RAM2\"\nSUB_1000:\n  lda #2 // [1000:a9 02    LDA #$02]\n  jsr SUB_1000 // [1002:20 00 10 JSR $1000]\n  rts // [1005:60       RTS]\n")

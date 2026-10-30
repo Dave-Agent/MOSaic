@@ -32,7 +32,7 @@ Exit status 0 only when checks 1, 2 and 2b are clean (and no check 3 pair builds
 The last line is always `VERDICT: <word> (details)` with the word COMPLETE (whole source, nothing provisional left), SLICE CLEAN (a --range, or marked names allowed and left) or NOT COMPLETE."""
 import re, os, sys, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, reachable, config, source_labels, split_comment
+from _common import parser, main_file, reachable, config, source_labels, split_comment, rule_line
 here = os.path.dirname(os.path.abspath(__file__))
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--extra', help='an extra regex for placeholder names'); a.add_argument('--lo', type=lambda x: int(x, 0), default=0x0800); a.add_argument('--hi', type=lambda x: int(x, 0), default=0xFFFF); a.add_argument('--range'); a.add_argument('--allow-marked', action='store_true')
 a.add_argument('--flags', action='append', default=[], help='tracer output PREFIX (PREFIX.flags) for check 7; repeatable'); a.add_argument('--no-flags', action='store_true', help='skip check 7'); a.add_argument('--exec-ignore', action='append', default=[], help='check 7: hex range LO-HI whose executed bytes are ROM code that runs at the same addresses as RAM data (the flags cannot tell them apart); repeatable')
@@ -192,5 +192,6 @@ if not ok: word, detail = 'NOT COMPLETE', 'raw operands %d, address pairs naming
 elif RANGE or marked: word, detail = 'SLICE CLEAN', '%s%s' % ('%d marked provisional names remain' % len(marked) if marked else 'no provisional names', '; review items: ' + rv if rv else '')
 else: word, detail = 'COMPLETE', ('review items: ' + rv) if rv else 'no review items'
 if n_user: print(f'  NOTE: {n_user} TODO(user) marker(s) open: run the question review first (references/phase1_method.md 6b: code and tracer before the owner; todo_list.py --tag user,name)')
+rule_line('no-raw-operands', raw); rule_line('no-placeholder-names', len(found)); rule_line('no-provisional-names', len(prov) + (0 if args.allow_marked else len(marked))); rule_line('no-address-pairs', imm_named)
 print('VERDICT: %s (%s)' % (word, detail))
 sys.exit(0 if ok else 1)

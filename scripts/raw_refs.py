@@ -4,7 +4,7 @@
 Must report 0 after every change in a project that has the no-raw-address rule."""
 import re, os, sys, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, expanded_lines
+from _common import parser, main_file, expanded_lines, rule_line
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('-v', action='store_true'); a.add_argument('--first', type=int, default=1); a.add_argument('--last', type=int, default=10**9)
 a.add_argument('--range', help='LO-HI (hex): count only the instructions whose [ADDR:bytes] trace address lies in the range (a slice of the source)')
 args = a.parse_args(); L = expanded_lines(main_file(args))
@@ -23,6 +23,7 @@ for i, l in enumerate(L[args.first - 1:args.last], args.first):
         if re.match(r'^\s*\w+\s+#', code): continue
         v = int(m.group(1), 16); cnt[v] += 1; where[v].append(i)
 print(f'{sum(cnt.values())} raw operand references to {len(cnt)} distinct addresses')
+rule_line('no-raw-operands', sum(cnt.values()))
 def region(v):
     return ('zero page' if v < 0x100 else 'stack/page1' if v < 0x200 else 'page 2-3' if v < 0x400 else 'screen/vars $0400-$07FF' if v < 0x800 else
             'image $0800-$CFFF' if v < 0xD000 else 'I/O $D000-$DFFF' if v < 0xE000 else 'under ROM $E000+')

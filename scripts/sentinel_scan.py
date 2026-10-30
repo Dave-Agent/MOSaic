@@ -16,7 +16,7 @@ A hint, not a proof: read the bytes before changing anything (rung 1: the code t
 import os, re, sys
 from collections import Counter
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, code_files
+from _common import parser, main_file, code_files, rule_line
 a = parser(__doc__.split('\n')[0], write=False, phase=True)
 a.add_argument('--min-group', type=int, default=3, help='smallest number of similarly named blocks that counts as a group (default 3)'); a.add_argument('--max-per-group', type=int, default=12, help='lines printed per group (the count is always complete)'); a.add_argument('--term', help='terminator byte in hex (default: the most common last byte of the group)')
 args = a.parse_args(); files = code_files(main_file(args))
@@ -60,4 +60,4 @@ for prefix, mem in sorted(groups.items()):
             print('%s:%d  %s (group %s_*, %d lists, terminator $%02X): %s' % (f, n, name, prefix, len(mem), term, '; '.join(why)))
 for k, v in sorted(why_seen.items()):
     if len(v) > args.max_per_group: print('  group %s_*: %d more not printed (%d in all)' % (k, len(v) - args.max_per_group, len(v)))
-print('sentinel_scan: %d list(s) to look at' % found)
+print('sentinel_scan: %d list(s) to look at' % found); rule_line('one-record-per-row', found, '(sentinel_scan)', hint=True)

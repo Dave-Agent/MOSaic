@@ -8,7 +8,7 @@
   --names REGEX  names counted as sprite-pointer registers (default: sprite.*ptr|ptr.*shadow|SPRITE_PTR|SPRITE\\.POINTER; project.config RELOC_SPRITE_PTR_NAMES)
   reloc_hazards.py [--phase 2 | --main FILE] [--names REGEX] [--max N]"""
 import sys, os; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, expanded_lines, config
+from _common import parser, main_file, expanded_lines, config, rule_line
 import re
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--names'); a.add_argument('--max', type=int, default=12); args = a.parse_args()
 main = main_file(args); L = expanded_lines(main); cfg = config(args.root)
@@ -60,7 +60,7 @@ for k, (ln, mn, op, ad, r) in enumerate(ins):
         near = [x[2] for x in ins[max(0, k - 8):k] if re.search(r'#[<>]\w', x[2]) and not re.search(r'#[<>]\(?(SCREEN|VIC|CIA|SID)', x[2])]
         if near: hz['file-io'].append('$%04X %s: %s with %s' % (ad, r, op, ', '.join(near)))
 tot = sum(len(v) for v in hz.values())
-print('reloc_hazards: ' + ', '.join('%s %d' % (k, len(v)) for k, v in hz.items()))
+print('reloc_hazards: ' + ', '.join('%s %d' % (k, len(v)) for k, v in hz.items())); rule_line('relocation-hazards-resolved', sum(len(v) for v in hz.values()), '(hazards found)', hint=True)
 for k, v in hz.items():
     for x in v[:args.max]: print('  %-12s %s' % (k, x))
     if len(v) > args.max: print('  %-12s ... %d more' % (k, len(v) - args.max))

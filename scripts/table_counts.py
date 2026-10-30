@@ -3,7 +3,7 @@
 A stated count that matches neither the entry count (bytes, words or records of the stated stride) nor the byte count is reported: the comment, the data or the table's end is wrong (unlabelled tails, a table that continues under another label, an off-by-one).
 Only a near miss is reported (within 2 or 25% of a size the data has: an off-by-n, an unlabelled tail, a table that continues); a number far from every size is taken to describe something else. Hint list, exit 0.  table_counts.py [--phase 2 | --main FILE] [--max N]"""
 import sys, os; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, expanded_lines
+from _common import parser, main_file, expanded_lines, rule_line
 import re
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--max', type=int, default=60); args = a.parse_args(); L = expanded_lines(main_file(args))
 NUM = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10, 'eleven': 11, 'twelve': 12, 'sixteen': 16, 'twenty': 20}
@@ -48,5 +48,5 @@ while i < n:
             if not cands or min(abs(v - x) for x in cands) > max(2, 0.25 * v): continue      # not near any size of this data: the number is about something else
             out.append((name, i + 1, sm.group(0), got_b, got_w)); break
     i = j if j > i else i + 1
-print('%d label(s) whose comment states a size the data does not have' % len(out))
+print('%d label(s) whose comment states a size the data does not have' % len(out)); rule_line('one-record-per-row', len(out), '(table_counts)', hint=True)
 for name, ln, st, b, w in out[:args.max]: print('  %s (line %d): says "%s", data has %d .byte values and %d .word values' % (name, ln, st, b, w))

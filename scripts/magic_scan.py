@@ -6,7 +6,7 @@
            a geometry or limit number (row stride, column count, table length) that the code repeats. Shown with the routines that use it.
   magic_scan.py [--phase 2 | --main FILE] [--min N] [--max N]"""
 import sys, os; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, expanded_lines, LABEL_FILES
+from _common import parser, main_file, expanded_lines, LABEL_FILES, rule_line
 import re
 from collections import defaultdict, Counter
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--min', type=int, default=8); a.add_argument('--max', type=int, default=25); args = a.parse_args()
@@ -49,5 +49,5 @@ for mn, op, r in ins:
         if v in (0, 1, 2, 0xFF): continue
         cnt[v] += 1; where[v].add(r or '?')
 rep = [(v, c) for v, c in cnt.most_common() if c >= args.min and v not in consts]
-print('repeats: %d raw value(s) used %d+ times with no constant of that value' % (len(rep), args.min))
+print('repeats: %d raw value(s) used %d+ times with no constant of that value' % (len(rep), args.min)); rule_line('values-have-names', len(st) + len(rep), '(magic_scan)', hint=True)
 for v, c in rep[:args.max]: print('  #$%02X x%d in %d routine(s): %s' % (v, c, len(where[v]), ' '.join(sorted(where[v])[:5])))

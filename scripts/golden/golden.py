@@ -35,7 +35,7 @@ import bisect, json, os, re, subprocess, sys, tempfile, zlib
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'trace')); sys.path.insert(0, os.path.dirname(HERE))
 from c64env import Env, hexval
-from _common import parser
+from _common import parser, rule_line
 
 def parse_scenarios(path):
     out = {}
@@ -259,7 +259,7 @@ def main():
                 if pers and pers[0][0] < g.min_clean: bad += 1; print('%-8s DIFFERS: %d persistent cells, first at frame %d (state byte %d); %d transient' % (name, len(pers), pers[0][0], pers[0][1], tr))
                 elif pers: print('%-8s OK, clean for %d frames, then drifts (timing); %d transient' % (name, pers[0][0], tr))
                 else: print('%-8s OK (%d frames, %d transient cells ignored%s)' % (name, fr, tr, lagged))
-        if mode == 'check-t': print('FAIL' if bad else 'PASS')
+        if mode == 'check-t': print('FAIL' if bad else 'PASS'); rule_line('golden-traces-match', bad, '(scenarios differ, timing-tolerant)')
         return 1 if bad else 0
     meta = {}
     if mode == 'check':
@@ -278,6 +278,6 @@ def main():
             else: bad += 1; print('%-8s DIFFERS at frame %s (golden %d frames, now %d): %s' % (name, diff, len(ref), len(c), g.scenarios[name]))
     if mode == 'record':
         json.dump(dict(frames_per_scenario=g.frames, state_bytes_per_frame=g.frame_size(), ram_sha256=g.ram_hash(), scenarios=meta), open(os.path.join(g.dir, 'golden.json'), 'w'), indent=1); return 0
-    print('FAIL' if bad else 'PASS')
+    print('FAIL' if bad else 'PASS'); rule_line('golden-traces-match', bad, '(scenarios differ, exact)')
     return 1 if bad else 0
 if __name__ == '__main__': sys.exit(main())

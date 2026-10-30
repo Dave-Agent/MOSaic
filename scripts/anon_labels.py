@@ -22,7 +22,7 @@ With --write the label line becomes `!:` (its trailing comment kept), the XREF c
 right number of marks. Run `just verify` afterwards: an added or removed anonymous label changes what every reference that spans it means. Without --write it only lists."""
 import os, re, sys, bisect
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, code_files, split_comment, block_flags, write_changed, LABEL_FILES
+from _common import parser, main_file, code_files, split_comment, block_flags, write_changed, LABEL_FILES, rule_line
 a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('--window', type=int); a.add_argument('--max-steps', type=int, default=2); a.add_argument('--strict', action='store_true'); a.add_argument('--allow-comments', action='store_true'); a.add_argument('--check', action='store_true'); a.add_argument('--apply', action='store_true', help='alias of --write')
 args = a.parse_args(); WINDOW = args.window or (10 if args.strict else 40); MAXS = args.max_steps; WRITE = args.write or args.apply
 main = main_file(args); files = [f for f in code_files(main) if os.path.basename(f) not in LABEL_FILES]
@@ -127,6 +127,7 @@ if args.check:
             else: msg = crossing(f, o, i, t)
             if msg: bad += 1; print('%s:%d  !%s  %s' % (os.path.relpath(f, args.root), i + 1, marks, msg))
     print('anon-check: %d anonymous references, %d violations%s' % (n, bad, ' FAIL' if bad else ''))
+    rule_line('anon-labels-limit', bad)
     sys.exit(1 if bad else 0)
 # ---- candidates --------------------------------------------------------------------------------------------------------------------
 cands = {}                                   # file -> [(def line, name, [(ref line, mnemonic)])]

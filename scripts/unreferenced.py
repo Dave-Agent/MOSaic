@@ -10,7 +10,7 @@ Not listed: a label reached by the hardware or the launcher (the hand-off addres
 A hint: a label reached only by a computed address (a table walked by index with no label of its own) shows up here; check the tracer flags (`trace/hit_counts.py`) before tagging it."""
 import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, code_files, config, split_comment, source_labels
+from _common import parser, main_file, code_files, config, split_comment, source_labels, rule_line
 a = parser(__doc__.split('\n')[0], write=False, phase=True); a.add_argument('--all', action='store_true'); a.add_argument('--write', action='store_true', help='put `// TODO(phase2): remove? unreferenced, never executed` on the line above each unmarked label (comments only; the owner decides in phase 2)'); a.add_argument('--ignore')
 args = a.parse_args(); main = main_file(args); cfg = config(args.root)
 files = code_files(main); text = {f: open(f).read().split('\n') for f in files}
@@ -46,6 +46,7 @@ for f, n, name in defs:
     out.append((f, n, name, names.get(name), marked))
 for f, n, name, ad, marked in out: print('%s:%d  %s%s  %s' % (os.path.relpath(f, args.root), n, name, ' ($%04X)' % ad if ad is not None else '', 'marked' if marked else 'UNMARKED: no reference, no TODO(phase2): remove? marker'))
 print('unreferenced: %d label(s)%s' % (len(out), '' if args.all else ' without the marker'))
+rule_line('unreferenced-labels', sum(1 for o in out if not o[4]))
 if args.write:
     for f in {o[0] for o in out}:
         L = text[f]

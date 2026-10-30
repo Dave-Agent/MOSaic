@@ -30,4 +30,6 @@ bad = 0
 for t in files:
     r = subprocess.run([sys.executable, os.path.join(tdir, t)], env=child); bad += r.returncode != 0
 print('FAIL' if bad else 'PASS', '(%d of %d test file(s) failed)' % (bad, len(files)) if bad else '(%d test file(s))' % len(files))
+from _common import rule_line
+rule_line('routine-tests-pass', bad, '(test files failed)')
 sys.exit(1 if bad else 0)

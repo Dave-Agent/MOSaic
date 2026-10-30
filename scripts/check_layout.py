@@ -8,7 +8,7 @@ The layout rules are a PREFERENCE (layout.md: "prefer not committing"), so every
 With --strict any finding makes the exit status 2 (a distinct "preference not met"); status 1 is reserved for a real error (not a git repository)."""
 import os, re, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, config
+from _common import parser, config, rule_line
 a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--strict', action='store_true', help='exit 2 when any preference is not met (default: always 0)'); args = a.parse_args(); root = os.path.abspath(args.root); cfg = config(root)
 EXT = ('.d64', '.d71', '.d81', '.g64', '.prg', '.bin', '.crt', '.t64', '.tap', '.sid', '.nes', '.gb', '.gbc', '.rom', '.sna', '.vsf', '.zip', '.7z', '.p00')
 import shlex
@@ -19,7 +19,7 @@ if git('rev-parse', '--show-toplevel').returncode: sys.exit('not a git repositor
 prefix = git('rev-parse', '--show-prefix').stdout.strip()
 tracked = [f[len(prefix):] if f.startswith(prefix) else f for f in git('ls-files', '--full-name').stdout.split('\n') if f]
 bad = [f for f in tracked if f.lower().endswith(EXT) and f not in allow]
-warn = []; fail = []
+warn = []; fail = []; n_ign = 0; n_sha = 0
 if bad:
     fail.append(f'{len(bad)} tracked binary file(s) that look like game data (layout.md: do not commit them):')
     for f in bad[:25]:
@@ -30,7 +30,7 @@ if bad:
 gi = open(os.path.join(root, '.gitignore')).read() if os.path.exists(os.path.join(root, '.gitignore')) else ''
 def ignored(d): return bool(re.search(r'^/?%s/?\*?\s*$' % re.escape(d), gi, re.M))
 for d in ('originals', 'original', 'dumps', 'reference', 'build'):          # `original` is the older spelling some projects still use
-    if os.path.isdir(os.path.join(root, d)) and not ignored(d): fail.append(f'.gitignore does not ignore /{d}/ (the directory exists)')
+    if os.path.isdir(os.path.join(root, d)) and not ignored(d): fail.append(f'.gitignore does not ignore /{d}/ (the directory exists)'); n_ign += 1
 for d in ('ghidra', 'analysis', 'extracted'):
     if os.path.isdir(os.path.join(root, d)) and not ignored(d) and not re.search(r'^/?%s/\*' % d, gi, re.M): warn.append(f'.gitignore does not ignore /{d}/')
 if os.path.isdir(os.path.join(root, 'reference')) and not (os.path.exists(os.path.join(root, 'reference.sha256')) or any(f.endswith('.sha256') for f in tracked)): warn.append('no reference.sha256 tracked (a checksum proves a supplied image is the right one)')
@@ -52,9 +52,10 @@ for d in ('originals', 'original'):
         if not os.path.isfile(p): continue
         if f in sums:
             h = hashlib.sha256(open(p, 'rb').read()).hexdigest()
-            if h != sums[f]: fail.append(f'{d}/{f} DOES NOT MATCH its recorded SHA-256: the original has been changed; restore it from the source')
+            if h != sums[f]: fail.append(f'{d}/{f} DOES NOT MATCH its recorded SHA-256: the original has been changed; restore it from the source'); n_sha += 1
         else: warn.append(f'{d}/{f} has no recorded SHA-256 (put it in {d}.sha256 when the media is gathered)')
 print('layout check:', root)
 for l in fail + warn: print('  prefer', l)
+rule_line('no-game-binaries-tracked', len(bad)); rule_line('data-dirs-ignored', n_ign); rule_line('originals-untouched', n_sha)
 if not fail and not warn: print('  ok')
 sys.exit(2 if (fail or warn) and args.strict else 0)

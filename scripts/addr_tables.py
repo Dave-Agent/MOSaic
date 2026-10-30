@@ -16,7 +16,7 @@ These are candidates, not proof: graphics and counters can look like addresses. 
 --all   also print every target; --range keeps the candidates whose table starts in the range (hex original addresses)."""
 import os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, reachable, source_labels, split_comment
+from _common import parser, main_file, reachable, source_labels, split_comment, rule_line
 
 ROW_BYTES = re.compile(r'^(\s*)\.byte\s+((?:\$[0-9a-fA-F]{2}\s*,?\s*)+)\s*//\s*\[([0-9A-Fa-f]{4})\]')
 
@@ -139,7 +139,7 @@ if __name__ == '__main__':
             m = re.search(r'//\s*\[([0-9A-Fa-f]{4})[:\]]', l)
             if m: starts.add(int(m.group(1), 16))
     cs = [c for c in candidates(data_runs(reachable(main)), set(at), args.lo, args.hi, args.min, args.window, None if args.no_interior else instruction_interior(reachable(main))) if not R or R[0] <= c[0] <= R[1]]
-    print('%d candidate pointer tables' % len(cs))
+    print('%d candidate pointer tables' % len(cs)); rule_line('pointer-data-is-names', len(cs), '(candidates)', hint=True)
     for ad, s, n, ws in cs:
         lab = sum(w in at for w in ws); tl = lambda w: (at[w][0] if w in at else 'row' if w in starts else '-')
         print('  $%04X  stride %2d  %3d words  %d/%d targets labelled   targets: %s%s' % (ad, s, n, lab, n, ' '.join('$%04X(%s)' % (w, tl(w)) for w in (ws if args.all else ws[:6])), '' if args.all or n <= 6 else ' ...'))

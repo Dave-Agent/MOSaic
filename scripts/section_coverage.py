@@ -4,7 +4,7 @@
 Reports GAPS (bytes no banner covers: name what is there and add a banner), OVERLAPS, banners whose RANGE is reversed or whose fields are missing, and banners still
 `STATUS: unknown` / `partial`. A banner is a comment, so fixing any of this never changes the bytes. Exit 1 on a gap, overlap or malformed banner (a status is reported, never fails)."""
 import sys, os; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, expanded_lines
+from _common import parser, main_file, expanded_lines, rule_line
 import re
 _a = parser(__doc__.split('\n')[0], write=False, phase=True); _a.add_argument('--hint', action='store_true', help='never fail (exit 0)'); ARGS = _a.parse_args(); MAIN = main_file(ARGS)
 L = expanded_lines(MAIN)
@@ -36,4 +36,5 @@ weak = [(n, st) for a, b, n, st, ln in secs if st in ('unknown', 'partial')]
 if weak: print('  status  %d banner(s) not "understood": %s' % (len(weak), ', '.join('%s=%s' % w for w in weak)))
 fail = bool(gaps or over or bad)
 print('section_coverage: %s' % ('FAIL' if fail else 'ok'))
+rule_line('sections-tile-image', len(gaps) + len(over) + len(bad))
 sys.exit(0 if (ARGS.hint or not fail) else 1)

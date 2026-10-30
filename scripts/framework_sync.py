@@ -18,6 +18,8 @@ for f in diff: print('  differs      ', f)
 for f in missing: print('  missing here ', f)
 for f in extra: print('  project only ', f, '(a local edit? move it into the skill or remove it)')
 if not (diff or missing or extra): print('framework/ matches the master')
+from _common import rule_line
+rule_line('framework-in-step', len(diff) + len(missing) + len(extra), '(files differ, are missing or are project-only)', hint=True)
 if args.write and (diff or missing):
     for f in diff + missing:
         os.makedirs(os.path.dirname(os.path.join(proj, f)) or proj, exist_ok=True); shutil.copy2(os.path.join(master, f), os.path.join(proj, f))

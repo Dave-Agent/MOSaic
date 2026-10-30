@@ -415,3 +415,22 @@ def expanded_origin(main, skip=('libs',)):
         if q and os.path.exists(q) and not any(('/%s/' % d) in q.replace(os.sep, '/') for d in skip): out += expanded_origin(q, skip)
         else: out.append((main, n, l))
     return out
+
+# ---- the rule registry (references/rules.tsv) ---------------------------------------------------------------------------------------------------------------------
+SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RULES_FILE = os.path.join(SKILL_DIR, 'references', 'rules.tsv')
+_RULES = {}
+
+def load_rules():
+    """{rule name: dict(kind, enforcer, waiver, what)} from references/rules.tsv: the one place that says which rules exist, what enforces each and how a place is waived."""
+    if not _RULES:
+        for l in open(RULES_FILE):
+            if not l.strip() or l.startswith('#'): continue
+            n, kind, enf, waiver, what = l.rstrip('\n').split('\t')
+            _RULES[n] = dict(kind=kind, enforcer=enf, waiver=waiver, what=what)
+    return _RULES
+
+def rule_line(rule, n, detail='', hint=False):
+    """Print the result of one rule in the one form every check uses: `FAIL <rule>: <n> places` (`HINT` for a script that only lists candidates, `PASS <rule>: 0 places` when there are none), then the detail. An unknown rule name is a bug of the script."""
+    if rule not in load_rules(): sys.exit('internal error: %r is not a rule in references/rules.tsv' % rule)
+    print('%s %s: %d place%s%s' % (('HINT' if hint else 'FAIL') if n else 'PASS', rule, n, '' if n == 1 else 's', (' ' + detail) if detail else ''))

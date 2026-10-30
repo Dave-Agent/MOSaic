@@ -25,7 +25,7 @@ start   copies the project (git repo included, `originals/` skipped, `build/` sk
         and commits there; it never touches the real project.
 merge   `git format-patch` of the scratch repo since the base commit, `git am` into the real project (the real tree must have no uncommitted changes to tracked files: untracked
         files are fine), then `check`. A failed `am` is aborted (`git am --abort`), nothing is left half applied."""
-import argparse, os, shutil, subprocess, sys, tempfile
+import argparse, os, re, shutil, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 p.add_argument('cmd', choices=('check', 'start', 'merge', 'status', 'note')); p.add_argument('name', nargs='?'); p.add_argument('text', nargs='*'); p.add_argument('--root', default='.'); p.add_argument('--phase', type=int, default=1)
@@ -38,7 +38,8 @@ def check(root_):
     old, root = root, root_; res = []
     def gate(name, cmd, ok=lambda r: r.returncode == 0, hint=False):
         r = run(cmd, root_); good = ok(r); tail = (r.stdout + r.stderr).strip().split('\n')
-        res.append((name, good, tail[-1][:150] if tail and tail[-1] else '', hint)); return r
+        failed = [l for l in tail if re.match(r'^FAIL [a-z0-9-]+: ', l)]                       # the rules that failed, by name (references/rules.tsv)
+        res.append((name, good, ('; '.join(l[5:] for l in failed[:4])[:150]) if failed and not good else (tail[-1][:150] if tail and tail[-1] else ''), hint)); return r
     os.environ['C64_PHASE'] = str(args.phase)            # verify.sh / build.sh gate the phase 2 source (PHASE2_MAIN) when it is 2
     verify = os.path.join(root_, 'framework/scripts/verify.sh')
     gate('verify', ['bash', verify] if os.path.exists(verify) else ['false'])

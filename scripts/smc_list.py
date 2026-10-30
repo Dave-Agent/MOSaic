@@ -3,8 +3,9 @@
   smc_list.py [--phase 1|2 | --main FILE]"""
 import re, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, expanded_lines
+from _common import parser, main_file, expanded_lines, rule_line
 a = parser(__doc__.split('\n')[0], write=False, phase=True); args = a.parse_args(); n = 0
 for i, l in enumerate(expanded_lines(main_file(args))):
     if re.search(r'\]\s+SMC\s*$', l) or l.lstrip().startswith('// SMC'): n += 1; print(f'{i+1:6d}  {l.strip()[:150]}')
 print(n, 'SMC lines')
+rule_line('smc-operands-named', n, '(to look at)', hint=True)

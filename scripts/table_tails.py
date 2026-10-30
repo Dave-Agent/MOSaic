@@ -3,7 +3,7 @@
 Those bytes are almost always more address words the exporter left as bytes (the table is longer than its labelled part, and what they point at is unlabelled data). Hint list, exit 0.
   table_tails.py [--phase 2 | --main FILE]"""
 import sys, os; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import parser, main_file, expanded_lines
+from _common import parser, main_file, expanded_lines, rule_line
 import re
 a = parser(__doc__.split('\n')[0], write=False, phase=True); args = a.parse_args(); L = expanded_lines(main_file(args))
 hits = []; cur = None; sym = False; tail = []
@@ -20,5 +20,5 @@ for i, l in enumerate(L):
     elif re.match(r'\s*\.byte\s', c) and sym: tail.append((i + 1, c.strip()))
     elif re.match(r'\s*(\.\w+|\w+)\s', c) and c.strip() and not c.strip().startswith('//'): flush(); cur = None
 flush()
-print('%d table(s) whose symbolic .word rows continue as .byte rows' % len(hits))
+print('%d table(s) whose symbolic .word rows continue as .byte rows' % len(hits)); rule_line('one-record-per-row', len(hits), '(table_tails)', hint=True)
 for n, ln, tl, nb in hits[:40]: print('  %s (line %d): .byte rows from line %d, %d bytes: more address words?' % (n, ln, tl[0], nb))
