@@ -2,6 +2,7 @@
 """Record how a name was found, outside the source (references/phase1_method.md, "Where the evidence goes").
 
   evidence.py NAME TEXT [--kind document|observation|user] [--root DIR]    append TEXT to the entry of NAME in docs/evidence.md (a new entry when there is none)
+  evidence.py NAME --text-file FILE|- [--kind ...]                          the same, TEXT read from FILE or from standard input (`-`): a text with `$`, quotes or apostrophes survives a shell and `just`
   evidence.py --show NAME [--root DIR]                                     print the entry of NAME
 
 The comment in the source states the conclusion (`// 1 while Thing climbs`); the run that showed it (`down held in frames 250-289 gave $80, $C0 ...`), the document that says so and the answer of the owner
@@ -15,10 +16,11 @@ def entries(text):
     return parts[0], {p.split('\n', 1)[0].strip(): p for p in parts[1:]}
 
 def main():
-    a = parser(__doc__.split('\n')[0], write=False); a.add_argument('name', nargs='?'); a.add_argument('text', nargs='?'); a.add_argument('--kind', default='observation', choices=('document', 'observation', 'user')); a.add_argument('--show', metavar='NAME')
+    a = parser(__doc__.split('\n')[0], write=False); a.add_argument('name', nargs='?'); a.add_argument('text', nargs='?'); a.add_argument('--text-file'); a.add_argument('--kind', default='observation', choices=('document', 'observation', 'user')); a.add_argument('--show', metavar='NAME')
     args = a.parse_args(); path = os.path.join(args.root, 'docs', 'evidence.md')
     old = open(path).read() if os.path.exists(path) else '# Evidence\n\nHow each name was found: one entry per name, one bullet per piece of evidence. The source comments state the conclusions; this file holds the runs, documents and answers behind them (`scripts/evidence.py`).\n\n'
     head, ent = entries(old)
+    if args.text_file: args.text = sys.stdin.read() if args.text_file == '-' else open(args.text_file).read()
     if args.show: print(ent.get(args.show, 'no entry for %s' % args.show).rstrip()); return 0 if args.show in ent else 1
     if not args.name or not args.text: print(__doc__); return 2
     bullet = '- %s (%s): %s' % (args.kind, datetime.date.today().isoformat(), args.text.strip())

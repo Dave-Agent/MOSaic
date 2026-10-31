@@ -755,6 +755,14 @@ check('coverage --union: the counts of the files are summed per address and the 
 r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'platform', 'bbc', 'emulator', 'coverage.py'), '--root', _ud, '--union', 'a.txt', 'missing.txt', '--out', 'v.txt'], capture_output=True, text=True)
 check('coverage --union: a missing file is an error and writes nothing', r.returncode != 0 and 'no such coverage file' in r.stderr + r.stdout and not os.path.exists(os.path.join(_ud, 'v.txt')), r.stdout + r.stderr)
 
+# ---- evidence.py --text-file: a text with $, quotes and an apostrophe survives -------------------------------------------------------------------------------------
+_ed = tempfile.mkdtemp(prefix='c64ev_'); _tx = "reads $0204 and writes it back; the 'Z' key and \"x\" work"
+open(os.path.join(_ed, 't.txt'), 'w').write(_tx + '\n')
+r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'evidence.py'), '--root', _ed, 'Name', '--text-file', os.path.join(_ed, 't.txt'), '--kind', 'document'], capture_output=True, text=True); _e1 = open(os.path.join(_ed, 'docs', 'evidence.md')).read() if os.path.exists(os.path.join(_ed, 'docs', 'evidence.md')) else ''
+check('evidence --text-file: the text of a file is recorded as it is (dollar, quotes, apostrophe)', r.returncode == 0 and _tx in _e1, r.stdout + r.stderr + _e1)
+r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'evidence.py'), '--root', _ed, 'Other', '--text-file', '-'], input=_tx, capture_output=True, text=True); _e2 = open(os.path.join(_ed, 'docs', 'evidence.md')).read()
+check('evidence --text-file -: the text of standard input is recorded', r.returncode == 0 and _e2.count(_tx) == 2, r.stdout + r.stderr + _e2)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')
