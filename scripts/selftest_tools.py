@@ -689,6 +689,16 @@ _d = _libs_project('bbc', '#import "symbols.asm"\n.pc = $0200 "RAM"\n  lda DAT_f
 r = _al(_d, os.path.join('platforms', 'bbc', 'libs'), '--write'); t = text(_d); _sy = open(os.path.join(_d, 'symbols.asm')).read()
 check('apply_libs, bbc: the system VIA register, the CRTC register and the OS call (a SUB_ label) are named from the BBC libs; $D021 is not hardware on this machine; the symbols file keeps their XREF lines as comments', r.returncode == 0 and 'sta CRTC.ADDRESS' in t and 'lda SYSVIA.IRQ_ENABLE' in t and 'jsr OS.OSBYTE' in t and 'DAT_d021' in t and 'exported as SUB_fff4' in _sy and '#import "libs/via.asm"' in t, t + _sy + r.stdout + r.stderr)
 
+# ---- inline_data.py: text or data that follows a call -----------------------------------------------------------------------------------------------------------------------
+_id = tempfile.mkdtemp(prefix='c64inl_'); os.makedirs(os.path.join(_id, 'ghidra'))
+_refb = bytes([0x20, 0x21, 0x0D, 0x48, 0x69, 0x1F, 0x01, 0x02, 0xEA, 0x60, 0x20, 0x21, 0x0D, 0xEA, 0x60, 0x20, 0x21, 0x0D, 0x41, 0x42])    # JSR print / "Hi" 1F 01 02 / NOP (the terminator, code) / RTS ; JSR print / NOP ; JSR print / "AB" with no terminator
+open(os.path.join(_id, 'ref.bin'), 'wb').write(_refb)
+open(os.path.join(_id, 'ghidra', 'x.asm'), 'w').write('  jsr SUB_0d21   // [1000:20 21 0d JSR $0d21]\n  jsr SUB_0d21   // [100a:20 21 0d JSR $0d21]\n  jsr SUB_0d21   // [1010:20 21 0d JSR $0d21]\n')
+open(os.path.join(_id, 'project.config'), 'w').write('REFERENCE_PRG="ref.bin"\nLOAD_ADDRESS="0x1000"\n')
+r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'ghidra', 'inline_data.py'), '--root', _id, '--routine', '0D21', '--terminator', 'EA', '--keep-terminator', '--source', 'ghidra/x.asm', '--write', '--max', '8'], capture_output=True, text=True)
+_dt = open(os.path.join(_id, 'tools', 'ghidra', 'data.txt')).read() if os.path.exists(os.path.join(_id, 'tools', 'ghidra', 'data.txt')) else ''; _sd = open(os.path.join(_id, 'tools', 'ghidra', 'inline_seeds.txt')).read() if os.path.exists(os.path.join(_id, 'tools', 'ghidra', 'inline_seeds.txt')) else ''
+check('inline_data: the text after a call is a data range up to the terminator (which stays code, and is where the disassembly resumes); a call with no data is skipped; a call with no terminator in range is reported, not written', r.returncode == 0 and '1003 1007' in _dt and '1008 ' in _sd and '100d ' in _sd and _dt.count('\n') == 1 and 'NOT WRITTEN' in r.stdout and '$1010' in r.stdout, _dt + _sd + r.stdout + r.stderr)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')

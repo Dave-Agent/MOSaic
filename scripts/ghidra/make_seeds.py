@@ -10,7 +10,7 @@ Sources, each optional and repeatable; every address is kept with the reason it 
   --jump-table LO HI        a table of 3-byte JMP/JSR entries in the image: each target
   --edges FILE              the tracer's `PREFIX.edges` (`type from to`): every executed jump/call/branch/interrupt TARGET
   --executed FILE           the tracer's `PREFIX.flags` (u16 per byte; bit 0 = executed as an opcode): every executed opcode address that begins a run
-  --lines FILE              extra "ADDR note" lines (PC samples from an emulator run)
+  --lines FILE              extra "ADDR note" lines (PC samples from an emulator run, or the instructions coverage.py counted: `ADDR count`); lines starting with # are skipped
 Only addresses inside the image (--base ADDR and the reference length) are kept.
 
   make_seeds.py --reference REF.bin [--base 0800] --out tools/ghidra/seeds.txt [sources ...]"""
@@ -55,6 +55,7 @@ for x in dropped: del seeds[x]
 if dropped: print('dropped %d seed(s) inside executed instructions: %s' % (len(dropped), ' '.join('$%04X' % x for x in dropped[:10])))
 for f in args.lines:
     for l in open(f):
+        if l.lstrip().startswith('#'): continue                       # a comment line (a tool's header)
         t = l.split(None, 1)
         if t: add(H(t[0]), t[1].strip() if len(t) > 1 else 'sample')
 os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)

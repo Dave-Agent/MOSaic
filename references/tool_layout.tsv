@@ -126,3 +126,5 @@ platform/bbc/emulator/handoff_dump.py	platform/bbc	platform/bbc/emulator/handoff
 platform/bbc/emulator/pc_samples.py	platform/bbc	platform/bbc/emulator/pc_samples.py	samples where a game executes in Beebium: seeds until a BBC machine model exists
 reloc_map.py	shared	reloc_map.py	
 platform/bbc/emulator/stale_probe.py	platform/bbc	platform/bbc/emulator/stale_probe.py	decides by experiment which bytes of the hand-off image the game never needs
+platform/bbc/emulator/coverage.py	platform/bbc	platform/bbc/emulator/coverage.py	counts which instructions ran, with recording breakpoints in Beebium
+ghidra/inline_data.py	shared	ghidra/inline_data.py	

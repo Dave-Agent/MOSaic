@@ -1,12 +1,13 @@
 # Headless setup + export for a game-only image.   (Jython 2.7: runs INSIDE Ghidra, via scripts/ghidra/run.sh)
 # @category C64
 #
-# Arguments (getScriptArgs): SEEDS LABELS HOLES OUTDIR [EXPORTER]
+# Arguments (getScriptArgs): SEEDS LABELS HOLES OUTDIR [EXPORTER [DATA]]
 #   SEEDS   file, one "ADDR [note]" per line (hex): disassembly start points (scripts/ghidra/make_seeds.py writes it)
 #   LABELS  file, one "ADDR NAME" per line (comments after //): labels to apply (missing file = none)
 #   HOLES   file, one "LO HI" per line (hex): ranges to REMOVE from the program so they are not exported as zero bytes (missing file = none)
 #   OUTDIR  directory the Kick Assembler export is written to (the landing zone, never the canonical source)
 #   EXPORTER path of KickAssemblerExport.py (passed by run.sh: see fetch_exporter.py; https://github.com/Dave-Agent/ghidra-kickass-export)
+#   DATA    file, one "LO HI [note]" per line (hex): ranges that are DATA: defined as bytes before any disassembly, so the flow of a call or a jump does not decode them as instructions (scripts/ghidra/inline_data.py writes it for text that follows a call)
 import os
 from java.io import File
 from ghidra.program.model.symbol import SourceType
@@ -14,6 +15,7 @@ from ghidra.program.model.symbol import SourceType
 args = getScriptArgs()
 SEEDS, LABELS, HOLES, OUT_DIR = args[0], args[1], args[2], args[3]
 EXPORTER = args[4] if len(args) > 4 else os.path.expanduser('~/ghidra_scripts/KickAssemblerExport.py')
+DATA = args[5] if len(args) > 5 else ''
 space = currentProgram.getAddressFactory().getDefaultAddressSpace()
 mem = currentProgram.getMemory()
 def A(x): return space.getAddress(x)
@@ -32,6 +34,19 @@ if os.path.exists(HOLES):
         if len(f) >= 2: remove_range(int(f[0].lstrip('$'), 16), int(f[1].lstrip('$'), 16))
 for b in mem.getBlocks():
     b.setWrite(True); b.setExecute(True)
+
+dn = 0
+if DATA and os.path.exists(DATA):
+    for line in open(DATA):
+        f = line.split('//')[0].split('#')[0].split()
+        if len(f) < 2: continue
+        lo, hi = int(f[0].lstrip('$'), 16), int(f[1].lstrip('$'), 16)
+        for x in range(lo, hi + 1):
+            a = A(x)
+            if mem.contains(a) and getInstructionAt(a) is None:
+                try: createByte(a); dn += 1
+                except Exception: pass
+    print('data ranges: %d byte(s) defined as data before the disassembly' % dn)
 
 n = 0
 for line in open(SEEDS):
