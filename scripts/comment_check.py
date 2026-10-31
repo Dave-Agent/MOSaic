@@ -16,7 +16,7 @@ otherwise they are listed as hints, so a project that has not adopted the style 
   xref       a Ghidra XREF list (`// XREF[n]: ...` and its continuation lines): they point at phase 1 addresses and go stale; phase 1 keeps them.
   zpform     a `.label NAME = $ADDR` line in zero_page.asm: phase 2 declares the variables in a `virtual` segment (`name: .byte $00`).
   narrative  a comment that records how a name was found (`Rung 3`, `Observed`, `frames 250-289`, `controlled run`, `docs/...`): the evidence lives in docs/, the comment states the conclusion.
-  codeaddr   a comment that names a code or data location by its address when a label has that address (needs the symbol file TRACE_SYM / TRACE_SYM_P1): name the label.
+  codeaddr   a comment that names a ROUTINE by its address when a label (PascalCase) has that address (needs the symbol file TRACE_SYM / TRACE_SYM_P1): name the routine. Data and hardware addresses are left: a comment that explains a layout needs them.
   restate    (hint only) a label-line comment whose words are all in the label's own name (`High byte of x`, `element 5 of x_tbl`): no comment is better.
 Exit status 1 when a count is above the baseline. The baseline is `tools/comment_baseline.tsv` (project.config COMMENT_BASELINE, or --baseline): `file<TAB>kind<TAB>count`, the most
 violations allowed per file and kind. Without one every count must be 0; with one the check is a ratchet for a source that is not yet clean (counts may fall, never rise).
@@ -58,7 +58,7 @@ def label_addresses():
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sim')); import symbols
     out = {}
     for n, a in symbols.load(os.path.join(args.root, f)).items():
-        if a >= 0x0100 and n.count('.') <= 1 and not n.startswith('zp'): out.setdefault(a, n)
+        if a >= 0x0800 and re.match(r'[A-Z][a-z]', n.split('.')[-1]) and n.count('.') <= 1 and not n.startswith(('zp', 'VIC', 'CIA', 'SID', 'CPU')): out.setdefault(a, n)      # a routine: data and hardware blocks keep their address in an explanation of a layout
     return out
 LABELS = label_addresses() if args.phase == 2 else {}
 def scan(path):
@@ -69,7 +69,7 @@ def scan(path):
             if XREF_HEAD.search(l) or XREF_CONT.match(l): out['xref'].append((n, len(l), l))
             elif base == 'zero_page.asm' and re.match(r'^\.label\s+\w+\s*=\s*\$', l): out['zpform'].append((n, len(l), l))
             elif cm and NARRATIVE.search(cm): out['narrative'].append((n, len(l), l))
-            if cm and LABELS:
+            if cm and LABELS and not re.match(r'\s*(?:RANGE|SECTION|STATUS|SUMMARY|P1_ROUTINE_NAME):', cm):
                 hit = [m for m in re.findall(r'\$([0-9A-Fa-f]{4})\b', cm) if int(m, 16) in LABELS]
                 if hit: out['codeaddr'].append((n, len(l), l))
             d = DECL.match(l)

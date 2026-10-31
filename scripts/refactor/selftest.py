@@ -456,6 +456,7 @@ else: print('SKIP zp_virtual assemble: no Java / Kick Assembler')
 RAMV = """
     #importonce
     // variables.asm
+
     // buf: a buffer
     .label buf = $0200
     .label ptr_x = $02F0
@@ -466,7 +467,26 @@ d = project('#import "symbols.asm"\n.pc = $0800 "RAM"\n  lda buf,x\n  lda screen
 open(os.path.join(d, 'variables.asm'), 'w').write(textwrap.dedent(RAMV).lstrip('\n')); open(os.path.join(d, 'symbols.asm'), 'w').write('#importonce\n#import "variables.asm"\n')
 r = tool('zp_virtual.py', d, '--file', 'variables.asm', '--region', '0200-03FF', '--namespace', 'ram', '--segment', 'Variables', '--write'); t = text(d)
 v = open(os.path.join(d, 'variables.asm')).read(); n = open(os.path.join(d, 'ram.asm')).read(); sy = open(os.path.join(d, 'symbols.asm')).read()
-check('zp_virtual --region: only the labels of the region are converted into their own file; the others stay; the file is imported; uses are ram.name', r.returncode == 0 and '*=$0200 "Variables" virtual' in n and 'buf:' in n and 'ptr_x:' in n and 'screen_cell' not in n and '.label screen_cell = $0400' in v and '.label alias = buf+1' in v and 'buf' not in v.replace('alias = buf+1', '') and '#import "ram.asm"' in sy and 'lda ram.buf,x' in t and 'lda screen_cell' in t, n + v + sy + t + r.stdout + r.stderr)
+check('zp_virtual --region: only the labels of the region are converted into their own file; the others stay; the file is imported; uses are ram.name', r.returncode == 0 and '*=$0200 "Variables" virtual' in n and 'buf:' in n and 'ptr_x:' in n and 'screen_cell' not in n and '.label screen_cell = $0400' in v and '.label alias = ram.buf+1' in v and 'buf' not in v.replace('alias = ram.buf+1', '') and '#import "ram.asm"' in sy and 'lda ram.buf,x' in t and 'lda screen_cell' in t, n + v + sy + t + r.stdout + r.stderr)
+
+d = project('#import "symbols.asm"\n#import "other.asm"\n.pc = $0800 "RAM"\n  lda tbl,x\n  lda tbl_alias\n  lda first\n  lda N.inner\n  rts\n')
+open(os.path.join(d, 'symbols.asm'), 'w').write('#importonce\n#import "variables.asm"\n')
+open(os.path.join(d, 'variables.asm'), 'w').write('#importonce\n.label first = $0200\n.label tbl = $0210   // 8 bytes of something\n')
+open(os.path.join(d, 'other.asm'), 'w').write('.label tbl_alias = $0212   // inside the table\n.label dup = $0200\n.namespace N {\n.label inner = $0220\n}\n.label outside = $0400\n')
+r = tool('zp_virtual.py', d, '--all-files', '--region', '0200-03FF', '--namespace', 'ram', '--segment', 'Variables', '--write'); t = text(d); n = open(os.path.join(d, 'ram.asm')).read(); o = open(os.path.join(d, 'other.asm')).read()
+check('zp_virtual --all-files: variables of several files end up in one declared region; a second name at the same address is an alias of the first, a member inside a table keeps its own byte; a label inside a { } scope or outside the region stays', r.returncode == 0 and 'first:' in n and 'tbl:' in n and '.fill 2, 0' in n and 'tbl_alias:' in n and '.label dup = first' in n and 'inner' not in n and '.label inner = $0220' in o and '.label outside = $0400' in o and 'tbl_alias' not in o and 'lda ram.tbl_alias' in t and 'lda N.inner' in t, n + o + t + r.stdout + r.stderr)
+
+PR = """
+    // The routine at $0810 clears it. Observed in frames 5-9: it was set. A second sentence stays.
+    //   an indented column line stays
+    // (frame 0 of the set) is not narrative; the one at $0900 (a table) keeps its address.
+    // Picture: docs/gfx/x.png and see docs/user_answers.md.
+    Start:
+      lda #1   // [0800:a9 01 LDA #$1]
+"""
+d = project(textwrap.dedent(PR).lstrip('\n')); symf = os.path.join(d, 'game.sym'); open(symf, 'w').write('.label ClearIt=$0810\n.label some_tbl=$0900\n')
+r = tool('tidy_comments.py', d, 'ALL', '--prose', '--sym', symf, '--write'); t = text(d)
+check('tidy_comments --prose: narrative sentences go, the address of a routine becomes its name, data addresses, frame 0 of a set, docs/gfx and docs/user_answers pointers and indented lines stay', r.returncode == 0 and 'Observed' not in t and 'The routine ClearIt clears it' in t and 'A second sentence stays' in t and '//   an indented column line stays' in t and '(frame 0 of the set)' in t and '$0900' in t and 'docs/gfx/x.png' in t and 'docs/user_answers.md' in t and '[0800:a9 01 LDA #$1]' in t, t + r.stdout)
 
 TD = """
     // zp_climb: Climb state. Rung 3: down held in frames 250-289 gave $80. Set by Foo.

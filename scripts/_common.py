@@ -160,7 +160,7 @@ XREF_LINE = re.compile(r'^\s*//\s*(?:Ghidra\s+)?XREF\b|^\s+//\s+[\w.:]+\([RWcjpd
 TRACE_COMMENT = re.compile(r'//\s*\[[0-9A-Fa-f]{4}[:\]]')
 
 # how a name was found, written into a comment (the evidence belongs in docs/): `Rung 3`, `Observed`, `frames 250-289`, `controlled run`, a docs/ path
-NARRATIVE = re.compile(r"\bRung \d|\bObserved\b|\bobserved\b|\bframes? \d|\bfrom frame \d|\bcontrolled run\b|\bfuzzed run\b|\bdocs/|\bphase1_log")
+NARRATIVE = re.compile(r"\bRung \d|\bObserved\b|\bobserved\b|\bframes \d+-\d+|\b(?:in|at|from|after|until|by) frames? \d|\b(?:in|with|from|after) (?:a|the) controlled runs?\b|\bfuzzed run\b|\bdocs/(?!gfx/|owner_questions|user_answers)|\bphase1_log")
 # the cross-reference list of the Ghidra exporter: a head (`XREF[3]: a(R), b(W)`) and its continuation lines (`//   c(R), d(W)`)
 XREF_ITEM = r'(?:[A-Za-z_]\w*:)?[0-9A-Fa-f]{4}\([A-Za-z]+\)'
 XREF_HEAD = re.compile(r'XREF\[\d+\]:')

@@ -3,12 +3,12 @@
 variables lose their `zp_` prefix. The addresses do not change (a `.fill` spans each unnamed gap), so the build stays byte-identical. Names and comments only.
 
   zp_virtual.py [--phase 1|2 | --main FILE] [--map tools/name_map.tsv] [--write]        (default --phase 2)
-  zp_virtual.py --file variables.asm --region 0200-03FF --namespace ram --segment Variables [--out ram.asm] [--write]
+  zp_virtual.py --file variables.asm [--file OTHER ...] | --all-files  --region 0200-03FF --namespace ram --segment Variables [--out ram.asm] [--write]
                                                                          the same for a region of RAM: only the `.label NAME = $ADDR` lines inside the region are converted, into --out (the
                                                                          file is `NAMESPACE.asm` by default, imported from symbols.asm); the other lines of --file stay where they are
 
 Reads the `.label NAME = $ADDR` lines of zero_page.asm (the comment block above a label stays with it, a trailing comment moves to the declaration) and writes the namespace form:
-  - a variable is one byte unless its comment says `N bytes` or its name ends in `_tbl`: then `.fill n, 0`, but never past the next label (members of a table keep their own labels, so a table is `.fill` up to its first member);
+  - a variable is one byte unless its comment says how many (`N bytes`, `per area (N)`, `N entries`): then `.fill n, 0`, never past the next label (members of a table keep their own labels, so a table is `.fill` up to its first member); a table whose size nothing says is one byte, followed by a `not named` gap;
   - a gap of bytes the game does not name is `.fill n, 0` (a bare `*=` would start a real memory block, and the PRG would then load from the zero page);
   - NAME loses `zp_` unless that gives a name the file already has; names without the prefix stay as they are, inside the namespace.
 Every other file of the source gets `NAME` -> `zp.NEW` in its code (not in strings; in comments only a `zp_` name is renamed: a bare name such as `icon_char` may be ordinary words there).
@@ -21,12 +21,17 @@ from _common import parser, main_file, code_files, map_code, split_comment, bloc
 LIMIT = 0x100          # the first address after the region (set from --region)
 LABEL = re.compile(r'^\.label\s+(\w+)\s*=\s*\$([0-9A-Fa-f]+)\s*(//.*)?$')
 
-def read_labels(path, lo, hi):
-    """(entries in the region, the lines that stay): entry = (comment lines above, name, address, trailing comment). The file's own header (the comment lines before its first blank line) is dropped when the whole file is converted."""
-    ent = []; keep = []; pend = []; top = True
+LABEL_FILES = ('zero_page.asm', 'variables.asm', 'constants.asm', 'symbols.asm')
+
+def read_labels(path, lo, hi, take_blocks=True):
+    """(entries in the region, the lines that stay): entry = (comment lines above, name, address, trailing comment). The file's own header (the comment lines before its first blank line) is dropped when the whole file is converted.
+    Only a label at the top level counts (not inside a `{ }` scope); the comment block above it goes with it only when take_blocks."""
+    ent = []; keep = []; pend = []; top = True; depth = 0
     for l in open(path).read().split('\n'):
-        m = LABEL.match(l)
-        if m and lo <= int(m.group(2), 16) <= hi: ent.append((pend, m.group(1), int(m.group(2), 16), (m.group(3) or '').strip())); pend = []; top = False; continue
+        code = re.sub(r'"[^"]*"', '', l.split('//')[0]); m = LABEL.match(l)
+        if m and depth == 0 and lo <= int(m.group(2), 16) <= hi:
+            ent.append((pend if take_blocks else [], m.group(1), int(m.group(2), 16), (m.group(3) or '').strip())); keep += [] if take_blocks else pend; pend = []; top = False; continue
+        depth += code.count('{') - code.count('}')
         if m: keep += pend + [l]; pend = []; top = False; continue
         if l.strip() == '': keep += pend + [l]; pend = []; top = False
         elif l.startswith('//') and top and lo == 0: continue
@@ -35,9 +40,11 @@ def read_labels(path, lo, hi):
     return ent, keep + pend
 
 def size_of(ent, k):
+    """bytes a variable takes: the count its comment gives (`N bytes`, `per area (N)`, `N entries`), else 1, never past the next label. A table whose size nothing says is one byte followed by a `not named` gap: the gap is honest, a guessed size is not."""
     c, name, a, tr = ent[k]; nxt = ent[k + 1][2] if k + 1 < len(ent) else LIMIT
-    m = re.search(r'\b(\d+)[- ]byte', ' '.join(c) + ' ' + tr)
-    want = int(m.group(1)) if m else (nxt - a if name.endswith('_tbl') else 1)
+    t = ' '.join(c) + ' ' + tr
+    m = re.search(r'\b(\d+)[- ]bytes?\b', t) or re.search(r'\bper \w+ \((\d+)\)', t) or re.search(r'\b(\d+) (?:entries|words|digits|flags|slots)\b', t)
+    want = int(m.group(1)) if m else 1
     return max(1, min(want, nxt - a, LIMIT - a))
 
 def build(ent, ns, segment, prefix, file):
@@ -45,39 +52,49 @@ def build(ent, ns, segment, prefix, file):
     for n in names:
         s = n[len(prefix):] if prefix and n.startswith(prefix) else n
         new[n] = s if s == n or s not in names and s not in new.values() else n
-    out = ['#importonce', '// %s - the variables of the %s region, accessed as %s.name: one declaration per variable in address order; a `.fill` spans a gap of bytes the game does not name.' % (file, segment, ns), '',
+    out = ['#importonce', '// %s - the variables of the %s region, accessed as %s.name: one declaration per variable in address order;' % (file, segment, ns), '// a `.fill` spans a gap of bytes the game does not name.', '',
            '.namespace %s {' % ns, '*=$%0*X "%s" virtual' % (2 if ent[0][2] < 0x100 else 4, ent[0][2], segment)]
     pc = ent[0][2]
-    k = 0
+    k = 0; placed = []                       # (start, end, name) of what is declared
     while k < len(ent):
         c, n, a, tr = ent[k]
-        if a != pc: out.append('.fill %d, 0   // $%02X-$%02X: not named' % (a - pc, pc, a - 1)); pc = a
+        if a < pc:                           # inside or at the same address as an earlier variable: an alias
+            e = next(x for x in placed if x[0] <= a < x[1]); off = a - e[0]
+            out += c; out.append('.label %s = %s%s%s' % (new[n], new[e[2]], ('+%d' % off) if off else '', ('   ' + tr) if tr else '')); k += 1; continue
+        if a != pc: out.append('.fill %d, 0   // %s: not named' % (a - pc, ('$%02X' % pc) if a - pc == 1 else '$%02X-$%02X' % (pc, a - 1))); pc = a
         out += c
         sz = size_of(ent, k)
         decl = '.byte $00' if sz == 1 else '.fill %d, 0' % sz
-        out.append('%-28s %s%s' % (new[n] + ':', decl, ('   ' + tr) if tr else '')); pc += sz; k += 1
+        out.append('%-28s %s%s' % (new[n] + ':', decl, ('   ' + tr) if tr else '')); placed.append((a, a + sz, n)); pc += sz; k += 1
     out += ['', '} // .namespace %s' % ns, '']
     return '\n'.join(out), new
 
 def main():
-    a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('--map', default='tools/name_map.tsv'); a.add_argument('--file', default='zero_page.asm'); a.add_argument('--region', default='0000-00FF')
+    a = parser(__doc__.split('\n')[0], phase=True); a.add_argument('--map', default='tools/name_map.tsv'); a.add_argument('--file', action='append'); a.add_argument('--all-files', action='store_true'); a.add_argument('--region', default='0000-00FF')
     a.add_argument('--namespace', default='zp'); a.add_argument('--segment', default='Zero page'); a.add_argument('--out'); a.add_argument('--prefix'); args = a.parse_args(); main_f = main_file(args)
-    src = os.path.dirname(main_f); path = os.path.join(src, args.file); ns = args.namespace
-    if not os.path.exists(path): sys.exit('no %s in %s' % (args.file, src))
+    src = os.path.dirname(main_f); ns = args.namespace; fnames = args.file or ['zero_page.asm']
+    paths = code_files(main_f) if args.all_files else [os.path.join(src, f) for f in fnames]
+    paths = sorted(paths, key=lambda q: os.path.basename(q) not in LABEL_FILES)             # the label files first: of two names at one address theirs is the variable
+    for q in paths:
+        if not os.path.exists(q): sys.exit('no %s in %s' % (os.path.basename(q), src))
     global LIMIT
-    lo, hi = (int(x, 16) for x in args.region.split('-')); LIMIT = hi + 1; whole = args.file == 'zero_page.asm' and ns == 'zp' and not args.out
-    out_path = path if whole else os.path.join(src, args.out or ns + '.asm')
+    lo, hi = (int(x, 16) for x in args.region.split('-')); LIMIT = hi + 1
+    whole = len(paths) == 1 and os.path.basename(paths[0]) == 'zero_page.asm' and ns == 'zp' and not args.out
+    out_path = paths[0] if whole else os.path.join(src, args.out or ns + '.asm'); path = paths[0]
     prefix = args.prefix if args.prefix is not None else ('zp_' if ns == 'zp' else '')
-    ent, keep = read_labels(path, lo, hi)
-    if not ent: sys.exit('%s has no `.label NAME = $ADDR` lines in %s (already converted?)' % (args.file, args.region))
+    ent = []; keeps = {}
+    for q in paths:
+        if q == out_path and not whole: continue
+        e, k = read_labels(q, lo, hi, os.path.basename(q) in LABEL_FILES or not args.all_files); ent += e; keeps[q] = k
+    ent.sort(key=lambda x: x[2])                  # stable: of two names at one address the one met first is the variable, the other an alias
+    if not ent: sys.exit('no `.label NAME = $ADDR` lines in %s (already converted?)' % args.region)
     text, new = build(ent, ns, args.segment, prefix, os.path.basename(out_path))
     pat = re.compile(r'(?<![\w.$])(%s)\b(?!\s*:)' % '|'.join(sorted(map(re.escape, new), key=len, reverse=True)))
     pre = re.compile(r'(?<![\w.$])(%s)\b' % '|'.join(sorted((re.escape(n) for n in new if prefix and n.startswith(prefix)), key=len, reverse=True))) if prefix else None
     changed = {out_path: text}; cnt = [0, 0]
-    if not whole: changed[path] = '\n'.join(keep)
     for f in code_files(main_f):
-        if f == out_path or (f == path and not whole): continue
-        L = open(f).read().split('\n'); fl = block_flags(L); out = []
+        if f == out_path: continue
+        L = keeps[f] if (f in keeps and not whole) else open(f).read().split('\n'); fl = block_flags(L); out = []
         for i, l in enumerate(L):
             if fl[i]: out.append(l); continue
             def sub(m): cnt[0] += 1; return ns + '.' + new[m.group(1)]
@@ -87,11 +104,12 @@ def main():
                 def csub(m): cnt[1] += 1; return ns + '.' + new[m.group(1)]
                 nl = code2 + pre.sub(csub, cm2)
             out.append(nl)
-        if out != L: changed[f] = '\n'.join(out)
+        if out != (open(f).read().split('\n')): changed[f] = '\n'.join(out)
     sym = os.path.join(src, 'symbols.asm')
     if not whole and os.path.exists(sym):
         S = open(sym).read(); imp = '#import "%s"' % os.path.basename(out_path)
-        if imp not in S: changed[sym] = S.replace('#import "%s"' % args.file, '#import "%s"\n%s' % (args.file, imp), 1) if '#import "%s"' % args.file in S else S.rstrip('\n') + '\n' + imp + '\n'
+        first = '#import "%s"' % os.path.basename(path)
+        if imp not in S: changed[sym] = S.replace(first, first + '\n' + imp, 1) if first in S else S.rstrip('\n') + '\n' + imp + '\n'
     rows = [(n, ns + '.' + v) for n, v in new.items()]
     mp = os.path.join(args.root, args.map); have = set()
     if os.path.exists(mp):
