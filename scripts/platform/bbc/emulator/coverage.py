@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Which instructions does a BBC Micro game execute? Real coverage from Beebium, at the speed of the emulator (the BBC counterpart of the tracer's `--executed`, until a BBC machine model exists).
 
-  coverage.py [--root DIR] [--media IMAGE] [--handoff HEX] [--ranges LO-HI[,LO-HI ...]] [--seconds N] [--block N] [--exact] [--seed N] [--keys CHARS | --key-codes HEX,HEX,...] [--start-key CODE@SECONDS] [--poke-addrs LO-HI,...] [--poke-skip ADDR,...] [--poke-every SECONDS] [--out dumps/executed.txt] [--preset ID] [--mos FILE] [--timeout SECONDS]
+  coverage.py [--root DIR] [--media IMAGE] [--handoff HEX] [--ranges LO-HI[,LO-HI ...]] [--seconds N] [--block N] [--exact] [--seed N] [--keys CHARS | --key-codes HEX,HEX,...] [--start-key CODE@SECONDS] [--poke-addrs LO-HI,...] [--poke-skip ADDR,...] [--poke-every SECONDS] [--out dumps/executed.txt] [--union FILE FILE ...] [--preset ID] [--mos FILE] [--timeout SECONDS]
 
 A scratch COPY of the disc is booted as for handoff_dump.py and run to the hand-off. Then recording-only breakpoints (condition `false`: they never stop the machine, but count how often they are reached) are put on the candidate addresses, and the game is
 run for --seconds emulated seconds with a seeded random key schedule. --keys names the characters that may be pressed (a short press now and then, one key at a time); --key-codes names the INKEY numbers the game tests instead
@@ -11,6 +11,8 @@ flag was poked in earlier projects; --poke-skip names bytes never to poke (the z
 finds the blocks that run at all, the second with one breakpoint per candidate address inside those blocks only (a few hundred times faster than breakpoints on all of them; `--exact` skips the first pass). A breakpoint is checked at instruction boundaries only, so an address with a count is the first byte of an instruction that really ran. Candidates: --ranges, else every
 non-zero byte of the reference image (REFERENCE_PRG, loaded at LOAD_ADDRESS, both of project.config: the zero holes of the reference are not code). Writes OUT: `ADDR count` (hex address, decimal count), sorted, and prints how many distinct instructions ran. It
 measures the paths the key schedule reached; run it with several seeds and longer, and `--merge` adds to an existing OUT instead of replacing it. It does not look at the OS ROM or at code the game copies elsewhere and runs there after the hand-off. The same
+--union adds the counts of the files several runs wrote into --out and starts no emulator (the files are the `ADDR count` lists of earlier runs).
+
 options and defaults as handoff_dump.py (HANDOFF_MEDIA, HANDOFF_PC, BBC_MOS in project.config; BEEBIUM_PYTHON)."""
 import os, random, shutil, sys, tempfile, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
@@ -24,11 +26,30 @@ def candidates(args, cfg):
     data = open(ref if os.path.isabs(ref) else os.path.join(args.root, ref), 'rb').read(); b = int(base, 16)
     return [b + i for i, v in enumerate(data) if v]
 
+def union(args):
+    """--union: add the counts of several runs' files into --out (no emulator)"""
+    hits = {}; names = []
+    for f in args.union:
+        f = f if os.path.isabs(f) else os.path.join(args.root, f)
+        if not os.path.exists(f): sys.exit('no such coverage file: %s' % f)
+        n = 0
+        for l in open(f):
+            p = l.split()
+            if len(p) == 2 and not l.startswith('#'): hits[int(p[0], 16)] = hits.get(int(p[0], 16), 0) + int(p[1]); n += 1
+        names.append(f); print('%s: %d instructions' % (os.path.relpath(f, args.root), n), flush=True)
+    out = args.out if os.path.isabs(args.out) else os.path.join(args.root, args.out); os.makedirs(os.path.dirname(out) or '.', exist_ok=True)
+    with open(out, 'w') as fh:
+        fh.write('# instructions that ran (first byte, hex; times reached): union of %d coverage files, counts summed\n' % len(names))
+        for ad in sorted(hits): fh.write('%04X %d\n' % (ad, hits[ad]))
+    print('%d distinct instructions in the union of %d file(s); wrote %s' % (len(hits), len(names), os.path.relpath(out, args.root)))
+    return 0
+
 def main():
     a = parser(__doc__.split('\n')[0], write=False)
     a.add_argument('--media'); a.add_argument('--handoff'); a.add_argument('--ranges'); a.add_argument('--seconds', type=int, default=120); a.add_argument('--seed', type=int, default=1); a.add_argument('--keys', default='zx :/\rasklqp1234'); a.add_argument('--key-codes'); a.add_argument('--start-key'); a.add_argument('--poke-addrs'); a.add_argument('--poke-skip', default=''); a.add_argument('--poke-every', type=float, default=2.0)
-    a.add_argument('--block', type=int, default=16); a.add_argument('--exact', action='store_true'); a.add_argument('--out', default='dumps/executed.txt'); a.add_argument('--merge', action='store_true'); a.add_argument('--preset', default='model-b-8271-disc'); a.add_argument('--mos'); a.add_argument('--timeout', type=int, default=240)
+    a.add_argument('--block', type=int, default=16); a.add_argument('--exact', action='store_true'); a.add_argument('--out', default='dumps/executed.txt'); a.add_argument('--merge', action='store_true'); a.add_argument('--preset', default='model-b-8271-disc'); a.add_argument('--mos'); a.add_argument('--timeout', type=int, default=240); a.add_argument('--union', nargs='+', metavar='FILE')
     args = a.parse_args(); cfg = config(args.root)
+    if args.union: return union(args)
     media = args.media or cfg.get('HANDOFF_MEDIA'); hp = args.handoff or cfg.get('HANDOFF_PC'); mos = args.mos or cfg.get('BBC_MOS') or None
     if not media or not hp: sys.exit('need --media and --handoff (or HANDOFF_MEDIA and HANDOFF_PC in project.config)')
     media = media if os.path.isabs(media) else os.path.join(args.root, media)

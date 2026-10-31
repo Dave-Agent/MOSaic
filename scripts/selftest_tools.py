@@ -747,6 +747,14 @@ if _gh and os.path.exists(os.path.join(_gh, 'support', 'analyzeHeadless')) and o
     check('ghidra setup: a seed inside an instruction, in defined data or outside the image is reported with its reason and its note (and printed, with the totals)', 'inside the instruction at $2000   (sample 99)' in _rt and 'defined data' in _rt and 'no bytes there' in _rt and 'seeds: 1 new disassembly start(s), 0 already code, 3 failed' in r.stdout, r.stdout[-1500:] + r.stderr[-500:] + _rt)
 else: print('SKIP ghidra setup: no Ghidra or no local exporter (GHIDRA_HOME, GHIDRA_EXPORTER)')
 
+# ---- coverage.py --union: the counts of several runs are added, no emulator needed -----------------------------------------------------------------------------------
+_ud = tempfile.mkdtemp(prefix='bbcun_'); open(os.path.join(_ud, 'a.txt'), 'w').write('# run a\n2000 5\n2003 2\n'); open(os.path.join(_ud, 'b.txt'), 'w').write('# run b\n2000 1\n2008 7\n')
+r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'platform', 'bbc', 'emulator', 'coverage.py'), '--root', _ud, '--union', 'a.txt', 'b.txt', '--out', 'u.txt'], capture_output=True, text=True)
+_ut = open(os.path.join(_ud, 'u.txt')).read() if os.path.exists(os.path.join(_ud, 'u.txt')) else ''
+check('coverage --union: the counts of the files are summed per address and the header says so, with no emulator', r.returncode == 0 and '2000 6\n2003 2\n2008 7\n' in _ut and 'union of 2' in _ut and '3 distinct instructions' in r.stdout, r.stdout + r.stderr + _ut)
+r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'platform', 'bbc', 'emulator', 'coverage.py'), '--root', _ud, '--union', 'a.txt', 'missing.txt', '--out', 'v.txt'], capture_output=True, text=True)
+check('coverage --union: a missing file is an error and writes nothing', r.returncode != 0 and 'no such coverage file' in r.stderr + r.stdout and not os.path.exists(os.path.join(_ud, 'v.txt')), r.stdout + r.stderr)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')
