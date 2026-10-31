@@ -274,6 +274,12 @@ except SystemExit as _e: _ok = 'no platform' in str(_e) and 'c64' in str(_e) and
 check('platform for_project: an unknown PLATFORM names the platforms there are', _ok)
 open(os.path.join(_pp, 'project.config'), 'a').write('PLATFORM="nes"\n')
 check('platform for_project: PLATFORM="nes" gives the NES (decimal mode off, no on-chip port, the reset vector is the cartridge start)', (lambda n: n['id'] == 'nes' and n['cpu']['decimal_mode'] is False and n['cpu']['onchip_port'] is None and n['boot']['cartridge_cold_start'] == 'FFFC')(_pf.for_project(_pp)))
+_mm = _pf.mapper_find('nes', 'mmc3'); _ux = _pf.mapper_find('nes', 2); _st, _hit = _pf.mapper_write(_mm, _pf.mapper_state(_mm), 0x8000, 0x06); _st, _ = _pf.mapper_write(_mm, _st, 0x8001, 5)
+check('mapper mmc3: a bank select then a bank data write set R6; $8000 reads bank R6 in mode 0 and the second last bank in mode 1', _hit == 'bank select' and _st['R6'] == 5 and _pf.mapper_window(_mm, 'prg', 0x8000, 0x20000, _st)[1:] == (5, 0xA000) and _pf.mapper_window(_mm, 'prg', 0x8000, 0x20000, dict(_st, prg_mode=1))[1] == 14)
+check('mapper mmc3: the last 8 KB is fixed, an odd address of a pair is another register, and CHR inversion swaps the 2 KB banks', _pf.mapper_window(_mm, 'prg', 0xFFFF, 0x20000, _st)[2] == 0x1FFFF and _pf.mapper_write(_mm, _st, 0x8001, 0)[1] == 'bank data' and _pf.mapper_window(_mm, 'chr', 0x0400, 0x20000, dict(_st, R0=7))[2] == 0x1C00 and _pf.mapper_window(_mm, 'chr', 0x0400, 0x20000, dict(_st, R3=9, chr_invert=1))[2] == 9 * 0x400)
+check('mapper uxrom: a write anywhere in $8000-$FFFF selects the bank at $8000, the last bank stays at $C000', _pf.mapper_window(_ux, 'prg', 0x8000, 0x40000, _pf.mapper_write(_ux, _pf.mapper_state(_ux), 0xC123, 3)[0])[1] == 3 and _pf.mapper_window(_ux, 'prg', 0xC000, 0x40000, _pf.mapper_state(_ux))[1] == 15)
+_bad = dict(_ux, registers=[dict(_ux['registers'][0], set={'prg_bank': 'nonsense + d'})])
+check('mapper validation: an expression that names no state is reported', _pf.validate_mapper(_bad) != [] and _pf.validate_mapper(_ux) == [])
 
 # ---- layout_plan.py: every tool is classified (shared / cpu / platform / backend), and the plan agrees with the disk ----------------------------------------------------
 _r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_plan.py'), 'check'], capture_output=True, text=True)

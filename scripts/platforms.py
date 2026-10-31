@@ -7,6 +7,8 @@
   platforms.py get ID PATH                one value, PATH dotted (`memory.banking.register`, `chips.0.lo`)
   platforms.py visible ID ADDR [PORT]     what the CPU sees at ADDR (hex) when the banking register holds PORT (hex, default 07)
   platforms.py mirror ID ADDR             the register address a mirror of a chip answers on (as apply_libs.py does)
+  platforms.py mapper-write ID MAPPER ADDR VALUE [ADDR VALUE ...]      the mapper state after CPU writes (hex); MAPPER is the iNES number or the name
+  platforms.py mapper-window ID MAPPER SPACE ADDR ROMSIZE [NAME=VALUE ...]   which bank and ROM offset ADDR reads (SPACE prg|chr, ROMSIZE hex bytes)
 
 A project names its platform in project.config (`PLATFORM="c64"`; the default is c64, so a project that has no such key is unchanged). Tools read what they need from the descriptor instead
 of assuming it; references/platform_descriptor.md says what each section is for and which tool reads it. Standard library only."""
@@ -128,6 +130,85 @@ def mirror(d, a):
         if c.get('mirror_step') and addr(c['lo']) <= a <= addr(c['hi']): return addr(c['lo']) + (a - addr(c['lo'])) % addr(c['mirror_step'])
     return a
 
+# ---- mappers: bank switching done by the cartridge (platforms/<id>/mappers/<name>.json) ----
+def mapper_dir(pid): return os.path.join(PLATFORMS, pid, 'mappers')
+
+def mappers(pid):
+    """{iNES number: mapper description} of a platform that has mapper files (empty for one that has none)."""
+    d = mapper_dir(pid)
+    out = {}
+    for f in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+        if f.endswith('.json'): m = json.load(open(os.path.join(d, f))); m['_file'] = f; out[m['ines']] = m
+    return out
+
+def mapper_find(pid, key):
+    """A mapper by iNES number or by name (case does not matter)."""
+    for n, m in mappers(pid).items():
+        if str(n) == str(key) or m['name'].lower() == str(key).lower(): return m
+    sys.exit('platform %s has no mapper %r (it has: %s)' % (pid, key, ', '.join('%d %s' % (n, m['name']) for n, m in mappers(pid).items()) or 'none'))
+
+def _mexpr(expr, state):
+    names = set(re.findall(r'[A-Za-z_]\w*', expr))
+    if not re.fullmatch(r'[A-Za-z0-9_ ()&|+\-<>=!^~]+', expr) or not names <= set(state) | {'d', 'and', 'or', 'not'}:
+        raise ValueError('bad mapper expression %r' % expr)
+    return eval(expr, {'__builtins__': {}}, state)
+
+def mapper_state(m): return dict(m['state'])
+
+def mapper_write(m, state, a, value):
+    """The state after the CPU writes `value` to address `a`; also the name of the register hit (None when none decodes it)."""
+    st = dict(state)
+    for r in m['registers']:
+        if a & addr(r['mask']) == addr(r['value']):
+            env = dict(st, d=value)
+            for k, e in r.get('set', {}).items():
+                key = k.format(**st)
+                if key not in st: raise ValueError('%s: no state %r' % (m['name'], key))
+                st[key] = _mexpr(e, env)
+            return st, r['name']
+    return st, None
+
+def mapper_window(m, space, a, rom_size, state):
+    """(window span, bank, ROM offset) that address `a` of the CPU (space `prg`) or PPU (`chr`) reads from a ROM of rom_size bytes; None outside every window."""
+    unit = addr(m[space + '_unit']); count = max(rom_size // unit, 1)
+    for w in m[space]:
+        lo, hi = span(w.get('cpu') or w['ppu'])
+        if not lo <= a <= hi: continue
+        for alt in w['bank']:
+            if 'when' in alt and not _mexpr(alt['when'], state): continue
+            b = _mexpr(str(alt['bank']), state); b = (count + b if b < 0 else b) % count
+            return (lo, hi), b, b * unit + (a - lo)
+    return None
+
+def validate_mapper(m):
+    bad = []
+    for k in ('ines', 'name', 'prg_unit', 'chr_unit', 'state', 'registers', 'prg', 'chr'):
+        if k not in m: bad.append('no `%s`' % k)
+    if bad: return bad
+    if m['schema'] != 1: bad.append('schema must be 1')
+    try:
+        if not isinstance(m['ines'], int): bad.append('ines must be a number')
+        if not (_hex(m['prg_unit']) and _hex(m['chr_unit'])): bad.append('prg_unit and chr_unit must be hex')
+        for r in m['registers']:
+            if not (_hex(r.get('mask')) and _hex(r.get('value'))): bad.append('register %s: mask and value must be hex' % r.get('name'))
+            elif addr(r['value']) & ~addr(r['mask']): bad.append('register %s: value has bits outside the mask' % r['name'])
+        if bad: return bad
+        for space, key in (('prg', 'cpu'), ('chr', 'ppu')):
+            spans = sorted(span(w[key]) for w in m[space])
+            for (a0, a1), (b0, b1) in zip(spans, spans[1:]):
+                if b0 <= a1: bad.append('%s windows overlap at %04X' % (space, b0))
+            for w in m[space]:
+                if not w['bank'] or 'when' in w['bank'][-1]: bad.append('%s window %s: the last alternative must have no `when`' % (space, w[key]))
+        # every register written with several values, and every window resolved
+        for v in (0, 0xFF, 0x5A, 0xC7):
+            st = mapper_state(m)
+            for r in m['registers']:
+                st, _ = mapper_write(m, st, addr(r['value']), v)
+                for sp in ('prg', 'chr'):
+                    for w in m[sp]: mapper_window(m, sp, span(w.get('cpu') or w['ppu'])[0], 0x40000, st)
+    except (ValueError, KeyError, TypeError) as e: bad.append(str(e))
+    return bad
+
 def get(d, path):
     for k in path.split('.'):
         d = d[int(k)] if isinstance(d, list) else d[k]
@@ -135,7 +216,7 @@ def get(d, path):
 
 def main():
     a = sys.argv[1:]
-    if not a or a[0] not in ('list', 'check', 'show', 'get', 'visible', 'mirror'): print(__doc__); return 2
+    if not a or a[0] not in ('list', 'check', 'show', 'get', 'visible', 'mirror', 'mapper-write', 'mapper-window'): print(__doc__); return 2
     c = a[0]
     if c == 'list':
         for i in ids(): d = load(i); print('%-10s %s (%s)' % (i, d['name'], d['cpu']['variant']))
@@ -146,7 +227,21 @@ def main():
             bad = validate(load(i)); print('%s: %s' % (i, 'ok' if not bad else '%d problem(s)' % len(bad)))
             for b in bad: print('  - ' + b)
             rc |= bool(bad)
+            for n, m in mappers(i).items():
+                mb = validate_mapper(m); print('%s mapper %d %s: %s' % (i, n, m['name'], 'ok' if not mb else '%d problem(s)' % len(mb)))
+                for b in mb: print('  - ' + b)
+                rc |= bool(mb)
         return rc
+    if c in ('mapper-write', 'mapper-window'):
+        m = mapper_find(a[1], a[2]); st = mapper_state(m)
+        if c == 'mapper-write':          # ID MAPPER ADDR VALUE [ADDR VALUE ...]: the state after a series of writes
+            for x, v in zip(a[3::2], a[4::2]):
+                st, hit = mapper_write(m, st, addr(x), int(v, 16)); print('%s <- %s: %s' % (x.upper(), v, hit or 'no register'))
+            print(json.dumps(st)); return 0
+        for kv in a[6:]:                 # ID MAPPER SPACE ADDR ROMSIZE [NAME=VALUE ...]
+            k, _, v = kv.partition('='); st[k] = int(v, 0)
+        w = mapper_window(m, a[3], addr(a[4]), addr(a[5]), st)
+        print('not mapped' if not w else 'window %04X-%04X bank %d ROM offset %X' % (w[0][0], w[0][1], w[1], w[2])); return 0
     d = load(a[1])
     if c == 'show': print(json.dumps(d, indent=2)); return 0
     if c == 'get': v = get(d, a[2]); print(json.dumps(v) if isinstance(v, (dict, list)) else v); return 0

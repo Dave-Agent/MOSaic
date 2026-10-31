@@ -62,15 +62,24 @@ The directories follow the same split as the descriptor (a platform's data is in
 ## What the NES descriptor showed
 `platforms/nes/platform.json` is written to test the format. It passes `platforms.py check`, but only because it keeps what the schema cannot say as prose or as extra keys; each gap is listed in the descriptor's `schema_gaps`:
 - A **mirror** (the 2 KB of work RAM repeats up to `$1FFF`) is a note (`mirror_of`), not a field the tools read.
-- A **mapper** is not one banking register with named bits at one CPU address (`memory.banking`); it is code on the cartridge, so the NES has `memory.mapper` in prose and `banking: null`.
+- A **mapper** is not one banking register with named bits at one CPU address (`memory.banking`); it is separate data per mapper (see Mappers), so the NES has `banking: null`.
 - **`video.memory`** is a second address space (the PPU's 16 KB) the CPU cannot read directly; the C64's VIC reads the CPU's own memory through banks.
 - **Cycles per line** is fractional on NTSC (113.667), so the NES says dots per line and dots per CPU cycle where the C64 says `cycles_per_line`.
 - **Boot** has no hand-off and no load address, only the reset vector.
 - **CPU**: the 2A03 is a 6502 with no decimal mode and no on-chip port (`decimal_mode: false`, `onchip_port: null`); the sound unit is on the CPU die. The `cpu/6502` tools are one family with variants read from the descriptor, not a directory per chip.
+
+## Mappers
+Cartridge mappers differ in kind (one write-anywhere register, an index/data pair, a serial shift register), so a mapper is its own file, `platforms/<id>/mappers/<name>.json`, chosen by the iNES header's mapper number. Mesen implements its mappers as C++ code, not as data, so these are written from the nesdev wiki's mapper pages and are to be checked by running a program under Mesen. A mapper file holds:
+- `state`: the named values the cartridge keeps, with initial values (`R6`, `prg_mode` ...).
+- `registers`: each has the `mask` and `value` an address must match to hit it, and `set`, the state it changes from the written byte `d` (a key such as `R{reg_index}` picks a state name from the state).
+- `prg` and `chr`: the windows (`cpu` or `ppu` span) and a list of alternatives for the bank number, the first whose `when` is true; a negative bank counts from the end (`-1` is the last bank). `prg_unit` and `chr_unit` are the size the bank numbers count in. `irq` and `bus_conflicts` are notes.
+
+`platforms.py mapper-write` replays writes into the state and `mapper-window` says which bank and ROM offset an address reads. Only MMC3 (4) and UxROM (2) exist; MMC3 is checked against nothing but the prototype's use of it, UxROM against nothing. MMC1's serial register needs an effect the format does not have yet (a shift register); that is the next thing a third mapper would show.
+
 No register libraries exist for the NES yet (`libs: []`), and no tool reads the NES descriptor: `used_by` is empty on purpose.
 
 ## Open design questions
-- **The reference image.** The gate compares one flat image. A NES cartridge is a header and banked ROM: the descriptor needs a `layout` (flat or banked, bank size, mapper) and the gate a way to compare banks. This is the real test of the format.
+- **The reference image.** The gate compares one flat image. A NES cartridge is a header and banked ROM: the descriptor needs a `layout` (flat or banked, bank size, mapper) and the gate a way to compare banks. The mapper files say what is visible where; how the gate compares banks is not designed.
 - **Hand-off.** A cartridge starts at the reset vector with no loader and no BASIC stub; `boot` has to say so, and `new_project.py` and the HOWTO steps that talk about hand-off have to follow.
 - **The model's interface.** Table-driven (the descriptor describes the chips) or code (one machine file each)? The chips' behaviour is code; the descriptor can only give parameters.
 - **The renderer.** `gfx_sheets.py` is a VIC-II renderer; the PPU has a different model (pattern tables, nametables, OAM).

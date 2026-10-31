@@ -1,0 +1,215 @@
+{
+  "schema": 1,
+  "ines": 4,
+  "name": "MMC3",
+  "doc": "Nintendo MMC3 (TxROM boards). Registers come in pairs: the even address of each pair, then the odd one. Written from the nesdev wiki's mapper description; checked against the ../nes prototype only so far.",
+  "prg_unit": "2000",
+  "chr_unit": "0400",
+  "state": {
+    "reg_index": 0,
+    "prg_mode": 0,
+    "chr_invert": 0,
+    "R0": 0,
+    "R1": 0,
+    "R2": 0,
+    "R3": 0,
+    "R4": 0,
+    "R5": 0,
+    "R6": 0,
+    "R7": 0
+  },
+  "registers": [
+    {
+      "name": "bank select",
+      "mask": "E001",
+      "value": "8000",
+      "set": {
+        "reg_index": "d & 7",
+        "prg_mode": "d >> 6 & 1",
+        "chr_invert": "d >> 7 & 1"
+      }
+    },
+    {
+      "name": "bank data",
+      "mask": "E001",
+      "value": "8001",
+      "set": {
+        "R{reg_index}": "d"
+      }
+    },
+    {
+      "name": "mirroring",
+      "mask": "E001",
+      "value": "A000",
+      "doc": "bit 0: 0 vertical, 1 horizontal"
+    },
+    {
+      "name": "PRG RAM protect",
+      "mask": "E001",
+      "value": "A001"
+    },
+    {
+      "name": "IRQ latch",
+      "mask": "E001",
+      "value": "C000"
+    },
+    {
+      "name": "IRQ reload",
+      "mask": "E001",
+      "value": "C001"
+    },
+    {
+      "name": "IRQ disable and acknowledge",
+      "mask": "E001",
+      "value": "E000"
+    },
+    {
+      "name": "IRQ enable",
+      "mask": "E001",
+      "value": "E001"
+    }
+  ],
+  "prg": [
+    {
+      "cpu": "8000-9FFF",
+      "bank": [
+        {
+          "when": "prg_mode == 0",
+          "bank": "R6 & 63"
+        },
+        {
+          "bank": "-2"
+        }
+      ]
+    },
+    {
+      "cpu": "A000-BFFF",
+      "bank": [
+        {
+          "bank": "R7 & 63"
+        }
+      ]
+    },
+    {
+      "cpu": "C000-DFFF",
+      "bank": [
+        {
+          "when": "prg_mode == 0",
+          "bank": "-2"
+        },
+        {
+          "bank": "R6 & 63"
+        }
+      ]
+    },
+    {
+      "cpu": "E000-FFFF",
+      "bank": [
+        {
+          "bank": "-1"
+        }
+      ]
+    }
+  ],
+  "chr": [
+    {
+      "ppu": "0000-03FF",
+      "bank": [
+        {
+          "when": "chr_invert == 0",
+          "bank": "R0 & 254"
+        },
+        {
+          "bank": "R2"
+        }
+      ]
+    },
+    {
+      "ppu": "0400-07FF",
+      "bank": [
+        {
+          "when": "chr_invert == 0",
+          "bank": "R0 | 1"
+        },
+        {
+          "bank": "R3"
+        }
+      ]
+    },
+    {
+      "ppu": "0800-0BFF",
+      "bank": [
+        {
+          "when": "chr_invert == 0",
+          "bank": "R1 & 254"
+        },
+        {
+          "bank": "R4"
+        }
+      ]
+    },
+    {
+      "ppu": "0C00-0FFF",
+      "bank": [
+        {
+          "when": "chr_invert == 0",
+          "bank": "R1 | 1"
+        },
+        {
+          "bank": "R5"
+        }
+      ]
+    },
+    {
+      "ppu": "1000-13FF",
+      "bank": [
+        {
+          "when": "chr_invert == 0",
+          "bank": "R2"
+        },
+        {
+          "bank": "R0 & 254"
+        }
+      ]
+    },
+    {
+      "ppu": "1400-17FF",
+      "bank": [
+        {
+          "when": "chr_invert == 0",
+          "bank": "R3"
+        },
+        {
+          "bank": "R0 | 1"
+        }
+      ]
+    },
+    {
+      "ppu": "1800-1BFF",
+      "bank": [
+        {
+          "when": "chr_invert == 0",
+          "bank": "R4"
+        },
+        {
+          "bank": "R1 & 254"
+        }
+      ]
+    },
+    {
+      "ppu": "1C00-1FFF",
+      "bank": [
+        {
+          "when": "chr_invert == 0",
+          "bank": "R5"
+        },
+        {
+          "bank": "R1 | 1"
+        }
+      ]
+    }
+  ],
+  "irq": "a counter clocked by rises of PPU address line A12 (so by the sprite pattern fetch of each scanline), reloaded from the latch, raising the CPU IRQ when it reaches 0 and is enabled",
+  "bus_conflicts": false,
+  "chr_note": "R0 and R1 select 2 KB banks (the low bit is ignored), so each takes two 1 KB windows; R2-R5 select 1 KB banks"
+}
