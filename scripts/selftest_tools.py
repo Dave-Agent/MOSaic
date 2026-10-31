@@ -635,6 +635,28 @@ if _has_b:
     check('handoff_dump: a hand-off that is never reached is reported and fails (no silent dump)', r.returncode == 1 and 'was not reached' in r.stdout and not os.path.exists(os.path.join(_hdir, 'dumps', 'never_0.bin')), r.stdout + r.stderr)
 else: print('SKIP handoff_dump: no Beebium client (set BEEBIUM_PYTHON to a Python that has it)')
 
+# ---- coverage.py: a key held by its INKEY code and a poked byte each send a program down a path play does not reach -------------------------------------------------------
+_cv = os.path.join(HERE, 'platform', 'bbc', 'emulator', 'coverage.py')
+if _has_b:
+    _cdir = tempfile.mkdtemp(prefix='bbccv_')
+    # a program with two paths play does not reach: a flag at $2100 (set by a poke), and INKEY(-$9E) (a held key)
+    _kcode = bytes([0xAD, 0x00, 0x21, 0xD0, 0x03, 0x4C, 0x0B, 0x20, 0x4C, 0x08, 0x20,
+                    0xA9, 0x81, 0xA2, 0x9E, 0xA0, 0xFF, 0x20, 0xF4, 0xFF, 0xC0, 0xFF, 0xF0, 0x03, 0x4C, 0x00, 0x20, 0x4C, 0x1B, 0x20])
+    # 2000 LDA $2100 / 2003 BNE $2008 / 2005 JMP $200B / 2008 JMP $2008 / 200B..: INKEY / 2016 BEQ $201B / 2018 JMP $2000 / 201B JMP $201B
+    _cdisc = os.path.join(_cdir, 'game.ssd'); open(_cdisc, 'wb').write(_dfs_image([('!BOOT', '$', 0, 0, b'*RUN TEST\r', False), ('TEST', '$', 0x2000, 0x2000, _kcode, False)], boot=3, title='CVTEST'))
+    def _cov(*extra):
+        out = os.path.join(_cdir, 'x.txt')
+        if os.path.exists(out): os.remove(out)
+        rr = subprocess.run([sys.executable, '-B', _cv, '--root', _cdir, '--media', 'game.ssd', '--handoff', '2000', '--ranges', '2000-201E', '--exact', '--out', 'x.txt', '--timeout', '120'] + list(extra), capture_output=True, text=True)
+        return rr, ({l.split()[0].upper() for l in open(out) if l[0] != '#'} if os.path.exists(out) else set())
+    r, got = _cov('--seconds', '5', '--key-codes', '9E', '--start-key', '9E@1')
+    check('coverage: --start-key presses the key whose INKEY code the program tests (the path behind it runs); without it the path stays unreached', r.returncode == 0 and '201B' in got and '2008' not in got, r.stdout + r.stderr + str(sorted(got)))
+    r, got = _cov('--seconds', '5', '--keys', '1')
+    check('coverage: with no key pressed the key path is not reached', r.returncode == 0 and '201B' not in got and '2018' in got, r.stdout + r.stderr + str(sorted(got)))
+    r, got = _cov('--seconds', '35', '--keys', '1', '--poke-addrs', '2100-2100', '--poke-every', '1')
+    check('coverage: --poke-addrs overwrites bytes after the first 30 emulated seconds (the flag the program polls is set, the path behind it runs)', r.returncode == 0 and '2008' in got, r.stdout + r.stderr + str(sorted(got)))
+else: print('SKIP coverage: no Beebium client (set BEEBIUM_PYTHON to a Python that has it)')
+
 # ---- reloc_map.py: the code a program moves ------------------------------------------------------------------------------------------------------------------------------
 import random as _rnd
 _r = _rnd.Random(5); _ref = bytes(_r.randrange(256) for _ in range(2000)); _dump = bytearray(0x8000)
