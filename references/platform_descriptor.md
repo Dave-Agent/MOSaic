@@ -59,6 +59,16 @@ The directories follow the same split as the descriptor (a platform's data is in
 6. **A second platform.** The NES as the second instance: a descriptor, a machine model, an emulator adapter (a headless Mesen test already exists in a prototype), a renderer for the PPU.
 7. **A byte-identical NES project** as the proof.
 
+## What the NES descriptor showed
+`platforms/nes/platform.json` is written to test the format. It passes `platforms.py check`, but only because it keeps what the schema cannot say as prose or as extra keys; each gap is listed in the descriptor's `schema_gaps`:
+- A **mirror** (the 2 KB of work RAM repeats up to `$1FFF`) is a note (`mirror_of`), not a field the tools read.
+- A **mapper** is not one banking register with named bits at one CPU address (`memory.banking`); it is code on the cartridge, so the NES has `memory.mapper` in prose and `banking: null`.
+- **`video.memory`** is a second address space (the PPU's 16 KB) the CPU cannot read directly; the C64's VIC reads the CPU's own memory through banks.
+- **Cycles per line** is fractional on NTSC (113.667), so the NES says dots per line and dots per CPU cycle where the C64 says `cycles_per_line`.
+- **Boot** has no hand-off and no load address, only the reset vector.
+- **CPU**: the 2A03 is a 6502 with no decimal mode and no on-chip port (`decimal_mode: false`, `onchip_port: null`); the sound unit is on the CPU die. The `cpu/6502` tools are one family with variants read from the descriptor, not a directory per chip.
+No register libraries exist for the NES yet (`libs: []`), and no tool reads the NES descriptor: `used_by` is empty on purpose.
+
 ## Open design questions
 - **The reference image.** The gate compares one flat image. A NES cartridge is a header and banked ROM: the descriptor needs a `layout` (flat or banked, bank size, mapper) and the gate a way to compare banks. This is the real test of the format.
 - **Hand-off.** A cartridge starts at the reset vector with no loader and no BASIC stub; `boot` has to say so, and `new_project.py` and the HOWTO steps that talk about hand-off have to follow.

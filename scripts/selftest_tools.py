@@ -268,10 +268,12 @@ check('platform validate: overlapping regions, a gap, a bad hex value, a chip ou
       and any('not inside an io region' in p for p in _mut(lambda d: d['chips'][0].__setitem__('lo', '0400'))) and any('may use only' in p for p in _mut(lambda d: d['memory']['banking']['visible'][0].__setitem__('when', 'FOO and LORAM'))) and any('no `media`' in p for p in _mut(lambda d: d.pop('media'))))
 _pp = project('Start:\n  rts  // [0800:60 RTS]\n')
 check('platform for_project: a project with no PLATFORM key is the c64', _pf.for_project(_pp)['id'] == 'c64')
-open(os.path.join(_pp, 'project.config'), 'a').write('PLATFORM="nes"\n')
+open(os.path.join(_pp, 'project.config'), 'a').write('PLATFORM="no-such-machine"\n')
 try: _pf.for_project(_pp); _ok = False
-except SystemExit as _e: _ok = 'no platform' in str(_e) and 'c64' in str(_e)
+except SystemExit as _e: _ok = 'no platform' in str(_e) and 'c64' in str(_e) and 'nes' in str(_e)
 check('platform for_project: an unknown PLATFORM names the platforms there are', _ok)
+open(os.path.join(_pp, 'project.config'), 'a').write('PLATFORM="nes"\n')
+check('platform for_project: PLATFORM="nes" gives the NES (decimal mode off, no on-chip port, the reset vector is the cartridge start)', (lambda n: n['id'] == 'nes' and n['cpu']['decimal_mode'] is False and n['cpu']['onchip_port'] is None and n['boot']['cartridge_cold_start'] == 'FFFC')(_pf.for_project(_pp)))
 
 # ---- layout_plan.py: every tool is classified (shared / cpu / platform / backend), and the plan agrees with the disk ----------------------------------------------------
 _r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'layout_plan.py'), 'check'], capture_output=True, text=True)

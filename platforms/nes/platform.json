@@ -1,0 +1,129 @@
+{
+  "_doc": "The Nintendo Entertainment System as data (issue #39): the second descriptor, written to test whether the schema is C64-shaped. What does not fit is listed under `schema_gaps`; every value here is a fact of the hardware or of the ../nes feasibility prototype, nothing is guessed. Addresses are hex strings without a prefix. Schema and rules: references/platform_descriptor.md.",
+  "schema": 1,
+  "id": "nes",
+  "name": "Nintendo Entertainment System",
+  "family": "6502",
+  "cpu": {
+    "variant": "2A03",
+    "variants": {"2A03": "NTSC", "2A07": "PAL"},
+    "assembler": {
+      "kick": "_6502",
+      "kick_without_illegal_opcodes": "_6502NoIllegals"
+    },
+    "decimal_mode": false,
+    "decimal_mode_doc": "The D flag can be set and cleared, but ADC and SBC ignore it: arithmetic is always binary.",
+    "illegal_opcodes": "the same undocumented ones as the 6502 exist; a game rarely uses them",
+    "onchip_port": null,
+    "onchip_apu": {"lo": "4000", "hi": "4017", "doc": "The sound unit sits on the CPU die; its registers are in the CPU's address space."},
+    "vectors": {"nmi": "FFFA", "reset": "FFFC", "irq": "FFFE"},
+    "used_by": ["scripts/cpu/6502", "scripts/ghidra/make_seeds.py"]
+  },
+  "memory": {
+    "size": 65536,
+    "regions": [
+      {"name": "zero page", "lo": "0000", "hi": "00FF", "kind": "ram"},
+      {"name": "stack", "lo": "0100", "hi": "01FF", "kind": "ram"},
+      {"name": "work RAM", "lo": "0200", "hi": "07FF", "kind": "ram"},
+      {"name": "work RAM mirrors", "lo": "0800", "hi": "1FFF", "kind": "ram", "mirror_of": "0000-07FF"},
+      {"name": "PPU registers", "lo": "2000", "hi": "3FFF", "kind": "io"},
+      {"name": "APU and I/O registers", "lo": "4000", "hi": "401F", "kind": "io"},
+      {"name": "cartridge space", "lo": "4020", "hi": "5FFF", "kind": "io", "doc": "decoded by the cartridge's mapper, if at all"},
+      {"name": "PRG RAM", "lo": "6000", "hi": "7FFF", "kind": "ram", "optional": true, "doc": "on the cartridge, often battery backed"},
+      {"name": "PRG ROM", "lo": "8000", "hi": "FFFF", "kind": "rom", "banked_by": "mapper"}
+    ],
+    "banking": null,
+    "mapper": {
+      "declared_in": "iNES header: the high nibble of byte 6 (low) and of byte 7 (high)",
+      "doc": "Which part of the PRG ROM (and of the CHR ROM or RAM) is visible, and at which addresses, is decided by registers on the cartridge, written by the program itself; it is not one register at a fixed CPU address.",
+      "seen": [{"id": 4, "name": "MMC3", "where": "the ../nes feasibility prototype", "doc": "PRG windows through R6 ($8000-$9FFF) and R7 ($A000-$BFFF), the rest fixed; CHR banks through R0-R5; a scanline counter IRQ"}]
+    },
+    "rom_images": {},
+    "used_by": ["scripts/cpu/6502/raw_refs.py", "scripts/check_env.py"]
+  },
+  "chips": [
+    {"name": "PPU", "scope": "PPU", "lo": "2000", "hi": "3FFF", "mirror_step": "8", "registers": "2000-2007", "role": "video; its own 16 KB address space (see video.memory)"},
+    {"name": "APU and I/O", "scope": "APU", "lo": "4000", "hi": "401F", "registers": "4000-4017", "role": "sound ($4000-$4013, $4015, $4017 frame counter), sprite DMA ($4014), controllers ($4016, $4017)"}
+  ],
+  "libs": [],
+  "libs_doc": "No register libraries yet (a ppu.asm and an apu.asm in the style of vic.asm are to be written from the hardware documentation); until then the chips carry no `lib` and apply_libs has nothing to name.",
+  "video": {
+    "chip": "PPU",
+    "resolution": {"width": 256, "height": 240},
+    "standard": {
+      "ntsc": {"lines": 262, "dots_per_line": 341, "dots_per_cpu_cycle": "3"},
+      "pal": {"lines": 312, "dots_per_line": 341, "dots_per_cpu_cycle": "3.2"}
+    },
+    "modelled_standard": null,
+    "memory": {
+      "size": 16384,
+      "regions": [
+        {"name": "pattern tables", "lo": "0000", "hi": "1FFF", "kind": "mapper", "doc": "CHR ROM or CHR RAM on the cartridge, banked by the mapper"},
+        {"name": "nametables", "lo": "2000", "hi": "2FFF", "kind": "ram", "doc": "2 KB of video RAM, mirrored by the cartridge's wiring or the mapper"},
+        {"name": "palettes", "lo": "3F00", "hi": "3F1F", "kind": "ram"}
+      ],
+      "oam": {"size": 256, "doc": "sprite memory inside the PPU, filled by DMA from a CPU page through $4014"}
+    },
+    "tiles": {"size": 8, "nametable": {"columns": 32, "rows": 30}},
+    "sprites": {"count": 64, "per_scanline": 8, "sizes": ["8x8", "8x16"], "bytes_per_sprite": 4},
+    "used_by": []
+  },
+  "input": {
+    "controllers": 2,
+    "read": {"strobe": "4016", "ports": ["4016", "4017"], "doc": "a serial shift register: strobe, then eight reads per controller"},
+    "buttons": ["A", "B", "Select", "Start", "Up", "Down", "Left", "Right"],
+    "used_by": []
+  },
+  "boot": {
+    "container": "iNES",
+    "header_bytes": 16,
+    "entry": "the reset vector at FFFC",
+    "load_address": null,
+    "basic_stub": false,
+    "hand_off": null,
+    "cartridge_cold_start": "FFFC",
+    "used_by": []
+  },
+  "media": {
+    "types": ["nes"],
+    "tools": {},
+    "used_by": []
+  },
+  "emulator": {
+    "name": "Mesen",
+    "binary": "Mesen",
+    "binary_env": "MESEN",
+    "headless": ["--testRunner", "SCRIPT.lua", "ROM", "--timeout=N"],
+    "headless_doc": "runs a Lua script against the ROM and exits; the ../nes prototype takes screenshots as artifacts this way",
+    "never_attach_originals": true,
+    "used_by": []
+  },
+  "dump_noise": {
+    "doc": "RAM at power-on is undefined: unless the program clears it, any cell of $0000-$07FF can differ from run to run.",
+    "cells": [{"lo": "0000", "hi": "07FF", "what": "work RAM at power-on"}],
+    "port": null
+  },
+  "hardware_markers": {
+    "doc": "What port_scan and platform_deps look for. There is no raster register: the PPU offers a vblank flag and a sprite-0 hit.",
+    "kernal_jump_table": null,
+    "raster_register": null,
+    "vblank_register": "2002",
+    "interrupt_flags": ["2002", "4015"],
+    "used_by": []
+  },
+  "tracer": {
+    "model": null,
+    "start": {"sp": "FD", "p": "34", "port": null},
+    "doc": "The reset state of the 6502 core (SP = $FD, I set). No NES machine model exists in the skill yet.",
+    "used_by": []
+  },
+  "schema_gaps": [
+    "memory.regions: a mirror (work RAM repeats every 2 KB up to $1FFF) has no field in the schema; `mirror_of` is only a note here",
+    "memory.banking: a mapper is not a register at one CPU address with named bits; it is described in prose under memory.mapper",
+    "memory.regions.kind: `rom` that is bank-switched by the cartridge is not the C64's `rom` that hides `under` ram",
+    "video.memory: a second address space (the PPU's own 16 KB) that the CPU cannot read directly",
+    "video.standard: cycles per line is fractional (113.667 on NTSC), so `cycles_per_line` is replaced by `dots_per_line` and `dots_per_cpu_cycle`",
+    "boot: there is no hand-off and no load address: a cartridge starts at the reset vector",
+    "cpu: `decimal_mode` is false and there is no on-chip port"
+  ]
+}
