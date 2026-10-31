@@ -6,6 +6,8 @@
 Installed version: the VERSION file of the skill, else `git describe --tags`. Releases: the tags of the skill's own git remote (`git ls-remote --tags`, the user's own git access, so a private repository works),
 else `gh api` when the GitHub CLI is installed. One quick read-only request, cached for a day in ~/.cache/mosaic/ (an hour after a failure), 6 s at most, never a prompt. MOSAIC_NO_UPDATE_CHECK=1 turns it off."""
 import json, os, re, subprocess, sys, time
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_REMOTE = 'https://github.com/Dave-Agent/MOSaic.git'
 CACHE = os.path.join(os.environ.get('XDG_CACHE_HOME') or os.path.expanduser('~/.cache'), 'mosaic', 'version_check.json')

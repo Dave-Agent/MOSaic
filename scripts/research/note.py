@@ -7,6 +7,8 @@
 A researcher (references/research.md, "Research on demand") answers ONE specific question from web pages, manuals and scans and hands back a note in this form; the session saves it and runs `check`.
 The note is never evidence for a name by itself (phase1_method.md, the evidence ladder): it says where to look and what to confirm. A prior without a source is not a prior: `check` fails it."""
 import os, re, sys, datetime
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import argparse
 SKELETON = """# Research: {topic}

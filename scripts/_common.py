@@ -1,6 +1,11 @@
 """Shared helpers for the MOSaic scripts. Every script runs from a project root (the directory with project.config) or takes --root."""
 import argparse, glob, os, re, sys
 
+# Progress shows as it happens, also when the output goes to a file or a pipe (a long run would otherwise look hung until it ends). Every tool imports this module.
+for _s in (sys.stdout, sys.stderr):
+    try: _s.reconfigure(line_buffering=True)
+    except (AttributeError, ValueError): pass
+
 def parser(desc, write=True, phase=False):
     full = getattr(sys.modules.get('__main__'), '__doc__', None)                  # --help shows the whole module docstring of the script (its map formats, rules and options)
     p = argparse.ArgumentParser(description=full or desc, formatter_class=argparse.RawDescriptionHelpFormatter)

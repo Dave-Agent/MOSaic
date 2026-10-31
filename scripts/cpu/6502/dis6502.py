@@ -8,6 +8,8 @@
      --follow also print, after the listing, the targets of JMP/JSR/branches found in the range (where to read next)
 Linear disassembly follows no flow: data inside the range prints as nonsense, and an overlapping-code trick shows only one reading. Confirm with a trace (scripts/trace)."""
 import argparse, sys
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 # official 6502 table: opcode -> (mnemonic, mode)
 T={}
 def add(m,modes):

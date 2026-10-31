@@ -849,6 +849,7 @@ static int read_file(const char *path, u8 *dst, size_t n, size_t skip) {
 }
 
 int main(int argc, char **argv) {
+    setvbuf(stdout, NULL, _IOLBF, 0);                           /* progress shows as it happens, also into a file or a pipe */
     const char *ram_path = NULL, *rom_dir = NULL, *out = NULL, *init = NULL;
     const char *selftest_packed = NULL, *selftest_ref = NULL, *dump_path = NULL, *state_path = NULL, *iolog_path = NULL, *memlog_path = NULL;
     unsigned selftest_base = 0x0800, selftest_pc = 0, selftest_sp = 0xFF, selftest_done = 0x10000, selftest_p = 0x34; unsigned long long selftest_cycles = 400000000ull; int selftest_builtin = 0;

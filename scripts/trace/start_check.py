@@ -19,6 +19,8 @@ what to look at.
 
 The state read here is the tracer's --dump (RAM, VIC registers, colour RAM, $DD00) and --state (CIA masks, flags, control, data directions, processor port) at the end of the run. SID is not compared."""
 import argparse, os, subprocess, sys, tempfile
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE))
 from c64env import Env, hexval
 

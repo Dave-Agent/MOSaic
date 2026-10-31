@@ -125,3 +125,4 @@ platform/bbc/media/dfs.py	platform/bbc	platform/bbc/media/dfs.py	reads an Acorn 
 platform/bbc/emulator/handoff_dump.py	platform/bbc	platform/bbc/emulator/handoff_dump.py	boots a scratch copy of a disc in Beebium, stops at the hand-off and dumps RAM and chip state
 platform/bbc/emulator/pc_samples.py	platform/bbc	platform/bbc/emulator/pc_samples.py	samples where a game executes in Beebium: seeds until a BBC machine model exists
 reloc_map.py	shared	reloc_map.py	
+platform/bbc/emulator/stale_probe.py	platform/bbc	platform/bbc/emulator/stale_probe.py	decides by experiment which bytes of the hand-off image the game never needs

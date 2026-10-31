@@ -18,6 +18,8 @@ project.config keys (besides TRACE_RAM, TRACE_ROM_DIR, TRACE_ENTRY (the start: a
 The coverage statistics describe only what ran: rare paths (death, level end, game over, high-score entry) need better input (steering pokes, a scripted play-through).
 """
 import argparse, collections, csv, os, struct, subprocess, sys
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, os.path.dirname(HERE))
 from c64env import Env, hexval
 import selftest

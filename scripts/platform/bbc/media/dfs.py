@@ -9,6 +9,8 @@ Layout: sector 0 holds the first 8 characters of the title and 8 bytes per file 
 high bits of the sector count (bits 0-1), the low byte of the sector count, and 8 bytes per file: load, exec and length (low 16 bits each), then a byte with the high bits (exec 6-7, length 4-5, load 2-3, start sector 0-1) and the low byte of
 the start sector. A .dsd holds the two sides track by track (side 0 then side 1 of track 0, ...), 10 sectors of 256 bytes per track; an .ssd is side 0 only."""
 import json, os, sys
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 
 SECTOR = 256; PER_TRACK = 10
 

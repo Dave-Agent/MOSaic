@@ -7,6 +7,8 @@ The cartridge has 128 KB of PRG in which every byte of bank-unit n is n, and (wh
 replays a list of writes (the mapper's `test.prelude` first, which must write every state value once because power-on values are undefined; then random writes, half to any address of $8000-$FFFF), then reads the first byte of every PRG window and of every CHR window. The same writes go through `platforms.mapper_write`; a difference is printed with the writes. Needs Kick Assembler
 (KICKASS_JAR) and Mesen (MESEN); the code lives at $E100, so the window at $E000 must stay the last bank. Not covered: anything that is not bank state (mirroring, IRQ, RAM protect, bus conflicts)."""
 import os, random, subprocess, sys, tempfile
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..', '..')))
 import platforms as pf
 PRG_SIZE, CHR_SIZE, CODE_AT = 0x20000, 0x40000, 0xE100

@@ -656,6 +656,23 @@ if _has_b:
     check('pc_samples: a two-instruction loop is seen at both of its instructions and nowhere else in the program (interrupts and the OS add their own addresses)', r.returncode == 0 and {'2000', '2002'} <= _seen and '2004' not in _seen and '2001' not in _seen, r.stdout + r.stderr + str(sorted(_seen))[:200])
 else: print('SKIP pc_samples: no Beebium client')
 
+# ---- stale_probe.py (needs the Beebium client) -----------------------------------------------------------------------------------------------------------------------------
+if _has_b:
+    _sp = os.path.join(HERE, 'platform', 'bbc', 'emulator', 'stale_probe.py'); _sdir = tempfile.mkdtemp(prefix='c64sp_')
+    _code = bytes([0xAD, 0x05, 0x30, 0x8D, 0x00, 0x7C, 0x4C, 0x00, 0x20])        # LDA $3005 / STA $7C00 / JMP $2000: reads one byte of the first range and shows it on the teletext screen
+    open(os.path.join(_sdir, 'g.ssd'), 'wb').write(_dfs_image([('!BOOT', '$', 0, 0, b'*RUN TEST\r', False), ('TEST', '$', 0x2000, 0x2000, _code, False)], boot=3, title='SPTEST'))
+    r = subprocess.run([sys.executable, '-B', _sp, '--root', _sdir, '--media', 'g.ssd', '--handoff', '2000', '--ranges', '3000-300F,3100-310F', '--seconds', '3', '--every', '10', '--max-runs', '60', '--granule', '1'], capture_output=True, text=True, env=dict(os.environ))
+    _st = open(os.path.join(_sdir, 'dumps', 'stale.txt')).read() if os.path.exists(os.path.join(_sdir, 'dumps', 'stale.txt')) else ''
+    check('stale_probe: of two stretches a program reads one byte of, the unread stretch is reported dead and the byte that matters is named', r.returncode == 0 and 'dead 3100-310F' in _st and 'needed 3005-3005' in _st and 'dead 3000' not in _st.replace('3006-300F', '').replace('3000-3004', ''), r.stdout[-400:] + _st)
+else: print('SKIP stale_probe: no Beebium client')
+
+# ---- progress shows as it happens: every tool imports _common (line-buffered output), and every recipe runs Python unbuffered ----------------------------------------------------
+r = subprocess.run([sys.executable, '-B', '-c', 'import sys; sys.path.insert(0, %r); import _common; print(sys.stdout.line_buffering)' % HERE], capture_output=True, text=True)
+check('output: a tool that imports _common is line-buffered when its output goes to a pipe (progress shows as it happens)', r.stdout.strip() == 'True', r.stdout + r.stderr)
+check('output: the justfile template exports PYTHONUNBUFFERED and the tracer sets line buffering', 'export PYTHONUNBUFFERED := "1"' in open(os.path.join(HERE, '..', 'templates', 'justfile.in')).read() and 'setvbuf(stdout, NULL, _IOLBF, 0)' in open(os.path.join(HERE, 'trace', 'c64trace.c')).read())
+_nb = [f for f in subprocess.run(['grep', '-rLE', 'from _common import|import _common|line_buffering|^import platforms|from platforms import|^import symbols|runpy', HERE, '--include=*.py'], capture_output=True, text=True).stdout.split() if os.path.getsize(f) > 2500 and 'if __name__' in open(f).read() and '__pycache__' not in f and 'ghidra' not in f and 'selftest' not in f]
+check('output: no tool of any size runs without line-buffered output (add `sys.stdout.reconfigure(line_buffering=True)` or import _common): %s' % ', '.join(os.path.relpath(f, HERE) for f in _nb), not _nb, _nb)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')

@@ -10,6 +10,8 @@ release (fixes, documentation, housekeeping). A MAJOR release is never chosen fr
 Prints `VERSION=X.Y.Z` when there is something to release, nothing when there is not. Without --write nothing is changed. With --write: VERSION is rewritten, committed as `Release X.Y.Z [skip ci]` and
 tagged `vX.Y.Z` (annotated); pushing is the caller's job. --notes FILE writes the release notes (one line per commit, the issues closed)."""
 import argparse, json, os, re, subprocess, sys
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 from version_check import parse, fmt
 

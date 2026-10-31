@@ -2,6 +2,8 @@
 """Self-test of the refactor tools on a tiny synthetic source (no project needed): python3 -B scripts/refactor/selftest.py [-v]. Exits non-zero on the first failing case.
 Positive and negative cases for rename.py / set_comment.py (what a description may replace), map-file newlines, bitskip.py --accept, bytes_to_code.py."""
 import os, subprocess, sys, tempfile, textwrap
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 HERE = os.path.dirname(os.path.abspath(__file__)); VERBOSE = '-v' in sys.argv
 fails = []
 

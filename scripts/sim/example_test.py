@@ -12,6 +12,8 @@ In a project the first lines are instead
     TARGET = symbol('Ns.Routine'); VAR = symbol('Ns.Data.var')       # or a zero-page name; never a literal address
 """
 import os, sys
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from c64sim import Sim
 

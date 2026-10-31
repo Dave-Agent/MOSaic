@@ -2,6 +2,8 @@
 """Self-test of tap_extract.py: a synthetic standard-format tape is built (the KERNAL encoding, written the other way round) and decoded; a damaged first copy, a tape that is only custom pulses and a turbo
 tail after a loader stub are also tried. No emulator, no real tape: python3 -B scripts/tape/selftest.py"""
 import os, subprocess, sys, tempfile, hashlib, random
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 HERE = os.path.dirname(os.path.abspath(__file__)); fails = []
 S, M, L = 48, 66, 86
 def check(name, cond, info=''):

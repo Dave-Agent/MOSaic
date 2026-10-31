@@ -11,6 +11,8 @@ NAME is a label path from the symbol file or a hex address (`$66`); a watch on a
 itself carries no .break / .watch: they would stop VICE at every launch. Prints how many labels, breakpoints and watches it wrote.
 No project.config keys; --bank is the VICE memory space prefix (default C)."""
 import re, sys
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 
 def parse_all(path):
     """Every label of a Kick symbol file with its scope path, local ones included: {'Ns.Routine.local': addr}."""

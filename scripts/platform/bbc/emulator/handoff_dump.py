@@ -24,6 +24,15 @@ def need_beebium():
             os.environ['_BEEBIUM_REEXEC'] = '1'; os.execv(py, [py, os.path.abspath(sys.argv[0])] + sys.argv[1:])
         sys.exit('the Beebium client is not importable here. Install it in a virtualenv (`python3 -m venv V && V/bin/pip install beebium beebium-server pillow`) and run this with V/bin/python, or set BEEBIUM_PYTHON=V/bin/python.')
 
+def boot_to_handoff(bbc, copy, handoff, timeout):
+    """boot the scratch copy with Shift-Break and run to the breakpoint at the hand-off; the machine is left stopped there (None) or the reason it was not reached"""
+    bbc.wait_until_ready(); bbc.system.set_speed_multiplier(0.0); bbc.debugger.stop(); bp = bbc.debugger.add_breakpoint(handoff); bbc.boot_disc(copy); t0 = time.time()
+    while not bbc.debugger.is_stopped:
+        if time.time() - t0 > timeout: return 'the hand-off $%04X was not reached in %d s (the machine is at PC $%04X)' % (handoff, timeout, bbc.cpu.pc)
+        time.sleep(0.05)
+    bp.remove()
+    return None if bbc.cpu.pc == handoff else 'stopped at $%04X, not at the hand-off $%04X' % (bbc.cpu.pc, handoff)
+
 def state(bbc):
     """what the machine is in, as plain values and the emulator's own text"""
     P = bbc.memory.address.peek

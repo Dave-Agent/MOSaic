@@ -1,6 +1,8 @@
 """Self-test of gfx_sheets.py --records / --check-against / --chars --rows. No project needed: a synthetic RAM image and state dumps in a temp folder.
   python3 -B selftest.py        (needs Pillow; prints SKIP and exits 0 when it is missing)"""
 import os, subprocess, sys, tempfile
+try: sys.stdout.reconfigure(line_buffering=True)         # progress shows as it happens, also into a file or a pipe
+except (AttributeError, ValueError): pass
 try: from PIL import Image
 except ImportError: print('selftest: SKIP (Pillow is missing: pip install pillow)'); sys.exit(0)
 HERE = os.path.dirname(os.path.abspath(__file__)); TOOL = os.path.join(HERE, 'gfx_sheets.py')
