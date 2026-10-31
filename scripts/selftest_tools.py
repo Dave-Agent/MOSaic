@@ -619,6 +619,22 @@ check('new_project --platform bbc: PLATFORM is written, no C64 libs are copied, 
 r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'new_project.py'), '--root', os.path.join(_td, 'p64'), '--name', 'Plain', '--no-git'], capture_output=True, text=True)
 check('new_project without --platform is unchanged: the C64 libs are copied and PLATFORM stays unset', r.returncode == 0 and os.path.exists(os.path.join(_td, 'p64', 'phase1', 'src', 'libs', 'vic.asm')) and '\nPLATFORM=' not in open(os.path.join(_td, 'p64', 'project.config')).read(), r.stdout + r.stderr)
 
+# ---- handoff_dump.py (needs the Beebium client: BEEBIUM_PYTHON, or this Python has it) ----------------------------------------------------------------------------------
+_hd = os.path.join(HERE, 'platform', 'bbc', 'emulator', 'handoff_dump.py'); _bpy = os.environ.get('BEEBIUM_PYTHON')
+_has_b = subprocess.run([_bpy or sys.executable, '-c', 'import beebium.client'], capture_output=True).returncode == 0
+if _has_b:
+    _hdir = tempfile.mkdtemp(prefix='c64hd_'); _code = bytes([0xA9, 0x2A, 0x85, 0x70, 0x60])
+    _hdisc = os.path.join(_hdir, 'game.ssd'); open(_hdisc, 'wb').write(_dfs_image([('!BOOT', '$', 0, 0, b'*RUN TEST\r', False), ('TEST', '$', 0x2000, 0x2000, _code, False)], boot=3, title='HDTEST'))
+    import hashlib as _hl; _h0 = _hl.sha256(open(_hdisc, 'rb').read()).hexdigest()
+    _env = dict(os.environ); 
+    r = subprocess.run([sys.executable, '-B', _hd, '--root', _hdir, '--media', 'game.ssd', '--handoff', '2000', '--runs', '2', '--timeout', '120'], capture_output=True, text=True, env=_env)
+    _bin = open(os.path.join(_hdir, 'dumps', 'at_dump_0.bin'), 'rb').read() if os.path.exists(os.path.join(_hdir, 'dumps', 'at_dump_0.bin')) else b''
+    _js = json.load(open(os.path.join(_hdir, 'dumps', 'at_dump_1.json'))) if os.path.exists(os.path.join(_hdir, 'dumps', 'at_dump_1.json')) else {}
+    check('handoff_dump: each run stops at the hand-off address, writes the 32 KB of main RAM (the loaded file is in it) and the machine state, and reports the bytes that differ between runs; the original image is untouched', r.returncode == 0 and len(_bin) == 0x8000 and _bin[0x2000:0x2005] == _code and _js.get('pc') == 0x2000 and len(_js.get('crtc', [])) == 18 and os.path.exists(os.path.join(_hdir, 'dumps', 'at_dump_noise.txt')) and _hl.sha256(open(_hdisc, 'rb').read()).hexdigest() == _h0, r.stdout + r.stderr)
+    r = subprocess.run([sys.executable, '-B', _hd, '--root', _hdir, '--media', 'game.ssd', '--handoff', '3000', '--runs', '1', '--timeout', '6', '--out', 'dumps/never'], capture_output=True, text=True, env=_env)
+    check('handoff_dump: a hand-off that is never reached is reported and fails (no silent dump)', r.returncode == 1 and 'was not reached' in r.stdout and not os.path.exists(os.path.join(_hdir, 'dumps', 'never_0.bin')), r.stdout + r.stderr)
+else: print('SKIP handoff_dump: no Beebium client (set BEEBIUM_PYTHON to a Python that has it)')
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')

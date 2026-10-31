@@ -126,6 +126,10 @@ comment-check:
 evidence *args:
     python3 -B {{skill}}/scripts/evidence.py --root . {{args}}
 
+# BBC Micro projects: dump main RAM and the chip state at the hand-off, unattended, in Beebium (HANDOFF_MEDIA and HANDOFF_PC of project.config; BEEBIUM_PYTHON names a Python that has the Beebium client). The C64's `dumps` recipe is VICE's.
+bbc-dumps *args:
+    python3 -B {{skill}}/scripts/platform/bbc/emulator/handoff_dump.py --root . {{args}}
+
 # How far phase 1 is, per area: a bar of the clean share (raw operands, placeholder and provisional names left), about two seconds per area; saved for `just status`.
 gauge:
     python3 -B {{skill}}/scripts/gauge.py --root . --phase 1
