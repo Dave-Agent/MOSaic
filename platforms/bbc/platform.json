@@ -1,0 +1,448 @@
+{
+  "_doc": "The BBC Micro (Model B, as Beebium emulates it) as data (issue #39): the third descriptor, written to test the schema. Hardware facts, and what the Beebium spike measured (marked `measured`); the chip register offsets are from memory of the hardware documentation and are marked `unverified` until a tool needs them and the emulator confirms them.",
+  "schema": 1,
+  "id": "bbc",
+  "name": "BBC Micro Model B",
+  "family": "6502",
+  "cpu": {
+    "variant": "6502A",
+    "variants": {
+      "6502A": "Model B and B+ (2 MHz)",
+      "65C02": "Master 128"
+    },
+    "clock_hz": 2000000,
+    "assembler": {
+      "kick": "_6502",
+      "kick_without_illegal_opcodes": "_6502NoIllegals"
+    },
+    "decimal_mode": true,
+    "illegal_opcodes": "an NMOS 6502: the undocumented opcodes exist",
+    "onchip_port": null,
+    "vectors": {
+      "nmi": "FFFA",
+      "reset": "FFFC",
+      "irq": "FFFE"
+    },
+    "os_vectors": {
+      "doc": "The OS indirects its services through RAM vectors at $0200-$0235 so a program can intercept them; the hardware IRQ vector in the OS ROM jumps through IRQ1V at $0204.",
+      "irq1v": "0204",
+      "measured": {
+        "os": "MOS 1.20",
+        "reset": "D9CD",
+        "irq": "DC1C",
+        "irq1v": "DC93",
+        "nmi": "0D00"
+      }
+    },
+    "used_by": []
+  },
+  "memory": {
+    "size": 65536,
+    "regions": [
+      {
+        "name": "zero page",
+        "lo": "0000",
+        "hi": "00FF",
+        "kind": "ram",
+        "doc": "$00-$6F and $70-$8F are free for a program; the OS and filing systems use the rest"
+      },
+      {
+        "name": "stack",
+        "lo": "0100",
+        "hi": "01FF",
+        "kind": "ram"
+      },
+      {
+        "name": "OS workspace",
+        "lo": "0200",
+        "hi": "03FF",
+        "kind": "ram",
+        "doc": "the OS vectors ($0200-$0235) and its variables"
+      },
+      {
+        "name": "user RAM and screen memory",
+        "lo": "0400",
+        "hi": "7FFF",
+        "kind": "ram",
+        "doc": "the screen sits at the top, its start and size set by the MODE (see video.modes); page $0D is the filing system's NMI code"
+      },
+      {
+        "name": "sideways window",
+        "lo": "8000",
+        "hi": "BFFF",
+        "kind": "rom",
+        "banked_by": "sideways",
+        "doc": "one of 16 sideways ROM or RAM banks"
+      },
+      {
+        "name": "OS ROM",
+        "lo": "C000",
+        "hi": "FBFF",
+        "kind": "rom"
+      },
+      {
+        "name": "FRED",
+        "lo": "FC00",
+        "hi": "FCFF",
+        "kind": "io",
+        "doc": "the 1 MHz bus: expansion cards"
+      },
+      {
+        "name": "JIM",
+        "lo": "FD00",
+        "hi": "FDFF",
+        "kind": "io",
+        "doc": "the 1 MHz bus: paged expansion memory"
+      },
+      {
+        "name": "SHEILA",
+        "lo": "FE00",
+        "hi": "FEFF",
+        "kind": "io",
+        "doc": "the on-board chips"
+      },
+      {
+        "name": "OS ROM top",
+        "lo": "FF00",
+        "hi": "FFFF",
+        "kind": "rom",
+        "doc": "the OS call vectors and the CPU vectors"
+      }
+    ],
+    "banking": null,
+    "sideways": {
+      "register": "FE30",
+      "write_only": true,
+      "window": "8000-BFFF",
+      "banks": 16,
+      "select": "bits 0-3 pick the bank; a Model B ignores the rest (the B+ and the Master use bit 7)",
+      "measured": {
+        "regions": [
+          "main_ram",
+          "mos_rom",
+          "bank_0",
+          "bank_1",
+          "bank_2",
+          "bank_3",
+          "bank_4",
+          "bank_5",
+          "bank_6",
+          "bank_7",
+          "bank_8",
+          "bank_9",
+          "bank_10",
+          "bank_11",
+          "bank_12",
+          "bank_13",
+          "bank_14",
+          "bank_15"
+        ],
+        "doc": "Beebium names the memory regions this way; each sideways bank is 16 KB at $8000"
+      },
+      "doc": "The same primitive as a simple NES mapper: one register picks which 16 KB bank the window shows."
+    },
+    "rom_images": {
+      "os": "acorn-mos_1_20.rom",
+      "doc": "supplied by the user, never kept in a project or in the skill; the OS ROM and the sideways ROMs (BASIC, the disc filing system) are named by the emulator's own ROM directory"
+    },
+    "used_by": []
+  },
+  "chips": [
+    {
+      "name": "6845 CRTC",
+      "scope": "CRTC",
+      "lo": "FE00",
+      "hi": "FE07",
+      "mirror_step": "2",
+      "registers": "FE00-FE01",
+      "role": "video timing and the screen start address; FE00 selects a register, FE01 is its data",
+      "unverified": true
+    },
+    {
+      "name": "6850 ACIA",
+      "scope": "ACIA",
+      "lo": "FE08",
+      "hi": "FE0F",
+      "mirror_step": "2",
+      "registers": "FE08-FE09",
+      "role": "serial and cassette",
+      "unverified": true
+    },
+    {
+      "name": "serial ULA",
+      "scope": "SERIAL",
+      "lo": "FE10",
+      "hi": "FE17",
+      "mirror_step": "1",
+      "registers": "FE10-FE10",
+      "role": "serial and cassette rate and motor; write only",
+      "unverified": true
+    },
+    {
+      "name": "video ULA",
+      "scope": "ULA",
+      "lo": "FE20",
+      "hi": "FE2F",
+      "mirror_step": "2",
+      "registers": "FE20-FE21",
+      "role": "FE20 the video control register (mode, cursor, flash), FE21 the palette",
+      "unverified": true
+    },
+    {
+      "name": "ROM select",
+      "scope": "ROMSEL",
+      "lo": "FE30",
+      "hi": "FE3F",
+      "mirror_step": "1",
+      "registers": "FE30-FE30",
+      "role": "sideways bank select; write only"
+    },
+    {
+      "name": "system VIA 6522",
+      "scope": "SYSVIA",
+      "lo": "FE40",
+      "hi": "FE5F",
+      "mirror_step": "10",
+      "registers": "FE40-FE4F",
+      "role": "keyboard, sound, the screen vsync (CA1), timers; its port B drives the addressable latch",
+      "unverified": true
+    },
+    {
+      "name": "user VIA 6522",
+      "scope": "USERVIA",
+      "lo": "FE60",
+      "hi": "FE7F",
+      "mirror_step": "10",
+      "registers": "FE60-FE6F",
+      "role": "the user port and printer port, timers",
+      "unverified": true
+    },
+    {
+      "name": "8271 floppy controller",
+      "scope": "FDC",
+      "lo": "FE80",
+      "hi": "FE9F",
+      "registers": "FE80-FE84",
+      "role": "the disc controller of the original Model B (a 1770 on later models)",
+      "unverified": true
+    },
+    {
+      "name": "Econet ADLC",
+      "scope": "ECONET",
+      "lo": "FEA0",
+      "hi": "FEBF",
+      "registers": "FEA0-FEA3",
+      "role": "Econet",
+      "unverified": true
+    },
+    {
+      "name": "ADC",
+      "scope": "ADC",
+      "lo": "FEC0",
+      "hi": "FEDF",
+      "mirror_step": "4",
+      "registers": "FEC0-FEC3",
+      "role": "four analogue channels: joysticks and paddles",
+      "unverified": true
+    },
+    {
+      "name": "Tube",
+      "scope": "TUBE",
+      "lo": "FEE0",
+      "hi": "FEFF",
+      "mirror_step": "8",
+      "registers": "FEE0-FEE7",
+      "role": "the second-processor interface",
+      "unverified": true
+    }
+  ],
+  "libs": [],
+  "libs_doc": "No register libraries yet (a crtc.asm, ula.asm and via.asm in the style of vic.asm are to be written).",
+  "video": {
+    "chip": "6845 CRTC with the video ULA (and the SAA5050 teletext chip in mode 7)",
+    "standard": {
+      "pal": {
+        "cycles_per_field": 40000,
+        "cycles_per_line": 128,
+        "lines_per_field": "312.5",
+        "field_rate_hz": 50,
+        "measured": true,
+        "doc": "measured: 100 fields of the running machine took exactly 4,000,000 CPU cycles; with a 64 us line (128 cycles) that is 625 lines interlaced, 312.5 per field"
+      }
+    },
+    "modelled_standard": null,
+    "modes": [
+      {
+        "mode": 0,
+        "text": "80x32",
+        "pixels": "640x256",
+        "colours": 2,
+        "start": "3000",
+        "bytes": 20480
+      },
+      {
+        "mode": 1,
+        "text": "40x32",
+        "pixels": "320x256",
+        "colours": 4,
+        "start": "3000",
+        "bytes": 20480
+      },
+      {
+        "mode": 2,
+        "text": "20x32",
+        "pixels": "160x256",
+        "colours": 16,
+        "start": "3000",
+        "bytes": 20480
+      },
+      {
+        "mode": 3,
+        "text": "80x25",
+        "pixels": "640x200",
+        "colours": 2,
+        "start": "4000",
+        "bytes": 16384
+      },
+      {
+        "mode": 4,
+        "text": "40x32",
+        "pixels": "320x256",
+        "colours": 2,
+        "start": "5800",
+        "bytes": 10240
+      },
+      {
+        "mode": 5,
+        "text": "20x32",
+        "pixels": "160x256",
+        "colours": 4,
+        "start": "5800",
+        "bytes": 10240
+      },
+      {
+        "mode": 6,
+        "text": "40x25",
+        "pixels": "320x200",
+        "colours": 2,
+        "start": "6000",
+        "bytes": 8192
+      },
+      {
+        "mode": 7,
+        "text": "40x25",
+        "pixels": "teletext",
+        "colours": 8,
+        "start": "7C00",
+        "bytes": 1024
+      }
+    ],
+    "modes_doc": "Start address and size of the screen memory the OS sets for a 32 KB machine (the CRTC start register is reprogrammed by hardware scrolling); a program may use its own CRTC and ULA values, so the mode is what the video ULA and CRTC hold, not what the OS says. Colour counts are logical (2 colours in mode 0, 16 with flashing in mode 2 from 8 physical colours).",
+    "palette": {
+      "physical_colours": 8,
+      "doc": "black, red, green, yellow, blue, magenta, cyan, white; the video ULA palette register maps logical to physical colours"
+    },
+    "sprites": null,
+    "used_by": []
+  },
+  "input": {
+    "keyboard": {
+      "doc": "a matrix scanned through the system VIA: a key is selected by writing its code to port A (FE41) with the keyboard enable of the addressable latch low, and bit 7 of port A says whether it is down",
+      "unverified": true
+    },
+    "joysticks": {
+      "doc": "analogue, read through the ADC channels (FEC0-FEC3); the fire buttons are on system VIA port B",
+      "unverified": true
+    },
+    "used_by": []
+  },
+  "boot": {
+    "container": "a disc image (DFS .ssd or .dsd) or a tape image (.uef)",
+    "entry": "the reset vector in the OS ROM; the OS then runs the disc's !BOOT through Shift-Break (boot option 3 is *EXEC !BOOT, 2 *RUN, 1 *LOAD) or the user types *RUN / CHAIN",
+    "load_address": "per file, from the DFS catalogue: load, exec, length and start sector (sector 0 and 1 of the disc; file data from sector 2)",
+    "basic_stub": "a BASIC program may be the loader: a file whose exec address is $8023 is BASIC",
+    "hand_off": "the moment the game is in RAM and the loader jumps to its exec address (a file run by *RUN, or a CALL from BASIC)",
+    "cartridge_cold_start": null,
+    "used_by": []
+  },
+  "media": {
+    "types": [
+      "ssd",
+      "dsd",
+      "uef",
+      "hfe"
+    ],
+    "disc_catalogue": "DFS: sector 0 holds the file names, sector 1 the load, exec and length of each file, the boot option and the sector count; 31 files at most",
+    "tools": {},
+    "used_by": []
+  },
+  "emulator": {
+    "name": "Beebium",
+    "binary": "beebium-model-b",
+    "binary_env": "BEEBIUM_SERVER",
+    "launch": "the Python client: Beebium.launch(variant=\"model-b\", preset=\"model-b-8271-disc\"); the default model-b has no disc controller",
+    "headless": true,
+    "api": "gRPC with a typed Python client: keyboard, screen text, memory peek and bus access, debugger (breakpoints, step), disc insert and boot, PNG frames",
+    "speed": {
+      "real_time": 1.0,
+      "unthrottled": "about 4x real time (measured)"
+    },
+    "cross_check": "jsbeeb (tested against real machines)",
+    "never_attach_originals": true,
+    "used_by": []
+  },
+  "dump_noise": {
+    "doc": "Not measured yet: the dump vote of the first project decides. Likely candidates are the OS clock, the keyboard and VIA timer state, the stack and the page-2 OS variables.",
+    "cells": [],
+    "port": null
+  },
+  "hardware_markers": {
+    "doc": "What port_scan and platform_deps look for. The vertical sync is a flag of the system VIA (CA1 in its interrupt flag register); there is no raster register.",
+    "kernal_jump_table": {
+      "lo": "FFB9",
+      "hi": "FFF7"
+    },
+    "os_calls": {
+      "OSFIND": "FFCE",
+      "OSGBPB": "FFD1",
+      "OSBPUT": "FFD4",
+      "OSBGET": "FFD7",
+      "OSARGS": "FFDA",
+      "OSFILE": "FFDD",
+      "OSRDCH": "FFE0",
+      "OSASCI": "FFE3",
+      "OSNEWL": "FFE7",
+      "OSWRCH": "FFEE",
+      "OSWORD": "FFF1",
+      "OSBYTE": "FFF4",
+      "OSCLI": "FFF7"
+    },
+    "raster_register": null,
+    "vblank_register": "FE4D",
+    "interrupt_flags": [
+      "FE4D",
+      "FE6D"
+    ],
+    "used_by": []
+  },
+  "tracer": {
+    "model": null,
+    "start": {
+      "sp": "FD",
+      "p": "34",
+      "port": null
+    },
+    "doc": "The reset state of the 6502 core. No BBC machine model exists in the skill yet; Beebium is the oracle a model would be checked against.",
+    "used_by": []
+  },
+  "schema_gaps": [
+    "memory.banking: the sideways window is a 16-way register select, not the C64's boolean `when` expressions; it is described in memory.sideways, and is the same primitive as a simple NES mapper (a `bbc/mappers` file would need a key other than the iNES number)",
+    "memory.regions: the same 16 KB window holds one of 16 banks (ROM or RAM), so `kind: rom` is only the usual case",
+    "video.standard: 312.5 lines per field (interlaced timing) is not an integer, like the NES's fractional cycles per line; `cycles_per_field` is the exact figure",
+    "video: the mode is not a fixed property: a program programs the CRTC and the video ULA, so `video.modes` is the OS's table, not a description of what the machine shows",
+    "video.sprites: none (software sprites); the C64 schema has a sprite block",
+    "boot: no single load address or container: a disc catalogue gives load, exec and length per file, and a BASIC loader hands off to machine code",
+    "media: a disc image is a DFS catalogue, not a file list; media.tools has no tool for it yet",
+    "chips: the registers of a chip are given by offset from memory, not checked (`unverified`)"
+  ]
+}

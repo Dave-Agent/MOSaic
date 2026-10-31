@@ -80,6 +80,15 @@ Cartridge mappers differ in kind (one write-anywhere register, an index/data pai
 
 No register libraries exist for the NES yet (`libs: []`), and no tool reads the NES descriptor: `used_by` is empty on purpose.
 
+## What the BBC descriptor showed
+`platforms/bbc/platform.json` is the third descriptor, written (like the NES one) to test the format, from hardware facts and from what a Beebium run measured (a field of `measured` or `unverified` marks which). It passes `platforms.py check`; the places where the format bends are in its `schema_gaps`:
+- The **sideways window** (`$8000-$BFFF`, 16 banks chosen by a register at `$FE30`) is neither the C64's boolean `banking` nor a NES mapper file: it is `memory.sideways`, the same primitive as a simple mapper, and a `bbc/mappers` file would need a key other than the iNES number.
+- A field has **312.5 lines**: `cycles_per_field` (40,000, measured) is the exact figure, as the NES needs dots per cycle.
+- The **video mode** is programmed by the program (CRTC and video ULA values), so `video.modes` is the OS's table for a 32 KB machine, not a fixed property; there are no hardware sprites.
+- **Boot** has no single load address: a DFS disc gives load, exec and length per file, a BASIC loader hands off to machine code, and Shift-Break runs `!BOOT`.
+- A single-register chip block (the ROM select, the serial ULA) needs `mirror_step: 1`; the register offsets of the other chips are from memory and marked `unverified`.
+No tool reads it (`used_by` is empty), no register libraries exist, and the OS ROM is supplied by the user, never kept in a project or in the skill.
+
 ## Open design questions
 - **The reference image.** The gate compares one flat image. A NES cartridge is a header and banked ROM: the descriptor needs a `layout` (flat or banked, bank size, mapper) and the gate a way to compare banks. The mapper files say what is visible where; how the gate compares banks is not designed.
 - **Hand-off.** A cartridge starts at the reset vector with no loader and no BASIC stub; `boot` has to say so, and `new_project.py` and the HOWTO steps that talk about hand-off have to follow.
