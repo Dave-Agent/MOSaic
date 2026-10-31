@@ -104,6 +104,7 @@ seeds:
 
 # First conversion step after the first byte-identical build: name the hardware registers with the libs (names only; the gate must stay green).
 libs:
+    -python3 -B {{skill}}/scripts/ghidra/manifest.py check --root .
     python3 -B {{skill}}/scripts/apply_libs.py --root . --phase 1
     @echo "dry run above: apply with  just libs-apply  (it re-runs verify)"
 
@@ -150,6 +151,7 @@ profile *args="--unknown":
 
 # How far phase 1 is, per area: a bar of the clean share (raw operands, placeholder and provisional names left), about two seconds per area; saved for `just status`.
 gauge:
+    -python3 -B {{skill}}/scripts/ghidra/manifest.py check --root .
     python3 -B {{skill}}/scripts/gauge.py --root . --phase 1
 
 # Stage 5b: import the reference into Ghidra, seed it, export Kick Assembler source into ghidra/ (the landing zone: never phase1/src).

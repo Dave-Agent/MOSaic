@@ -788,6 +788,15 @@ r = _bs('A9 ?? 8D ?? D0'); check('byte_search: a wildcard pattern finds both hit
 r = _bs('A0/F0'); check('byte_search: a masked byte matches a whole class (A0/F0 is any byte A0-AF)', r.returncode == 0 and '$1001' in r.stdout and '$100C' in r.stdout and '$100D' in r.stdout, r.stdout + r.stderr)
 r = _bs('?? ??'); check('byte_search: a pattern that constrains no bit is refused', r.returncode != 0 and 'constrains no bit' in r.stdout + r.stderr, r.stdout + r.stderr)
 
+# ---- ghidra/manifest.py: an export records its inputs and a change is reported -------------------------------------------------------------------------------------
+_mf = tempfile.mkdtemp(prefix='c64mf_'); os.makedirs(os.path.join(_mf, 'tools', 'ghidra')); os.makedirs(os.path.join(_mf, 'reference'))
+open(os.path.join(_mf, 'project.config'), 'w').write('REFERENCE_PRG="reference/r.bin"\n'); open(os.path.join(_mf, 'reference', 'r.bin'), 'wb').write(b'\x01\x02'); open(os.path.join(_mf, 'tools', 'ghidra', 'seeds.txt'), 'w').write('2000 a\n')
+_mfp = os.path.join(HERE, 'ghidra', 'manifest.py')
+def _mfr(*a): return subprocess.run([sys.executable, '-B', _mfp, '--root', _mf] + list(a), capture_output=True, text=True)
+r0 = _mfr('check', '--strict'); r1 = _mfr('write', '--ghidra', 'g1'); r2 = _mfr('check', '--strict')
+open(os.path.join(_mf, 'tools', 'ghidra', 'seeds.txt'), 'a').write('2003 b\n'); r3 = _mfr('check', '--strict'); r4 = _mfr('check')
+check('manifest: no manifest is reported, a written one matches, a changed seeds file is STALE (exit 1 with --strict, 0 without)', 'no export manifest' in r0.stdout and r0.returncode == 1 and r1.returncode == 0 and 'matches its inputs' in r2.stdout and r2.returncode == 0 and 'STALE: seeds' in r3.stdout and r3.returncode == 1 and r4.returncode == 0 and 'STALE: seeds' in r4.stdout, r0.stdout + r2.stdout + r3.stdout + r4.stdout)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')
