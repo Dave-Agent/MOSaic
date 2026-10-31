@@ -132,3 +132,4 @@ platform/bbc/text/vdu_text.py	platform/bbc	platform/bbc/text/vdu_text.py	turns t
 region_profile.py	shared	region_profile.py	describes a region of the reference image: entropy, runs, valid-opcode share, printable share, a triage hint
 byte_search.py	shared	byte_search.py	searches the reference image for a byte pattern with wildcards and masks, naming the nearest routine of each hit
 ghidra/manifest.py	shared	ghidra/manifest.py	records the inputs of a Ghidra export and warns when they have changed since
+with_status.py	shared	with_status.py	runs a long command and leaves its outcome in build/RECIPE.status

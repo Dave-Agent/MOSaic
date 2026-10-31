@@ -797,6 +797,21 @@ r0 = _mfr('check', '--strict'); r1 = _mfr('write', '--ghidra', 'g1'); r2 = _mfr(
 open(os.path.join(_mf, 'tools', 'ghidra', 'seeds.txt'), 'a').write('2003 b\n'); r3 = _mfr('check', '--strict'); r4 = _mfr('check')
 check('manifest: no manifest is reported, a written one matches, a changed seeds file is STALE (exit 1 with --strict, 0 without)', 'no export manifest' in r0.stdout and r0.returncode == 1 and r1.returncode == 0 and 'matches its inputs' in r2.stdout and r2.returncode == 0 and 'STALE: seeds' in r3.stdout and r3.returncode == 1 and r4.returncode == 0 and 'STALE: seeds' in r4.stdout, r0.stdout + r2.stdout + r3.stdout + r4.stdout)
 
+# ---- with_status.py: the outcome of a long command is left in build/RECIPE.status ---------------------------------------------------------------------------------
+_wd = tempfile.mkdtemp(prefix='c64ws_'); _ws = os.path.join(HERE, 'with_status.py')
+def _st(n): 
+    f = os.path.join(_wd, 'build', n + '.status'); return dict(l.rstrip('\n').split(': ', 1) for l in open(f)) if os.path.exists(f) else {}
+r = subprocess.run([sys.executable, '-B', _ws, 'ok', '--root', _wd, '--', sys.executable, '-c', 'print("hello")'], capture_output=True, text=True)
+r2 = subprocess.run([sys.executable, '-B', _ws, 'bad', '--root', _wd, '--', sys.executable, '-c', 'import sys; sys.exit(3)'], capture_output=True, text=True)
+check('with_status: a finished command leaves state finished and its exit code, its output passes through, and a failing exit code is returned', r.returncode == 0 and 'hello' in r.stdout and _st('ok').get('state') == 'finished' and _st('ok').get('exit') == '0' and r2.returncode == 3 and _st('bad').get('exit') == '3', r.stdout + r.stderr + str(_st('ok')) + str(_st('bad')))
+import signal as _sg, time as _tm
+_pp = subprocess.Popen([sys.executable, '-B', _ws, 'slow', '--root', _wd, '--', sys.executable, '-c', 'import time; time.sleep(60)'])
+for _ in range(50):
+    if _st('slow').get('state') == 'running': break
+    _tm.sleep(0.1)
+_run = _st('slow').get('state'); _pid = 'pid' in _st('slow'); _pp.send_signal(_sg.SIGTERM); _pp.wait(timeout=20)
+check('with_status: while it runs the file says running with a pid, and a SIGTERM is recorded as killed', _run == 'running' and _pid and _st('slow').get('state') == 'killed', str(_st('slow')))
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')

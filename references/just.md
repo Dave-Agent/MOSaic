@@ -9,6 +9,7 @@
 - **Every recipe has a comment line above it**: that is what `just --list` shows. Say what it does and how long it takes if it is slow.
 - **Recipes run unattended** (no prompts, no GUI waits); anything that needs an emulator window is a separate, clearly named recipe (`launch`, `debug-*`).
 - **Machine-local recipes go in `local.just`** (not tracked): ones that need supplied data (`originals/`, `reference/`) or tools not everyone has.
+- **A long recipe leaves its outcome in `build/RECIPE.status`** (`scripts/with_status.py`: `state:` running, finished or killed, `exit:`, `pid:`, times). `ghidra`, `bbc-dumps` and `fuzz-layout` do. Run a long recipe in the background and wait for it to exit; a timeout of the caller or a closed terminal proves nothing about the work, so read the status file, check for a leftover process (the `pid:`, an emulator or tracer), and only then run it again. Never repeat an unchanged call because it seemed to hang.
 - **Arguments with `$`** are expanded by the shell: do not pass hex through a recipe argument; use a script argument file instead.
 - **A recipe prints its result and exits non-zero on failure**, so `just check && git commit` works.
 
