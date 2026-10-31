@@ -16,3 +16,18 @@ OS: {
     .label OSBYTE                    = $FFF4   // a call with A, X and Y
     .label OSCLI                     = $FFF7   // run a command line
 }
+
+// The OS vectors in page 2 (low byte at the label, high byte at label+1): a program replaces one by storing its own address, and passes the call on through the old one.
+OSVEC: {
+    .label USERV                     = $0200   // *LINE and OSBYTE $88 jump through it
+    .label BRKV                      = $0202   // BRK instruction
+    .label IRQ1V                     = $0204   // every interrupt, before the OS looks at its source
+    .label IRQ2V                     = $0206   // an interrupt the OS did not claim
+    .label CLIV                      = $0208   // command line interpreter
+    .label BYTEV                     = $020A   // OSBYTE
+    .label WORDV                     = $020C   // OSWORD
+    .label WRCHV                     = $020E   // OSWRCH
+    .label RDCHV                     = $0210   // OSRDCH
+    .label EVNTV                     = $0220   // events
+    .label KEYV                      = $0228   // keyboard
+}
