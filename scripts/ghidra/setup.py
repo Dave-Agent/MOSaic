@@ -48,14 +48,33 @@ if DATA and os.path.exists(DATA):
                 except Exception: pass
     print('data ranges: %d byte(s) defined as data before the disassembly' % dn)
 
-n = 0
+def why(a):
+    """why a seed could not become a new instruction: a short reason"""
+    if not mem.contains(a): return 'no bytes there (outside the image or in a removed hole)'
+    ins = getInstructionContaining(a)
+    if ins is not None and ins.getMinAddress().getOffset() != a.getOffset(): return 'inside the instruction at $%04X' % ins.getMinAddress().getOffset()
+    d = getDataContaining(a)
+    if d is not None and d.isDefined(): return 'defined data (from $%04X)' % d.getMinAddress().getOffset()
+    return 'does not decode as an instruction'
+
+created = existing = 0; failed = []
 for line in open(SEEDS):
     f = line.split()
     if not f: continue
-    a = A(int(f[0].lstrip('$'), 16))
-    if mem.contains(a) and getInstructionAt(a) is None:
-        disassemble(a); n += 1
-print('seeds: %d new disassembly start(s); seeds already inside a disassembled instruction are skipped' % n)
+    off = int(f[0].lstrip('$'), 16); a = A(off); note = ' '.join(f[1:])
+    if mem.contains(a) and getInstructionAt(a) is not None: existing += 1; continue
+    if mem.contains(a):
+        disassemble(a)
+        if getInstructionAt(a) is not None: created += 1; continue
+    failed.append((off, note, why(a)))
+print('seeds: %d new disassembly start(s), %d already code, %d failed' % (created, existing, len(failed)))
+for off, note, reason in failed[:20]: print('seed $%04X FAILED: %s%s' % (off, reason, ('   (' + note + ')') if note else ''))
+if len(failed) > 20: print('... %d more seed failures: see seed_report.txt in the export directory' % (len(failed) - 20))
+if not os.path.isdir(OUT_DIR): os.makedirs(OUT_DIR)
+rep = open(os.path.join(OUT_DIR, 'seed_report.txt'), 'w')
+rep.write('# seeds that did not become code: ADDR reason (note from the seeds file); a seed with execution evidence in its note that fails here is a code/data mislabel or self-modifying code\n')
+for off, note, reason in failed: rep.write('%04X %s%s\n' % (off, reason, ('   (' + note + ')') if note else ''))
+rep.close()
 
 if os.path.exists(LABELS):
     for line in open(LABELS):

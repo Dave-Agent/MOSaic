@@ -733,6 +733,20 @@ r = _vt('--write'); _out = open(os.path.join(_vd, 'phase1', 'src', 'x.asm')).rea
 check('vdu_text: control codes become .byte VDU.name with their arguments, printable runs become .text (quotes escaped), a last code may stop short', r.returncode == 0 and '.byte VDU.TAB, 16, 3' in _out and '.text "Hi \\"x\\""' in _out and '.byte VDU.COLOUR, 129' in _out and _out.rstrip().endswith('nop') and '.byte VDU.TAB, 17' in _out, r.stdout + r.stderr + _out)
 r = _vt('--write'); check('vdu_text: a second run converts nothing more (a converted range is left alone)', r.returncode == 0 and '0 range(s) converted' in r.stdout and open(os.path.join(_vd, 'phase1', 'src', 'x.asm')).read() == _out, r.stdout + r.stderr)
 
+# ---- ghidra/setup.py: every seed is reported, a failed one with its reason (needs Ghidra and a local exporter; skipped otherwise) ---------------------------------------
+_gh = subprocess.run([sys.executable, os.path.join(HERE, 'ghidra', 'find_ghidra.py')], capture_output=True, text=True).stdout.strip()
+_exp = os.environ.get('GHIDRA_EXPORTER') or os.path.expanduser('~/ghidra_scripts/KickAssemblerExport.py')
+if _gh and os.path.exists(os.path.join(_gh, 'support', 'analyzeHeadless')) and os.path.exists(_exp):
+    _gd = tempfile.mkdtemp(prefix='c64gh_'); os.makedirs(os.path.join(_gd, 'tools', 'ghidra')); os.makedirs(os.path.join(_gd, 'reference'))
+    open(os.path.join(_gd, 'reference', 'r.bin'), 'wb').write(bytes([0xAD, 0x00, 0x21, 0x60, 0x00, 0x00, 0x00, 0x00]) + bytes([0xFF] * 8))        # LDA $2100 / RTS, then zeros, then bytes defined as data
+    open(os.path.join(_gd, 'project.config'), 'w').write('PROJECT_NAME="gh"\nREFERENCE_PRG="reference/r.bin"\nREFERENCE_IS_RAW="true"\nLOAD_ADDRESS="0x2000"\nGHIDRA_EXPORTER="%s"\n' % _exp)
+    open(os.path.join(_gd, 'tools', 'ghidra', 'seeds.txt'), 'w').write('2000 entry\n2001 sample 99\n2008 sample 7\n9000 outside\n')
+    open(os.path.join(_gd, 'tools', 'ghidra', 'data.txt'), 'w').write('2008 200F table\n')
+    r = subprocess.run(['bash', os.path.join(HERE, 'ghidra', 'run.sh'), _gd], capture_output=True, text=True, env=dict(os.environ, GHIDRA_HOME=_gh)); _rp = os.path.join(_gd, 'ghidra', 'seed_report.txt')
+    _rt = open(_rp).read() if os.path.exists(_rp) else ''
+    check('ghidra setup: a seed inside an instruction, in defined data or outside the image is reported with its reason and its note (and printed, with the totals)', 'inside the instruction at $2000   (sample 99)' in _rt and 'defined data' in _rt and 'no bytes there' in _rt and 'seeds: 1 new disassembly start(s), 0 already code, 3 failed' in r.stdout, r.stdout[-1500:] + r.stderr[-500:] + _rt)
+else: print('SKIP ghidra setup: no Ghidra or no local exporter (GHIDRA_HOME, GHIDRA_EXPORTER)')
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')

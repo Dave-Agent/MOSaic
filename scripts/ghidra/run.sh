@@ -49,5 +49,5 @@ mkdir -p "$OUT"
 rm -rf "${GPROJ:?}/${GNAME:?}.rep" "${GPROJ:?}/${GNAME:?}.gpr"
 "${LAUNCH[@]}" "$GPROJ" "$GNAME" -import "$REFERENCE_PRG" \
     -processor "${GHIDRA_PROCESSOR:-6502:LE:16:default}" -loader BinaryLoader "${LOADER_OPTS[@]}" -overwrite \
-    -scriptPath "$HERE" -postScript setup.py "$SEEDS" "$LABELS" "$HOLES" "$OUT" "$EXP" "$DATA" 2>&1 | grep -E "Export Complete|ERROR|Exception|Traceback|seeded|File|\.asm" || true
+    -scriptPath "$HERE" -postScript setup.py "$SEEDS" "$LABELS" "$HOLES" "$OUT" "$EXP" "$DATA" 2>&1 | grep -E "Export Complete|ERROR|Exception|Traceback|seeded|File|\.asm|setup\.py>|^seeds:|^seed \$|^data ranges|^\.\.\. [0-9]+ more seed" || true
 ls -la "$OUT"
