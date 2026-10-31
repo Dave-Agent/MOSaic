@@ -2,14 +2,15 @@
 
 *MOS AI deCompiler*
 
-Turn a Commodore 64 game's disk or tape image into byte-identical, fully commented, relocatable [Kick Assembler](http://theweb.dk/KickAssembler/) source, one piece of evidence at a time.
+Turn an 8-bit game's disk, tape or cartridge image into byte-identical, fully commented, relocatable [Kick Assembler](http://theweb.dk/KickAssembler/) source, one piece of evidence at a time.
 
-MOSaic is a Claude Code skill: a process, its rules, and the scripts that check them.
+MOSaic is a Claude Code skill: a process, its rules, and the scripts that check them. The machine is data (`platforms/<id>/platform.json`): the Commodore 64 is supported end to end, the BBC Micro as far as the hand-off, coverage and phase 1 (see Known limitations), and the NES as a descriptor with mapper files.
 
 ## What's in it
 
 - `SKILL.md`, `references/`: the process (acquire, phase 1, phase 2), the rules, and the decision log
-- `scripts/`: refactoring tools, checks, a 6510 tracer, a routine-test simulator, graphics renderer, Ghidra and VICE glue
+- `scripts/`: refactoring tools, checks, a 6510 tracer, a routine-test simulator, graphics renderer, Ghidra and VICE glue, and Beebium glue for the BBC Micro (`scripts/platform/bbc/`)
+- `platforms/`: one descriptor per machine (memory map, chips, vectors, media), NES mapper files, and the hardware libraries of the BBC Micro
 - `templates/`, `framework/`, `libs/`: project scaffold, byte-identity gate, C64 hardware definitions
 
 ## How it works
@@ -70,7 +71,7 @@ just --list        # every command with its description
 
 ## Known limitations
 
-- Commodore 64 only: the hardware libraries, the tracer and the VICE glue are C64-specific.
+- The tracer, routine tests, golden traces and smoke test are C64-specific. On the BBC Micro the hand-off dump, the stale-byte probe and coverage run in the Beebium emulator (`scripts/platform/bbc/emulator/`), and DFS discs are read by `scripts/platform/bbc/media/dfs.py`; the tracer has no BBC machine model, and the machine's OS ROM is supplied by the user, never shipped. For the NES there is a descriptor and the MMC3 and UxROM mapper files (checked against Mesen) but no project tooling.
 - Disk images are read with `c1541`. A tape's standard-format files are decoded; a turbo or custom tape loader needs a decoder written for that loader (`tap_extract.py` extracts the stub, reports the rest, and the hand-off dump from VICE gets the game itself). Cartridge images are not handled.
 - The reference comes from a medium with the copy protection removed; analysing a protected original is manual work.
 - The tracer is not a full emulator: it does not draw sprites or characters, model collisions, or produce SID output. Checking pictures and sound needs VICE, and the game's owner.
