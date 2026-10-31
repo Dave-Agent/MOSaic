@@ -586,6 +586,39 @@ if __import__('shutil').which('java') and os.path.exists(_jar) and os.path.exist
         check('mapper_check: the %s file agrees with Mesen on every configuration' % _m, r.returncode == 0 and ' 0 of ' in r.stdout, r.stdout + r.stderr)
 else: print('SKIP mapper_check: no Java / Kick Assembler / Mesen')
 
+# ---- dfs.py and new_project.py --platform bbc ------------------------------------------------------------------------------------------------------------------------
+import struct as _st
+def _dfs_image(files, boot=3, title='TESTDISC', tracks=40):
+    img = bytearray(tracks * 10 * 256); t = title.encode().ljust(12, b' '); img[0:8] = t[:8]; img[256:260] = t[8:12]
+    img[256 + 5] = len(files) * 8; img[256 + 6] = (boot << 4) | ((tracks * 10) >> 8); img[256 + 7] = (tracks * 10) & 255; sec = 2
+    for i, (name, d, load, ex, data, lock) in enumerate(files):
+        img[8 + 8 * i: 15 + 8 * i] = name.encode().ljust(7, b' '); img[15 + 8 * i] = ord(d) | (0x80 if lock else 0); e = 256 + 8 + 8 * i
+        img[e:e + 8] = _st.pack('<HHHBB', load & 0xFFFF, ex & 0xFFFF, len(data), ((ex >> 16) & 3) << 6 | ((len(data) >> 16) & 3) << 4 | ((load >> 16) & 3) << 2 | (sec >> 8) & 3, sec & 255)
+        img[sec * 256: sec * 256 + len(data)] = data; sec += (len(data) + 255) // 256
+    return bytes(img)
+_dfs = os.path.join(HERE, 'platform', 'bbc', 'media', 'dfs.py')
+def _run_dfs(*a): return subprocess.run([sys.executable, '-I', _dfs] + list(a), capture_output=True, text=True)
+_td = tempfile.mkdtemp(prefix='c64dfs_'); _ssd = os.path.join(_td, 'a.ssd')
+open(_ssd, 'wb').write(_dfs_image([('!BOOT', '$', 0, 0, b'*RUN GAME\r', True), ('GAME', '$', 0x2800, 0x2950, bytes(range(256)) * 3, True), ('DATA', 'A', 0x30000, 0x30000, b'xyz', False)]))
+r = _run_dfs('list', _ssd)
+check('dfs list: title, boot option, sector count and every file with load, exec, length and sector (a high address bit too)', r.returncode == 0 and "title 'TESTDISC'" in r.stdout and 'boot option 3, 400 sectors' in r.stdout and '$.GAME    L load 02800 exec 02950 length 00300 sector   3' in r.stdout and 'A.DATA' in r.stdout and 'load 30000' in r.stdout, r.stdout + r.stderr)
+r = _run_dfs('extract', _ssd, os.path.join(_td, 'out')); _g = open(os.path.join(_td, 'out', 'GAME'), 'rb').read(); _inf = open(os.path.join(_td, 'out', 'GAME.inf')).read()
+check('dfs extract: each file with its bytes and a sidecar `NAME load exec length L`; a file in another directory is D.NAME', r.returncode == 0 and _g == bytes(range(256)) * 3 and _inf.strip() == '$.GAME 002800 002950 000300 L' and os.path.exists(os.path.join(_td, 'out', 'A.DATA')) and open(os.path.join(_td, 'out', 'A.DATA.inf')).read().strip() == 'A.DATA 030000 030000 000003', _inf)
+check('dfs check: a sane catalogue passes', _run_dfs('check', _ssd).returncode == 0)
+_bad = bytearray(_dfs_image([('BIG', '$', 0, 0, b'q' * 300, False)], tracks=2)); _bad[256 + 8 + 4:256 + 8 + 6] = _st.pack('<H', 60000)
+open(os.path.join(_td, 'bad.ssd'), 'wb').write(bytes(_bad)); r = _run_dfs('check', os.path.join(_td, 'bad.ssd'))
+check('dfs check: a file that runs past the end of the image is reported, and extract refuses it', r.returncode == 1 and 'runs past the end' in r.stdout and _run_dfs('extract', os.path.join(_td, 'bad.ssd'), os.path.join(_td, 'o2')).returncode == 1, r.stdout)
+open(os.path.join(_td, 'junk.ssd'), 'wb').write(b'\xff' * 1024); r = _run_dfs('list', os.path.join(_td, 'junk.ssd'))
+check('dfs list: a file that is not a DFS image says so', r.returncode == 1 and 'not a DFS image' in r.stdout, r.stdout)
+# a double-sided image: two sides interleaved by track; side 1 holds its own catalogue
+_s0 = _dfs_image([('SIDE0', '$', 0, 0, b'a', False)], tracks=2); _s1 = _dfs_image([('SIDE1', '$', 0, 0, b'b', False)], tracks=2)
+_dsd = b''.join(_s0[t * 2560:(t + 1) * 2560] + _s1[t * 2560:(t + 1) * 2560] for t in range(2)); open(os.path.join(_td, 'd.dsd'), 'wb').write(_dsd)
+check('dfs list --side: a .dsd keeps each side\'s catalogue apart', 'SIDE0' in _run_dfs('list', os.path.join(_td, 'd.dsd')).stdout and 'SIDE1' in _run_dfs('list', os.path.join(_td, 'd.dsd'), '--side', '1').stdout and 'SIDE1' not in _run_dfs('list', os.path.join(_td, 'd.dsd')).stdout)
+_np = os.path.join(_td, 'proj'); r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'new_project.py'), '--root', _np, '--name', 'Test Disc', '--platform', 'bbc', '--media', _ssd, '--no-git'], capture_output=True, text=True)
+check('new_project --platform bbc: PLATFORM is written, no C64 libs are copied, the disc catalogue is in docs/original_files.md, the SHA-256 recorded, and the scaffold says which stages do not exist yet', r.returncode == 0 and 'PLATFORM="bbc"' in open(os.path.join(_np, 'project.config')).read() and not os.path.exists(os.path.join(_np, 'phase1', 'src', 'libs', 'vic.asm')) and '`$.GAME` | 02800 | 02950 | 00300' in open(os.path.join(_np, 'docs', 'original_files.md')).read() and 'a.ssd' in open(os.path.join(_np, 'originals.sha256')).read() and 'scaffold only' in r.stdout, r.stdout + r.stderr)
+r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'new_project.py'), '--root', os.path.join(_td, 'p64'), '--name', 'Plain', '--no-git'], capture_output=True, text=True)
+check('new_project without --platform is unchanged: the C64 libs are copied and PLATFORM stays unset', r.returncode == 0 and os.path.exists(os.path.join(_td, 'p64', 'phase1', 'src', 'libs', 'vic.asm')) and '\nPLATFORM=' not in open(os.path.join(_td, 'p64', 'project.config')).read(), r.stdout + r.stderr)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')

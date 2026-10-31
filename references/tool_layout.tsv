@@ -121,3 +121,4 @@ evidence.py	shared	evidence.py
 refactor/drop_xrefs.py	shared	refactor/drop_xrefs.py	
 refactor/tidy_comments.py	shared	refactor/tidy_comments.py	
 refactor/zp_virtual.py	shared	refactor/zp_virtual.py	
+platform/bbc/media/dfs.py	platform/bbc	platform/bbc/media/dfs.py	reads an Acorn DFS disc image: catalogue, files, sanity check

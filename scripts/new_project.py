@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Create a new decompilation project from the skill's templates (the start of references/new_game.md, stage 1 and the scaffolding for stages 2-6).
 
-  new_project.py --root DIR --name "Game Name" [--media FILE ...] [--protect] [--no-git] [--force]
+  new_project.py --root DIR --name "Game Name" [--platform ID] [--media FILE ...] [--protect] [--no-git] [--force]
 
 Creates in DIR (made if missing): project.config, justfile, README.md, .gitignore, docs/background.md, docs/boot_analysis.md and docs/original_files.md (templates to fill in), tools/reference.spec,
 phase1/src/libs/ (the skill's hardware libs), framework/ (a copy of the skill's master), and the empty dirs the recipes use (originals, dumps, reference, build).
+--platform ID  the machine (platforms/ID/platform.json; default c64): PLATFORM is written to project.config, the media types come from the descriptor, and for a machine other than the C64 the hardware libs are not copied. Only the scaffold exists for a machine other than the C64: the stages that run the game (dumps, tracer, smoke test) still use the C64's recipes
 --media FILE   copy a medium into DIR/originals/ if it is not there already (the original file is never modified)
 --handoff-media NAME  which file in originals/ the hand-off dumps are taken from (default: the first image alphabetically, with a warning when there are several)
 --protect      make the files in originals/ read-only (their SHA-256 is always recorded in originals.sha256; do this BEFORE anything touches them)
@@ -14,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import parser
 SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 a = parser(__doc__.split('\n')[0], write=False); a.add_argument('--name', required=True); a.add_argument('--media', action='append', default=[])
-a.add_argument('--handoff-media', help='file name (in originals/) the dumps are taken from: the UNPROTECTED medium'); a.add_argument('--protect', action='store_true'); a.add_argument('--no-next', action='store_true', help='do not print the next steps (a wrapper script prints its own)'); a.add_argument('--no-git', action='store_true'); a.add_argument('--target', choices=('image', 'prg'), help='what the byte-identical build is checked against: image = a RAM image of the game alone (the default), prg = the PRG file itself, header included (the default when the medium is a .prg)'); a.add_argument('--force', action='store_true')
+a.add_argument('--handoff-media', help='file name (in originals/) the dumps are taken from: the UNPROTECTED medium'); a.add_argument('--protect', action='store_true'); a.add_argument('--no-next', action='store_true', help='do not print the next steps (a wrapper script prints its own)'); a.add_argument('--no-git', action='store_true'); a.add_argument('--target', choices=('image', 'prg'), help='what the byte-identical build is checked against: image = a RAM image of the game alone (the default), prg = the PRG file itself, header included (the default when the medium is a .prg)'); a.add_argument('--force', action='store_true'); a.add_argument('--platform', default='c64')
 args = a.parse_args(); root = os.path.abspath(args.root); os.makedirs(root, exist_ok=True)
 slug = re.sub(r'[^a-z0-9]+', '', args.name.lower()) or 'game'
 for d in ('originals', 'dumps', 'reference', 'build', 'docs', 'tools/ghidra', 'phase1/src/libs'): os.makedirs(os.path.join(root, d), exist_ok=True)
@@ -22,7 +23,10 @@ for m in args.media:
     dst = os.path.join(root, 'originals', os.path.basename(m))
     if os.path.abspath(m) != os.path.abspath(dst) and not os.path.exists(dst): shutil.copy2(m, dst); print('copied', m, '->', dst)
 media = sorted(f for f in os.listdir(os.path.join(root, 'originals')) if os.path.isfile(os.path.join(root, 'originals', f)))
-imgs = [f for f in media if f.lower().endswith(('.d64', '.g64', '.d71', '.d81', '.t64', '.tap', '.prg', '.crt'))]
+import platforms as _plat
+plat = _plat.load(args.platform)
+exts = tuple('.' + t for t in plat['media']['types'])
+imgs = [f for f in media if f.lower().endswith(exts)]
 first = args.handoff_media or (imgs[0] if imgs else (media[0] if media else 'MEDIA'))
 if not args.handoff_media and len(imgs) > 1: print('WARNING: %d media found; HANDOFF_MEDIA is set to %r (the first alphabetically). Pass --handoff-media or edit project.config: the dumps must come from the UNPROTECTED medium.' % (len(imgs), first))
 kick = next((p for p in (os.path.expanduser('~/tools/KickAss.jar'), '/opt/KickAss/KickAss.jar') if os.path.exists(p)), '~/tools/KickAss.jar')
@@ -35,6 +39,9 @@ def put(rel, tpl):
     os.makedirs(os.path.dirname(dst) or root, exist_ok=True); open(dst, 'w').write(t); print('wrote  ', rel)
 target = args.target or ('prg' if first.lower().endswith('.prg') else 'image')
 put('project.config', 'project.config.in')
+if args.platform != 'c64':
+    cp = os.path.join(root, 'project.config'); c = open(cp).read()
+    if '#PLATFORM="c64"' in c: open(cp, 'w').write(c.replace('#PLATFORM="c64"', 'PLATFORM="%s"' % args.platform)); print('PLATFORM="%s" (%s)' % (args.platform, plat['name']))
 if target == 'prg':      # the reference is the PRG itself: its first two bytes are the load address and its third byte lands there, so no LOAD_ADDRESS is needed
     cp = os.path.join(root, 'project.config'); c = open(cp).read()
     if 'REFERENCE_IS_RAW="true"' in c:
@@ -43,11 +50,22 @@ if target == 'prg':      # the reference is the PRG itself: its first two bytes 
         open(cp, 'w').write(c); print('target: the PRG file itself (REFERENCE_IS_RAW="false"); `just reference` copies it from originals/')
 put('justfile', 'justfile.in'); put('README.md', 'README.md.in'); put('.gitignore', 'gitignore.in')
 put('docs/background.md', 'background.md.in'); put('docs/boot_analysis.md', 'boot_analysis.md.in'); put('docs/original_files.md', 'original_files.md.in'); put('tools/reference.spec', 'reference.spec.in')
-for f in glob.glob(os.path.join(SKILL, 'libs', '*.asm')):
+for f in (glob.glob(os.path.join(SKILL, 'libs', '*.asm')) if args.platform == 'c64' else glob.glob(os.path.join(SKILL, 'platforms', args.platform, 'libs', '*.asm'))):
     d = os.path.join(root, 'phase1/src/libs', os.path.basename(f))
     if not os.path.exists(d) or args.force: shutil.copy2(f, d)
 subprocess.run([sys.executable, os.path.join(SKILL, 'scripts', 'framework_sync.py'), '--root', root, '--write'], capture_output=True)
 print('copied framework/ and phase1/src/libs/')
+if args.platform == 'bbc':                                  # the catalogue of every disc image, written once into docs/original_files.md
+    sys.path.insert(0, os.path.join(SKILL, 'scripts', 'platform', 'bbc', 'media')); import dfs
+    out = []
+    for f in media:
+        if not f.lower().endswith(('.ssd', '.dsd')): continue
+        try: cat = dfs.catalogue(dfs.read(os.path.join(root, 'originals', f), 0))
+        except ValueError: continue
+        out += ['', '### %s' % f, '', 'DFS title `%s`, boot option %d, %d sectors.' % (cat['title'], cat['boot_option'], cat['sectors']), '', '| file | load | exec | length | start sector | locked |', '|---|---|---|---|---|---|']
+        out += ['| `%s.%s` | %05X | %05X | %05X | %d | %s |' % (x['dir'], x['name'], x['load'], x['exec'], x['length'], x['sector'], 'yes' if x['locked'] else 'no') for x in cat['files']]
+    if out:
+        op = os.path.join(root, 'docs', 'original_files.md'); open(op, 'a').write('\n## Disc catalogue (read by scripts/platform/bbc/media/dfs.py)\n' + '\n'.join(out) + '\n'); print('wrote the DFS catalogue into docs/original_files.md')
 if media:                                                    # the SHA-256 of every original is always recorded (check_layout compares it); --protect also makes the files read-only
     sums = []
     for f in media:
@@ -59,7 +77,8 @@ if not args.no_git and not os.path.isdir(os.path.join(root, '.git')):
     subprocess.run(['git', 'add', '-A'], cwd=root)
     if subprocess.run(['git', 'commit', '-q', '-m', 'Project scaffold'], cwd=root, capture_output=True).returncode == 0: print('first commit: Project scaffold (the game files are git-ignored)')
     else: print('note: no first commit made (is git user.name / user.email set?); commit the scaffold yourself before the first step')
-if not args.no_next: print('''
+if not args.no_next and args.platform != 'c64': print('''\nNext (%s): this is the scaffold only. The stages that run the game (the dumps at the hand-off, the tracer, `just smoke`) are not written for this machine yet; the C64 recipes in the justfile do not apply. What exists: `scripts/platform/bbc/media/dfs.py` (list, extract, check a disc), the descriptor `platforms/%s/platform.json`, and the emulator notes in references/decisions.md.''' % (plat['name'], args.platform))
+elif not args.no_next: print('''
 Next:
   1. cd into the project and run `just env` to check the tools, then `just status` to see where you are.
   2. Open Claude Code in the project folder and say: "Use the MOSaic skill. Create a source that builds and starts this game, without stopping between its parts."
