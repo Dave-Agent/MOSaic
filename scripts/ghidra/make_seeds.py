@@ -10,6 +10,7 @@ Sources, each optional and repeatable; every address is kept with the reason it 
   --jump-table LO HI        a table of 3-byte JMP/JSR entries in the image: each target
   --edges FILE              the tracer's `PREFIX.edges` (`type from to`): every executed jump/call/branch/interrupt TARGET
   --executed FILE           the tracer's `PREFIX.flags` (u16 per byte; bit 0 = executed as an opcode): every executed opcode address that begins a run
+  (always read when present: tools/ghidra/inline_seeds.txt, the code after each inline-data call that scripts/ghidra/inline_data.py found)
   --lines FILE              extra "ADDR note" lines (PC samples from an emulator run, or the instructions coverage.py counted: `ADDR count`); lines starting with # are skipped
 Only addresses inside the image (--base ADDR and the reference length) are kept.
 
@@ -53,6 +54,8 @@ for f in args.executed:
 dropped = [x for x in list(seeds) if x in operand]
 for x in dropped: del seeds[x]
 if dropped: print('dropped %d seed(s) inside executed instructions: %s' % (len(dropped), ' '.join('$%04X' % x for x in dropped[:10])))
+inl = 'tools/ghidra/inline_seeds.txt'                                  # where inline_data.py writes the code after each call that is followed by data: always part of the seeds, so a regeneration cannot lose them
+if os.path.exists(inl) and not any(os.path.abspath(f) == os.path.abspath(inl) for f in args.lines): args.lines.append(inl); print('including the inline-data seeds of %s' % inl)
 for f in args.lines:
     for l in open(f):
         if l.lstrip().startswith('#'): continue                       # a comment line (a tool's header)

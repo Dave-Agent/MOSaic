@@ -763,6 +763,12 @@ check('evidence --text-file: the text of a file is recorded as it is (dollar, qu
 r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'evidence.py'), '--root', _ed, 'Other', '--text-file', '-'], input=_tx, capture_output=True, text=True); _e2 = open(os.path.join(_ed, 'docs', 'evidence.md')).read()
 check('evidence --text-file -: the text of standard input is recorded', r.returncode == 0 and _e2.count(_tx) == 2, r.stdout + r.stderr + _e2)
 
+# ---- make_seeds.py: the inline-data seeds are always included ------------------------------------------------------------------------------------------------------
+_sd = tempfile.mkdtemp(prefix='c64ms_'); os.makedirs(os.path.join(_sd, 'tools', 'ghidra')); open(os.path.join(_sd, 'r.bin'), 'wb').write(bytes([0xEA] * 64))
+open(os.path.join(_sd, 'tools', 'ghidra', 'inline_seeds.txt'), 'w').write('0830 the code after the inline data of the call at $0820\n'); open(os.path.join(_sd, 'lines.txt'), 'w').write('0810 sample 3\n')
+r = subprocess.run([sys.executable, '-B', _ms, '--root', _sd, '--reference', 'r.bin', '--base', '0800', '--out', 'tools/ghidra/seeds.txt', '--lines', 'lines.txt'], capture_output=True, text=True); _st = open(os.path.join(_sd, 'tools', 'ghidra', 'seeds.txt')).read() if os.path.exists(os.path.join(_sd, 'tools', 'ghidra', 'seeds.txt')) else ''
+check('make_seeds: tools/ghidra/inline_seeds.txt is read without being named (a regeneration from other lines keeps the seeds after inline data)', r.returncode == 0 and '0830' in _st and '0810' in _st and 'including the inline-data seeds' in r.stdout, r.stdout + r.stderr + _st)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')

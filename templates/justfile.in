@@ -133,6 +133,17 @@ evidence *args:
 bbc-dumps *args:
     python3 -B {{skill}}/scripts/platform/bbc/emulator/handoff_dump.py --root . {{args}}
 
+# BBC Micro projects: write the Ghidra seeds from the hand-off, the PC samples (dumps/pcs.txt) and the coverage (dumps/executed_all.txt, else dumps/executed.txt); the inline-data seeds (tools/ghidra/inline_seeds.txt) are always included. Then `just ghidra`.
+bbc-seeds:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    . ./project.config
+    : "${HANDOFF_PC:?}"
+    lines=()
+    for f in dumps/pcs.txt dumps/executed_all.txt; do [ -f "$f" ] && lines+=(--lines "$f"); done
+    [ -f dumps/executed_all.txt ] || { [ -f dumps/executed.txt ] && lines+=(--lines dumps/executed.txt); } || true
+    python3 -B {{skill}}/scripts/ghidra/make_seeds.py --root . --reference "$REFERENCE_PRG" --base "${LOAD_ADDRESS#0x}" --out tools/ghidra/seeds.txt --entry "$HANDOFF_PC:hand-off" --vectors dumps/handoff.bin "${lines[@]}"
+
 # How far phase 1 is, per area: a bar of the clean share (raw operands, placeholder and provisional names left), about two seconds per area; saved for `just status`.
 gauge:
     python3 -B {{skill}}/scripts/gauge.py --root . --phase 1
