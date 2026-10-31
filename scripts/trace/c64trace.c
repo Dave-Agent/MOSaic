@@ -16,7 +16,7 @@
  * Build:  gcc -O2 -o c64trace c64trace.c
  *
  * Run:    c64trace --ram IMAGE [--rom-dir DIR] --out PREFIX --pc HEX [--a HEX --x HEX --y HEX --sp HEX --p HEX] [--port HEX (the processor port, $01: pass it when the dump's $01 is not the value you want, a dump taken mid-load may hold junk)]
- *                  [--init FILE] [--frames N] [--seed S] [--chaos N] [--poke F[+P]:ADDR[-HI]=VAL ...] [--joy1 HEX] [--joy2 HEX]
+ *                  [--state FILE] [--overlay F FILE [ADDR]] [--jump F HEX] [--init FILE] [--frames N] [--seed S] [--chaos N] [--poke F[+P]:ADDR[-HI]=VAL ...] [--joy1 HEX] [--joy2 HEX]
  *                  [--keymat B0,..,B7 [--keymat-frames N]] [--joy1-at F=HEX ...] [--joy2-at F=HEX ...] [--keymat-at F=B0,..,B7 ...] [--skew CYCLES]
  *           IMAGE: 64K RAM (a 65538-byte file with a 2-byte load address is accepted); without --rom-dir the ROM areas read $02 (KIL: executing one stops the run); DIR holds kernal-901227-03.bin,
  *           basic-901226-01.bin, chargen-901225-01.bin (override a name with --kernal / --basic / --chargen FILE).
@@ -738,6 +738,27 @@ static void apply_pokes(long fr) {
         if (fr == pokes[i].frame || (pokes[i].period && fr > pokes[i].frame && (fr - pokes[i].frame) % pokes[i].period == 0))
             for (unsigned a = pokes[i].addr; a <= pokes[i].hi; a++) poke_byte((u16)a, pokes[i].val);
 }
+/* --overlay F FILE [ADDR]: at frame F copy FILE into RAM (a PRG, its first two bytes the load address, when ADDR is left out); --jump F HEX: at frame F continue at PC = HEX
+   (a SYS from the READY prompt; it also zeroes the --iolog interrupt counts, so they describe the program). Together they start a program on a machine the KERNAL has booted (--pc FCE2 on an empty image), as a loader would leave it. */
+static struct { long frame; const char *file; long addr; } overlays[8];
+static int noverlays;
+static struct { long frame; unsigned pc; int done; } jumps[8];
+static int njumps;
+static void apply_overlays(long fr) {
+    for (int i = 0; i < noverlays; i++)
+        if (overlays[i].frame == fr) {
+            static u8 buf[65538]; FILE *f = fopen(overlays[i].file, "rb"); size_t n; unsigned at = 0, off = 0;
+            if (!f) { fprintf(stderr, "cannot open %s\n", overlays[i].file); continue; }
+            n = fread(buf, 1, sizeof buf, f); fclose(f);
+            if (overlays[i].addr < 0) { if (n < 2) continue; at = buf[0] | (buf[1] << 8); off = 2; } else at = (unsigned)overlays[i].addr;
+            for (size_t k = off; k < n && at + (k - off) < 0x10000; k++) ram[at + (k - off)] = buf[k];
+        }
+}
+/* a jump waits for the first instruction boundary at or after its frame with the I flag clear (a SYS from READY runs with interrupts enabled, never inside an interrupt handler) */
+static void apply_jumps(void) {
+    for (int i = 0; i < njumps; i++)
+        if (!jumps[i].done && jumps[i].frame <= frame && !fI) { jumps[i].done = 1; PC = (u16)jumps[i].pc; irq_vic_raster = irq_vic_other = irq_cia1 = irq_nmi = brk_count = 0; iolog_count = 0; }
+}
 static int hold_frames;
 static int key_fixed;                  /* --keymat given: the key fuzzer leaves the keyboard matrix alone (as --joy1/--joy2 do for the joysticks) */
 static long keymat_frames;             /* --keymat-frames N: release the fixed keys after N frames (0 = hold them for the whole run) */
@@ -757,6 +778,7 @@ static void on_frame(void) {
     if (sample_f && !nset) fwrite(ram + sample_lo, 1, sample_hi - sample_lo + 1, sample_f);
     if (sample_f && nset) for (int i = 0; i < nset; i++) fwrite(ram + set_lo[i], 1, set_hi[i] - set_lo[i] + 1, sample_f);
     apply_pokes(frame);
+    apply_overlays(frame);
     /* seeded input fuzzer: joystick changes every few frames, occasional key taps */
     if (frame % 7 == 0 && !joy_fixed) {
         u8 j = 0xFF;
@@ -828,7 +850,7 @@ static int read_file(const char *path, u8 *dst, size_t n, size_t skip) {
 
 int main(int argc, char **argv) {
     const char *ram_path = NULL, *rom_dir = NULL, *out = NULL, *init = NULL;
-    const char *selftest_packed = NULL, *selftest_ref = NULL, *dump_path = NULL, *iolog_path = NULL, *memlog_path = NULL;
+    const char *selftest_packed = NULL, *selftest_ref = NULL, *dump_path = NULL, *state_path = NULL, *iolog_path = NULL, *memlog_path = NULL;
     unsigned selftest_base = 0x0800, selftest_pc = 0, selftest_sp = 0xFF, selftest_done = 0x10000, selftest_p = 0x34; unsigned long long selftest_cycles = 400000000ull; int selftest_builtin = 0;
     long frames = 3000; u32 seed = 1; int skew = 0, init_ddra = 0;
     unsigned pc = 0x10000, a = 0, x = 0, y = 0, sp = 0xFF, p = 0x34;      /* --pc is required for a run */
@@ -885,6 +907,12 @@ int main(int argc, char **argv) {
             if (!n || hi < ad || ad > 0xFFFF || hi > 0xFFFF) { fprintf(stderr, "bad --poke %s\n", s); return 2; }
             pokes[npokes].frame = f; pokes[npokes].period = per; pokes[npokes].addr = (u16)ad; pokes[npokes].hi = (u16)hi; pokes[npokes].val = (u8)v; npokes++;
         }
+        else if (!strcmp(argv[i], "--overlay") && i + 2 < argc && noverlays < 8) {
+            overlays[noverlays].frame = atol(argv[++i]); overlays[noverlays].file = argv[++i]; overlays[noverlays].addr = -1;
+            if (i + 1 < argc && argv[i + 1][0] != '-') overlays[noverlays].addr = (long)strtoul(argv[++i], 0, 16);
+            noverlays++;
+        }
+        else if (!strcmp(argv[i], "--jump") && i + 2 < argc && njumps < 8) { jumps[njumps].frame = atol(argv[++i]); jumps[njumps].pc = (unsigned)strtoul(argv[++i], 0, 16); njumps++; }
         else if (!strcmp(argv[i], "--port") && i + 1 < argc) port_init = (unsigned)strtoul(argv[++i], 0, 16);
         else if (!strcmp(argv[i], "--dump-at") && i + 1 < argc) dump_at = (int)strtoul(argv[++i], 0, 16);
         else if (!strcmp(argv[i], "--chaos") && i + 1 < argc) chaos = (u32)atol(argv[++i]);
@@ -892,6 +920,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--memlog") && i + 3 < argc) { memlog_path = argv[++i]; memlog_lo = (unsigned)strtoul(argv[++i], 0, 16); memlog_hi = (unsigned)strtoul(argv[++i], 0, 16); memlog_on = 1; }
         else if (!strcmp(argv[i], "--memlog-pc") && i + 2 < argc) { memlog_pclo = (unsigned)strtoul(argv[++i], 0, 16); memlog_pchi = (unsigned)strtoul(argv[++i], 0, 16); }
         else if (!strcmp(argv[i], "--dump") && i + 1 < argc) dump_path = argv[++i];
+        else if (!strcmp(argv[i], "--state") && i + 1 < argc) state_path = argv[++i];
         else if (!strcmp(argv[i], "--selftest-base") && i + 1 < argc) selftest_base = (unsigned)strtoul(argv[++i], 0, 16);
         else if (!strcmp(argv[i], "--selftest-pc") && i + 1 < argc) selftest_pc = (unsigned)strtoul(argv[++i], 0, 16);
         else if (!strcmp(argv[i], "--selftest-sp") && i + 1 < argc) selftest_sp = (unsigned)strtoul(argv[++i], 0, 16);
@@ -1004,6 +1033,7 @@ int main(int argc, char **argv) {
             printf("dump-at $%04X after %ld frames\n", dump_at, (long)frame); break; }
         if (nmi_pending) { nmi_pending = 0; take_interrupt(1); advance(7); }
         else if (!fI && irq_line()) { take_interrupt(0); advance(7); }
+        if (njumps) apply_jumps();
         int c = step();
         instr_count++;
         advance(c);
@@ -1014,6 +1044,13 @@ int main(int argc, char **argv) {
         FILE *f = fopen(dump_path, "wb");
         fwrite(ram, 1, 65536, f); fwrite(vic, 1, 64, f); fwrite(color, 1, 1024, f);
         u8 d = cia[1].pra; fwrite(&d, 1, 1, f); fclose(f);
+    }
+    if (state_path) {                   /* --state FILE: the machine state a dump does not hold, one "name value" (hex) per line */
+        FILE *f = fopen(state_path, "w");
+        for (int n = 0; n < 2; n++)
+            fprintf(f, "cia%d_mask %02x\ncia%d_flags %02x\ncia%d_cra %02x\ncia%d_crb %02x\ncia%d_ddra %02x\ncia%d_ddrb %02x\n", n + 1, cia[n].mask, n + 1, cia[n].data, n + 1, cia[n].cra, n + 1, cia[n].crb, n + 1, cia[n].ddra, n + 1, cia[n].ddrb);
+        fprintf(f, "port %02x\nport_dir %02x\nflag_i %d\n", port_val, port_dir, fI);
+        fclose(f);
     }
     if (memlog_path) {
         FILE *f = fopen(memlog_path, "a");

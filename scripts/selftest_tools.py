@@ -461,6 +461,22 @@ r = subprocess.run([sys.executable, '-B', fx, '--root', d, '--dest', os.path.joi
 check('fetch_exporter: a file that does not match the pinned SHA-256 is refused and not installed', r.returncode != 0 and 'pinned SHA-256' in (r.stdout + r.stderr) and not os.path.exists(os.path.join(d, 'out', 'KickAssemblerExport.py')), r.stdout + r.stderr)
 r = subprocess.run([sys.executable, '-B', fx, '--root', d, '--dest', os.path.join(d, 'out'), '--source', os.path.join(d, 'missing')], capture_output=True, text=True)
 check('fetch_exporter: an unreachable source gives a clear message', r.returncode != 0 and 'could not fetch' in (r.stdout + r.stderr), r.stdout + r.stderr)
+# ---- trace/start_check.py ---------------------------------------------------------------------------------------------------------------------------------
+sys.path.insert(0, os.path.join(HERE, 'trace')); import start_check as sc
+a = bytearray(65536 + 64 + 1024 + 1); a[sc.VIC_OFF + 0x18] = 0x14; a[sc.DD00_OFF] = 3; b = bytearray(a)      # screen at $0400, data $1000 (the character ROM)
+check('start_check: identical dumps and states have no differences', not sc.cells(a, b) and not sc.state_diff({'cia1_pending': 0}, [{'cia1_pending': 0}]))
+b[sc.VIC_OFF + 0x12] = 99; b[sc.VIC_OFF + 0x19] = 1; b[sc.VIC_OFF + 0x16] = 0xC0; b[0x0300] = 1; b[0x07F8] = 1; b[0x0410] = 1       # the last one is in the screen matrix
+check('start_check: the raster, the interrupt flags and unused register bits do not count; a $0200-$03FF cell is the ROM workspace, not a difference of the group "low RAM"', sc.cells(a, b) == {('KERNAL workspace', 0x0300), ('low RAM', 0x07F8), ('screen matrix', 0x0410)}, str(sc.cells(a, b)))
+check('start_check: a pending CIA interrupt in ANY clean run is reported', sc.state_diff({'cia1_pending': 0}, [{'cia1_pending': 0}, {'cia1_pending': 1}]) == {'cia1_pending': 1})
+rd = sc.ranges([5, 6, 7, 9]); check('start_check: cells are shown as ranges', rd == ['$0005-$0007', '$0009'], str(rd))
+import rom_dir as _rd2
+if os.path.isfile(os.path.join(_rd2.find(), _rd2.KERNAL)):
+    d = tempfile.mkdtemp(prefix='c64st_'); os.makedirs(os.path.join(d, 'build'))
+    prg = bytes([0x00, 0xC0, 0xA9, 0x05, 0x8D, 0x20, 0xD0, 0x4C, 0x05, 0xC0]); open(os.path.join(d, 'build', 'g.prg'), 'wb').write(prg)
+    ram = bytearray(65536); ram[0xC000:0xC008] = prg[2:]; open(os.path.join(d, 'ram.bin'), 'wb').write(ram)
+    open(os.path.join(d, 'project.config'), 'w').write('OUTPUT_PRG="build/g.prg"\nTRACE_RAM="ram.bin"\nTRACE_ENTRY="c000"\nHANDOFF_PC="c000"\nLAUNCH_PC="c000"\nTRACE_PORT="35"\n')
+    r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'trace', 'start_check.py'), '--root', d, '--phase', '1', '--frames', '40'], capture_output=True, text=True)
+    check('start_check: a program that only sets the border colour starts the same from a plain boot (no stuck interrupt, the border colour register agrees)', r.returncode == 0 and 'start at $C000' in r.stdout and 'PENDING' not in r.stdout and 'VIC $D020' not in r.stdout, r.stdout + r.stderr)
 
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)

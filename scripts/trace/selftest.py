@@ -4,6 +4,7 @@
   1c. input that changes during a run: `--joy1-at` / `--joy2-at` / `--keymat-at FRAME=...` (a tiny program stores what it reads each pass; the per-frame samples show the frame of each change);
   1d. a key option from a hand-off image with CIA 1 DDRA = 0: no `--init dc02 ff` needed, joystick 2 still reads, a WARNING when no column is ever selected;
   1e. `--poke`: RAM, VIC, colour RAM, CIA, the LO-HI range form and frame 0;
+  1f. `--overlay` / `--jump` / `--state`: the KERNAL boots from empty RAM, a program is copied in at a frame and started with a jump (needs the ROMs; skipped without them);
   1b. the keyboard matrix: `--keymat` holds a key for the whole run (the fuzzer leaves it alone), `--keymat-frames N` releases it;
   2. if the project has one, `c64trace --selftest IMAGE REFERENCE ...`: a program of the project that transforms a known image (a depacker, an unscrambler) must reproduce a known
      reference byte for byte. A real program of 2 million instructions agreeing with the reference is the strongest evidence the core is right.
@@ -99,6 +100,23 @@ def poke_selftest(exe):
         return ok, 'poke: frame-0 RAM %02x (want 5a), frame-0 colour fill %02x/%02x (want f7/f7); VIC poke at 5: samples 5/6 = %02x/%02x (low nibble, want !=3 / 3); CIA poke at 6: samples 6/7 = %02x/%02x (want !=a5 / a5); colour refill at 8: %02x/%02x (want fb/fb)%s' % (
             r1[4], r1[1], r1[2], r5[0], r6[0], r6[3], r7[3], r9[1], r9[2], ' (PASS)' if ok else ' (FAIL)')
 
+BOOT_PRG = bytes([0x00, 0xC0, 0xA9, 0x05, 0x8D, 0x20, 0xD0, 0x4C, 0x05, 0xC0])      # PRG at $C000: border colour 5, then loop
+
+def boot_selftest(exe, rom_dir):
+    """`--pc FCE2` on empty RAM boots the KERNAL to the READY prompt (the BASIC banner is in screen RAM); `--overlay F FILE` copies a PRG in at frame F and `--jump F ADDR` continues
+    there; `--state FILE` holds the CIA and port state. Returns (ok, text); ok is None when the ROMs are missing."""
+    if not os.path.isfile(os.path.join(rom_dir, 'kernal-901227-03.bin')): return None, 'boot: skipped (no ROMs in %s)' % rom_dir
+    with tempfile.TemporaryDirectory() as d:
+        zero = os.path.join(d, 'z.bin'); open(zero, 'wb').write(bytes(65536)); prg = os.path.join(d, 't.prg'); open(prg, 'wb').write(BOOT_PRG)
+        base = [exe, '--ram', zero, '--rom-dir', rom_dir, '--out', os.path.join(d, 'b'), '--pc', 'FCE2', '--sp', 'FF', '--p', '34', '--port', '37']
+        subprocess.run(base + ['--frames', '199', '--dump', os.path.join(d, 'boot.bin')], capture_output=True)
+        subprocess.run(base + ['--frames', '260', '--overlay', '200', prg, '--jump', '200', 'C000', '--dump', os.path.join(d, 'run.bin'), '--state', os.path.join(d, 'run.state')], capture_output=True)
+        try: boot = open(os.path.join(d, 'boot.bin'), 'rb').read(); run = open(os.path.join(d, 'run.bin'), 'rb').read(); state = open(os.path.join(d, 'run.state')).read()
+        except OSError: return False, 'boot: FAIL (no output)'
+        banner = bytes(boot[0x0428 + 4:0x0428 + 12]) == bytes([0x2A, 0x2A, 0x2A, 0x2A, 0x20, 0x03, 0x0F, 0x0D])      # "**** COM" in screen codes, second row
+        ok = banner and run[0xC000] == 0xA9 and run[65536 + 0x20] == 5 and 'cia1_mask' in state and 'port ' in state
+        return ok, 'boot: READY banner %s, overlay at frame 200 -> $C000 = %02x (want a9), border after the jump = %d (want 5)%s' % ('yes' if banner else 'NO', run[0xC000], run[65536 + 0x20], ' (PASS)' if ok else ' (FAIL)')
+
 def run(env, quiet=False):
     """-> True when every enabled self-test passes (prints the tracer's lines)"""
     exe = env.build_tracer(); ok = True; c = env.cfg
@@ -121,6 +139,9 @@ def run(env, quiet=False):
     pok, ptext = poke_selftest(exe)
     if not quiet or not pok: print('[poke] ' + ptext)
     ok &= pok
+    bok, btext = boot_selftest(exe, env.rom_dir)
+    if not quiet or bok is False: print('[boot] ' + btext)
+    ok &= bok is not False
     for name, cmd in steps:
         r = subprocess.run(cmd, capture_output=True, text=True)
         if not quiet or r.returncode: print('[%s] %s' % (name, (r.stdout + r.stderr).strip()))

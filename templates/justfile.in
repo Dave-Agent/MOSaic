@@ -199,6 +199,10 @@ launch phase=active_phase: (build phase)
     extra=(); if [ "{{phase}}" = "2" ]; then extra=(--mode sys --prg build/p2/game.prg --symbols "$(ls -t build/p2/*.vs | head -1)"); fi      # phase 2 never injects state: whatever the game needs at start is code in its Boot routine
     python3 -B {{skill}}/scripts/launcher/run_game.py --root . ${extra[@]+"${extra[@]}"}
 
+# Does the game start from a plain boot at these addresses (default LAUNCH_PC)? Runs the tracer from a booted machine and from the injected hand-off and lists what differs (references/new_game.md, section 4). PENDING = a CIA interrupt the program never acknowledges.
+start-check *addrs: (build active_phase)
+    python3 -B {{skill}}/scripts/trace/start_check.py --root . --phase {{active_phase}} {{addrs}}
+
 # Unattended start test (about 20 s): boot a phase headless in VICE (warp), screenshot after SMOKE_CYCLES, fail when the game did not start or the picture differs from the reference (tools/smoke_ref.png; the first run creates it: look at it once and commit it).
 smoke phase=active_phase: (build phase)
     #!/usr/bin/env bash
