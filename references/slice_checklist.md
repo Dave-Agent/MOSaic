@@ -6,6 +6,7 @@ Read before starting a slice, and run `just slice-check` (`scripts/slice.py chec
 - Work in a scratch copy (`just slice-start NAME`), commit there with a path-limited `git add`, never `git checkout/reset/restore/clean`. Merge with `just slice-merge NAME`.
 - The build stays byte-identical at every commit (`just verify`).
 - A slice is **reviewed by a second agent before it merges** (`references/challenger.md`; `just review-brief NAME`): it answers every review-only rule (`rules_table.py --unenforced`) and tries to refute the names the slice introduces. Any new commit needs a new review. Write the names so they survive that: a name that claims a role carries its document and its observation.
+- Evidence goes to `docs/evidence.md` (`scripts/evidence.py NAME TEXT`), not into the comment: the comment states the conclusion at the end of the line in about 80 characters (`rules.md`, "Phase 2 label files").
 - No guessing: describe what the code does; a name that claims a role needs the document (rung 1) AND an observation (rung 3, a controlled tracer run). Otherwise a descriptive name plus `TODO(name)`. Ask the owner only what a thing IS to a player, with a picture, after trying the code.
 
 **Slices run in parallel**: do not run `just align` / `align_comments.py` in a slice (it rewrites the comment columns of the whole file and every other slice then conflicts on merge); the lead runs it once, between merges. Edit only your range.

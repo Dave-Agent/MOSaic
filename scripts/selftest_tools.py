@@ -478,6 +478,40 @@ if os.path.isfile(os.path.join(_rd2.find(), _rd2.KERNAL)):
     r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'trace', 'start_check.py'), '--root', d, '--phase', '1', '--frames', '40'], capture_output=True, text=True)
     check('start_check: a program that only sets the border colour starts the same from a plain boot (no stuck interrupt, the border colour register agrees)', r.returncode == 0 and 'start at $C000' in r.stdout and 'PENDING' not in r.stdout and 'VIC $D020' not in r.stdout, r.stdout + r.stderr)
 
+# ---- comment_check.py: the phase 2 label style (xref, zpform, narrative, codeaddr, restate) ---------------------------------------------------------------------------
+STYLE_SRC = """
+    Start:
+                                          // XREF[1]: 0803(j)
+    Loop:
+      lda #1          // [0800:a9 01 LDA #$1]
+      jmp Loop
+    .label tbl_hi = $20     // high byte of tbl
+    .label thing = $21      // Observed in frames 250-289: the flag
+    .label other = $22      // see the routine at $0800
+"""
+def style_project(style):
+    d = project(STYLE_SRC)
+    open(os.path.join(d, 'zero_page.asm'), 'w').write('.label zp_a = $02\n.label zp_b = $03   // two bytes\n')
+    open(os.path.join(d, 'main.asm'), 'a').write('\n#import "zero_page.asm"\n')
+    sym = os.path.join(d, 'game.sym'); open(sym, 'w').write('.label Start=$0800\n')
+    open(os.path.join(d, 'project.config'), 'a').write('TRACE_SYM="game.sym"\n' + ('PHASE2_LABEL_STYLE="standard"\n' if style else ''))
+    return d
+d = style_project(False); r = tool('comment_check.py', d)
+check('comment_check style: without PHASE2_LABEL_STYLE the style rules are hints and do not fail', r.returncode == 0 and 'hint no-xref-in-phase2: 1' in r.stdout and 'hint zero-page-declared: 2' in r.stdout and 'hint no-narrative-comments: 1' in r.stdout and 'hint no-code-address-in-comment: 1' in r.stdout and 'FAIL' not in r.stdout, r.stdout + r.stderr)
+d = style_project(True); r = tool('comment_check.py', d)
+check('comment_check style: with PHASE2_LABEL_STYLE="standard" each style rule fails and names itself', r.returncode == 1 and all(('FAIL %s: 1' % n) in r.stdout or ('FAIL %s: 2' % n) in r.stdout for n in ('no-xref-in-phase2', 'zero-page-declared', 'no-narrative-comments', 'no-code-address-in-comment')), r.stdout + r.stderr)
+check('comment_check style: a comment that only repeats its label is a hint, never a failure', 'hint comment-restates-name: 1' in r.stdout and 'FAIL comment-restates-name' not in r.stdout, r.stdout)
+d = style_project(True); open(os.path.join(d, 'zero_page.asm'), 'w').write('.namespace zp {\n*=$02 "Zero page" virtual\na: .byte $00\n}\n')
+r = tool('comment_check.py', d, '--phase', '1')
+check('comment_check style: phase 1 keeps XREF lists and `.label` zero page: the style rules are not counted', 'no-xref-in-phase2' not in r.stdout and r.returncode == 0, r.stdout + r.stderr)
+
+# ---- evidence.py ------------------------------------------------------------------------------------------------------------------------------------------------
+d = project('')
+def evidence(*a): return subprocess.run([sys.executable, '-B', os.path.join(HERE, 'evidence.py')] + list(a) + ['--root', d], capture_output=True, text=True)
+r1 = evidence('climb_flag', 'down held in frames 250-289 gave 80'); r2 = evidence('climb_flag', 'owner said it is the climb', '--kind', 'user'); r3 = evidence('climb_flag', 'owner said it is the climb'); r4 = evidence('--show', 'climb_flag')
+check('evidence: one entry per name, one bullet per piece of evidence, the same text not twice, readable with --show', r1.returncode == r2.returncode == r3.returncode == r4.returncode == 0 and 'already recorded' in r3.stdout and r4.stdout.count('\n- ') == 2 and 'user (' in r4.stdout and 'observation (' in r4.stdout and text(d, 'docs/evidence.md').count('## climb_flag') == 1, r4.stdout + r3.stdout)
+check('evidence: a name with no entry says so', evidence('--show', 'nothing').returncode == 1)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')

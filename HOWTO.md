@@ -98,7 +98,7 @@ To see how far it is, run `just gauge` in the project: a bar for each area of th
 
 ## Step 4. Refactor ready for future development (phase 2)
 
-**Goal:** the named source is split into files, separated from the C64 hardware by a written interface, and proven relocatable, still byte-identical. This is one job in four parts that need nothing from you (the safety net, the split, the interface, relocation; see Appendix B). After this, every command takes the phase: `just verify 2`, `just check 2`, `just launch 2`. Background reading: `references/phase2_split.md` and `references/phase2_port.md`.
+**Goal:** the named source is split into files, separated from the C64 hardware by a written interface, and proven relocatable, still byte-identical. This is one job in five parts that need nothing from you (the safety net, the split, the label files, the interface, relocation; see Appendix B). After this, every command takes the phase: `just verify 2`, `just check 2`, `just launch 2`. Background reading: `references/phase2_split.md` and `references/phase2_port.md`.
 
 Say "yes" to the question after step 3, or:
 
@@ -151,11 +151,12 @@ You do not need this unless you want to know what the agent is doing. `just stat
 
 ---
 
-## Appendix B. The four parts of step 4
+## Appendix B. The parts of step 4
 
 | Part | What happens | Done when |
 |---|---|---|
 | **4.1 Safety net** | `phase2/src` is created as a copy of `phase1/src`. Routine tests (code run in a simulator against Python models), golden traces (the game's state per frame under scripted input), `docs/platform_layer.md` and `docs/phase2_plan.md` are written. | `just check 1` passes |
 | **4.2 Split into files** | Each section moves into its own file under `game/`, `platform/` and `data/`; the gate runs after every move. | the phase 2 main file is only imports and `just verify 2` is byte-identical |
+| **4.2b Label files** | The XREF lists are removed, the zero page becomes a declared `zp` namespace with one `.byte` per variable, the comments are brought to the end of their lines, the evidence behind names goes to `docs/evidence.md` (`rules.md`, "Phase 2 label files"). | `just comment-check` has no hint left and `just verify 2` is unchanged |
 | **4.3 Platform interface** | The hardware-facing routines move into namespaces (`Input`, `Time`, `Sound`, `Gfx`, `Storage`, `Boot`) with written contracts; anything phase 1 had to inject to start (`docs/start_contract.md`) becomes code in `Boot`, so phase 2 starts from a plain boot. Where a wrapper would cost bytes or cycles in a full image the access is left alone, tagged `TODO(port)`, and the reason written down. | `docs/porting.md` exists and `just check 2` passes |
 | **4.4 Relocatable** | Each relocation hazard is resolved, layout assumptions become `.assert`s, and a layout sweep with a control variant that changes no address proves code can move. Findings go in `docs/relocation_hazards.md`. | every hazard is resolved or documented and the sweep shows no address dependency |

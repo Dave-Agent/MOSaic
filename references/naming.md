@@ -10,6 +10,7 @@ Names are the index of the source: grep must find things, and the case of a name
 | Constant (a value, not an address) | UPPER_SNAKE with a family prefix | `STATE_JUMP`, `MSG_ID_GAME_OVER`, `OPC_RTS` |
 | Hardware register | the canonical lib name | `VIC.BORDER_COLOR`, `SID.V1_CTRL`, `CIA.DATA_PORT_A_1` |
 | Zero-page variable, phase 1 | `zp_` prefix, snake_case | `zp_ptr_a`, `zp_tmp_a` |
+| Zero-page variable, phase 2 | `zp.` namespace, no prefix; a pointer is `ptr` and `ptr_hi`, two `.byte` lines | `zp.ptr_a`, `zp.ptr_a_hi` |
 | Zero-page variable, phase 2 | `zp.` namespace, no prefix | `zp.ptr_a`, `zp.tmp_a` |
 | File | snake_case, named for its namespace or section | `round_flow.asm`, `zero_page.asm` |
 

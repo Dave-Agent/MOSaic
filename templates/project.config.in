@@ -75,3 +75,6 @@ VICE_DISPLAY="minimized"
 
 # Unattended start test: how many times `just smoke` tries before it fails (1 = once). A program whose ORIGINAL start is flaky (a race, or state a loader left in low RAM that the program reads) needs more than 1; a pass after failed attempts says so and is not hidden.
 SMOKE_RETRIES="1"
+
+# Phase 2 label style (references/rules.md, "Phase 2 label files"): "standard" makes `just comment-check` fail on XREF lists, a `.label` zero page, narrative comments and code addresses in comments. Unset, they are listed as hints. Set it once `just comment-check` reports no hint left.
+# PHASE2_LABEL_STYLE="standard"

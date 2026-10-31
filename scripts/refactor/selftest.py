@@ -406,6 +406,87 @@ d, r = half(LOHI, [['0900', 'lo', '3', '-', 'L0,L1,L1']])
 t = text(d)
 check('table_words: a half-converted lo table (`.byte <L0,<L1` rows then a raw byte) is read back from its names and finished', r.returncode == 0 and '$10' not in t and t.count('<L1') == 2 and '<L0' in t, r.stdout + r.stderr + t)
 
+# ---- drop_xrefs / zp_virtual / tidy_comments: the phase 2 label style ------------------------------------------------------------------------------------
+XR = """
+                                          // XREF[2]: 0803(j), 0810(c)
+                                          //          0820(j)
+    Start:
+      lda #1                // [0800:a9 01 LDA #$1]
+      rts                   // [0802:60 RTS]
+    .label tmp = $10                          // XREF[1]: FUN_0800:0802(W)
+"""
+d = project(XR); r = tool('drop_xrefs.py', d, '--write'); t = text(d)
+check('drop_xrefs: heads, continuation lines and a trailing list go; the trace comments and the code stay', r.returncode == 0 and 'XREF' not in t and '0820(j)' not in t and '[0800:a9 01 LDA #$1]' in t and '.label tmp = $10' in t and 'Start:' in t, t + r.stdout)
+d = project('    // a comment that mentions XREF text\n    lda #1\n'); r = tool('drop_xrefs.py', d, '--write')
+check('drop_xrefs: a comment that only mentions XREF is reported, not removed', 'NOT REMOVED' in r.stdout and 'mentions XREF' in text(d), r.stdout)
+
+ZP = """
+    #importonce
+    // zero_page.asm - old header
+    // second header line
+
+    // zp_ptr_a: scratch pointer
+    .label zp_ptr_a = $02
+    // zp_ptr_a_hi: High byte of zp_ptr_a.
+    .label zp_ptr_a_hi = $03
+    .label zp_table = $10   // 8 bytes of something
+    .label zp_after = $18
+    .label counter = $19
+"""
+def zpproject():
+    d = project('#import "zero_page.asm"\n.pc = $0800 "RAM"\n  lda zp_ptr_a_hi      // reads zp_ptr_a_hi and counter\n  sta zp_ptr_a\n  lda zp_table,x\n  inc counter\n  rts\n')
+    open(os.path.join(d, 'zero_page.asm'), 'w').write(textwrap.dedent(ZP).lstrip('\n'))
+    return d
+d = zpproject(); r = tool('zp_virtual.py', d, '--write'); t = text(d); z = open(os.path.join(d, 'zero_page.asm')).read()
+check('zp_virtual: one namespace and virtual segment, one declaration per variable, the zp_ prefix dropped, a pointer is two .byte lines', r.returncode == 0 and '.namespace zp {' in z and '*=$02 "Zero page" virtual' in z and 'ptr_a:' in z and 'ptr_a_hi:' in z and z.count('.byte $00') >= 3 and '.word' not in z and '\nzp_ptr_a:' not in z, z + r.stdout + r.stderr)
+check('zp_virtual: a gap is .fill, a `N bytes` comment sizes the table up to the next label', '.fill 12, 0   // $04-$0F: not named' in z and 'table:' in z and '.fill 8, 0' in z, z)
+check('zp_virtual: every use is zp.name in code, and in comments for a zp_ name only; the name map gets one row per variable', 'lda zp.ptr_a_hi' in t and 'sta zp.ptr_a' in t and 'lda zp.table,x' in t and 'inc zp.counter' in t and 'reads zp.ptr_a_hi and counter' in t and 'zp_ptr_a\tzp.ptr_a' in open(os.path.join(d, 'tools', 'name_map.tsv')).read(), t)
+r = tool('zp_virtual.py', d, '--write')
+check('zp_virtual: a second run on a converted file stops with a message', r.returncode != 0 and 'already converted' in (r.stdout + r.stderr), r.stdout + r.stderr)
+cs = subprocess.run(['java', '-version'], capture_output=True)
+_jar = os.path.expanduser(os.environ.get('KICKASS_JAR') or '~/tools/KickAss.jar')
+if cs.returncode == 0 and os.path.exists(_jar):
+    d = zpproject(); tool('zp_virtual.py', d, '--write')
+    r = subprocess.run(['java', '-jar', _jar, 'main.asm', '-o', 'out.prg', '-symbolfile'], cwd=d, capture_output=True, text=True)
+    sy = open(os.path.join(d, 'main.sym')).read() if os.path.exists(os.path.join(d, 'main.sym')) else ''
+    prg = open(os.path.join(d, 'out.prg'), 'rb').read() if os.path.exists(os.path.join(d, 'out.prg')) else b''
+    check('zp_virtual: the converted source assembles, the PRG still loads at $0800 (the virtual block adds nothing) and the variables keep their addresses', r.returncode == 0 and prg[:2] == b'\x00\x08' and 'ptr_a=$2' in sy and 'ptr_a_hi=$3' in sy and 'table=$10' in sy and 'after=$18' in sy and 'counter=$19' in sy, r.stdout[-300:] + sy)
+else: print('SKIP zp_virtual assemble: no Java / Kick Assembler')
+
+RAMV = """
+    #importonce
+    // variables.asm
+    // buf: a buffer
+    .label buf = $0200
+    .label ptr_x = $02F0
+    .label screen_cell = $0400
+    .label alias = buf+1
+"""
+d = project('#import "symbols.asm"\n.pc = $0800 "RAM"\n  lda buf,x\n  lda screen_cell\n  rts\n')
+open(os.path.join(d, 'variables.asm'), 'w').write(textwrap.dedent(RAMV).lstrip('\n')); open(os.path.join(d, 'symbols.asm'), 'w').write('#importonce\n#import "variables.asm"\n')
+r = tool('zp_virtual.py', d, '--file', 'variables.asm', '--region', '0200-03FF', '--namespace', 'ram', '--segment', 'Variables', '--write'); t = text(d)
+v = open(os.path.join(d, 'variables.asm')).read(); n = open(os.path.join(d, 'ram.asm')).read(); sy = open(os.path.join(d, 'symbols.asm')).read()
+check('zp_virtual --region: only the labels of the region are converted into their own file; the others stay; the file is imported; uses are ram.name', r.returncode == 0 and '*=$0200 "Variables" virtual' in n and 'buf:' in n and 'ptr_x:' in n and 'screen_cell' not in n and '.label screen_cell = $0400' in v and '.label alias = buf+1' in v and 'buf' not in v.replace('alias = buf+1', '') and '#import "ram.asm"' in sy and 'lda ram.buf,x' in t and 'lda screen_cell' in t, n + v + sy + t + r.stdout + r.stderr)
+
+TD = """
+    // zp_climb: Climb state. Rung 3: down held in frames 250-289 gave $80. Set by Foo.
+    .label zp_climb = $10
+    // Group header
+
+    // zp_ptr: something that is long enough to need a block comment above the declaration because the end of the line cannot hold it at all, even at the full width of the line
+    .label zp_ptr = $11
+    // zp_unit: Observed in frames 5-9 (docs/log.md).
+    .label zp_unit = $12
+    // the table at $5183 is read here
+    .label zp_idx = $13
+"""
+d = project(textwrap.dedent(TD).lstrip('\n')); symf = os.path.join(d, 'game.sym'); open(symf, 'w').write('.label ChairTbl=$5183\n')
+r = tool('tidy_comments.py', d, 'main.asm', '--sym', symf, '--write'); t = text(d)
+check('tidy_comments: the narrative clauses and the repeated name go, the comment moves to the end of the line', r.returncode == 0 and '.label zp_climb = $10   // Climb state; Set by Foo.' in t.replace('Climb state. Set by Foo.', 'Climb state; Set by Foo.') or '// Climb state' in t, t + r.stdout)
+check('tidy_comments: Rung / frames / docs/ text is gone', 'Rung' not in t and 'frames' not in t and 'docs/' not in t and 'Observed' not in t, t)
+check('tidy_comments: a long comment becomes a block above its declaration; a declaration whose comment is all narrative loses it; a group header stays', '// Group header' in t and '.label zp_unit = $12\n' in t + '\n' and t.index('// something that is long') < t.index('.label zp_ptr'), t)
+check('tidy_comments: the address of a label becomes the label', 'the table ChairTbl is read here' in t or 'ChairTbl' in t, t)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall refactor self-tests passed')

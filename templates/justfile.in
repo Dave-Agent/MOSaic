@@ -122,6 +122,10 @@ anon-apply:
 comment-check:
     python3 -B {{skill}}/scripts/comment_check.py --root . --phase 1
 
+# Record how a name was found, outside the source (docs/evidence.md): just evidence NAME "what was seen" [--kind document|observation|user]; just evidence --show NAME
+evidence *args:
+    python3 -B {{skill}}/scripts/evidence.py --root . {{args}}
+
 # How far phase 1 is, per area: a bar of the clean share (raw operands, placeholder and provisional names left), about two seconds per area; saved for `just status`.
 gauge:
     python3 -B {{skill}}/scripts/gauge.py --root . --phase 1
