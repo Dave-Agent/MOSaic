@@ -720,6 +720,18 @@ open(os.path.join(_id, 'project.config'), 'w').write('REFERENCE_PRG="ref.bin"\nL
 r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'ghidra', 'inline_data.py'), '--root', _id, '--routine', '0D21', '--terminator', 'EA', '--keep-terminator', '--source', 'ghidra/x.asm', '--write', '--max', '8'], capture_output=True, text=True)
 _dt = open(os.path.join(_id, 'tools', 'ghidra', 'data.txt')).read() if os.path.exists(os.path.join(_id, 'tools', 'ghidra', 'data.txt')) else ''; _sd = open(os.path.join(_id, 'tools', 'ghidra', 'inline_seeds.txt')).read() if os.path.exists(os.path.join(_id, 'tools', 'ghidra', 'inline_seeds.txt')) else ''
 check('inline_data: the text after a call is a data range up to the terminator (which stays code, and is where the disassembly resumes); a call with no data is skipped; a call with no terminator in range is reported, not written', r.returncode == 0 and '1003 1007' in _dt and '1008 ' in _sd and '100d ' in _sd and _dt.count('\n') == 1 and 'NOT WRITTEN' in r.stdout and '$1010' in r.stdout, _dt + _sd + r.stdout + r.stderr)
+# ---- vdu_text.py: an inline VDU stream becomes text ----------------------------------------------------------------------------------------------------------------------
+_vd = tempfile.mkdtemp(prefix='vdutext_'); os.makedirs(os.path.join(_vd, 'tools', 'ghidra')); os.makedirs(os.path.join(_vd, 'phase1', 'src')); os.makedirs(os.path.join(_vd, 'reference'))
+_stream = bytes([31, 16, 3]) + b'Hi "x"' + bytes([17, 129]) + b'A' + bytes([31, 17])          # TAB 16,3 / text / COLOUR 129 / text / a TAB that stops after its x (the code after sends y)
+open(os.path.join(_vd, 'reference', 'r.bin'), 'wb').write(bytes([0x20, 0x21, 0x0D]) + _stream + bytes([0xEA]))
+open(os.path.join(_vd, 'project.config'), 'w').write('PLATFORM="bbc"\nREFERENCE_PRG="reference/r.bin"\nLOAD_ADDRESS="0x2000"\nREFERENCE_IS_RAW=true\n')
+open(os.path.join(_vd, 'tools', 'ghidra', 'data.txt'), 'w').write('2003 %04x inline data\n' % (0x2003 + len(_stream) - 1))
+_rows = ['  .byte ' + ','.join('$%02x' % b for b in _stream[i:i + 16]) + ' // [%04x] ....' % (0x2003 + i) for i in range(0, len(_stream), 16)]
+open(os.path.join(_vd, 'phase1', 'src', 'x.asm'), 'w').write('start:\n  jsr $0d21\n' + '\n'.join(_rows) + '\n  nop\n')
+def _vt(*a): return subprocess.run([sys.executable, '-B', os.path.join(HERE, 'platform', 'bbc', 'text', 'vdu_text.py'), '--root', _vd, '--main', os.path.join(_vd, 'phase1', 'src', 'x.asm')] + list(a), capture_output=True, text=True)
+r = _vt('--write'); _out = open(os.path.join(_vd, 'phase1', 'src', 'x.asm')).read()
+check('vdu_text: control codes become .byte VDU.name with their arguments, printable runs become .text (quotes escaped), a last code may stop short', r.returncode == 0 and '.byte VDU.TAB, 16, 3' in _out and '.text "Hi \\"x\\""' in _out and '.byte VDU.COLOUR, 129' in _out and _out.rstrip().endswith('nop') and '.byte VDU.TAB, 17' in _out, r.stdout + r.stderr + _out)
+r = _vt('--write'); check('vdu_text: a second run converts nothing more (a converted range is left alone)', r.returncode == 0 and '0 range(s) converted' in r.stdout and open(os.path.join(_vd, 'phase1', 'src', 'x.asm')).read() == _out, r.stdout + r.stderr)
 
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
