@@ -21,7 +21,7 @@ def need_beebium():
     except ImportError:
         py = os.environ.get('BEEBIUM_PYTHON')
         if py and os.path.abspath(py) != os.path.abspath(sys.executable) and not os.environ.get('_BEEBIUM_REEXEC'):
-            os.environ['_BEEBIUM_REEXEC'] = '1'; os.execv(py, [py, os.path.abspath(__file__)] + sys.argv[1:])
+            os.environ['_BEEBIUM_REEXEC'] = '1'; os.execv(py, [py, os.path.abspath(sys.argv[0])] + sys.argv[1:])
         sys.exit('the Beebium client is not importable here. Install it in a virtualenv (`python3 -m venv V && V/bin/pip install beebium beebium-server pillow`) and run this with V/bin/python, or set BEEBIUM_PYTHON=V/bin/python.')
 
 def state(bbc):

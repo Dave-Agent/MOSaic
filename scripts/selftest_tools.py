@@ -635,6 +635,27 @@ if _has_b:
     check('handoff_dump: a hand-off that is never reached is reported and fails (no silent dump)', r.returncode == 1 and 'was not reached' in r.stdout and not os.path.exists(os.path.join(_hdir, 'dumps', 'never_0.bin')), r.stdout + r.stderr)
 else: print('SKIP handoff_dump: no Beebium client (set BEEBIUM_PYTHON to a Python that has it)')
 
+# ---- reloc_map.py: the code a program moves ------------------------------------------------------------------------------------------------------------------------------
+import random as _rnd
+_r = _rnd.Random(5); _ref = bytes(_r.randrange(256) for _ in range(2000)); _dump = bytearray(0x8000)
+_dump[0x3000:0x3000 + 2000] = _ref                      # the image at its load address $3000 (a load site, not a move)
+_dump[0x0A00:0x0A00 + 500] = _ref[100:600]              # a 500-byte stretch copied down to $0A00
+_dump[0x1C00:0x1C00 + 300] = _ref[1500:1800]; _dump[0x1C00 + 150] ^= 0xFF      # another, with one changed byte inside: two runs
+_dump[0x2000:0x2000 + 400] = bytes(400)                 # a block of zeros: never a move
+_td = tempfile.mkdtemp(prefix='c64rm_'); open(os.path.join(_td, 'ref.bin'), 'wb').write(_ref); open(os.path.join(_td, 'late.bin'), 'wb').write(bytes(_dump))
+r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'reloc_map.py'), '--root', _td, '--reference', 'ref.bin', '--base', '3000', '--dump', 'late.bin', '--min', '48'], capture_output=True, text=True)
+_tsv = open(os.path.join(_td, 'tools', 'relocations.tsv')).read() if os.path.exists(os.path.join(_td, 'tools', 'relocations.tsv')) else ''
+check('reloc_map: a stretch copied to another address is found with its file and run addresses; a changed byte splits a run in two; zeros and the load site are not moves', r.returncode == 0 and '3064 3257 0A00 01F4' in _tsv.replace('#', '#') and '35DC' in _tsv and '1C00' in _tsv and _tsv.count('\n') == 4 and 'ZERO' not in _tsv, _tsv + r.stdout + r.stderr)
+
+# ---- pc_samples.py (needs the Beebium client) --------------------------------------------------------------------------------------------------------------------------------
+if _has_b:
+    _ps = os.path.join(HERE, 'platform', 'bbc', 'emulator', 'pc_samples.py'); _pdir = tempfile.mkdtemp(prefix='c64ps_')
+    _pd = os.path.join(_pdir, 'game.ssd'); open(_pd, 'wb').write(_dfs_image([('!BOOT', '$', 0, 0, b'*RUN TEST\r', False), ('TEST', '$', 0x2000, 0x2000, bytes([0xE6, 0x70, 0x4C, 0x00, 0x20]), False)], boot=3, title='PSTEST'))
+    r = subprocess.run([sys.executable, '-B', _ps, '--root', _pdir, '--media', 'game.ssd', '--handoff', '2000', '--samples', '120', '--timeout', '120'], capture_output=True, text=True, env=dict(os.environ))
+    _seen = {l.split()[0] for l in open(os.path.join(_pdir, 'dumps', 'pcs.txt'))} if os.path.exists(os.path.join(_pdir, 'dumps', 'pcs.txt')) else set()
+    check('pc_samples: a two-instruction loop is seen at both of its instructions and nowhere else in the program (interrupts and the OS add their own addresses)', r.returncode == 0 and {'2000', '2002'} <= _seen and '2004' not in _seen and '2001' not in _seen, r.stdout + r.stderr + str(sorted(_seen))[:200])
+else: print('SKIP pc_samples: no Beebium client')
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')
