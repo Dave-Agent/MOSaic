@@ -8,7 +8,7 @@ into the game, for example the exec address of its main file in the DFS catalogu
   OUT_N.bin     the 32 KB of main RAM ($0000-$7FFF), the RAM the game lives in (the ROMs and I/O are not part of it);
   OUT_N.json    the CPU registers, the 18 CRTC registers, the video ULA, the two VIAs and the addressable latch as text, the OS copy of the ROM select (zero page $F4) and the cycle count.
 An emulator is deterministic, so runs differ only when the start differs: run N waits N * --perturb fields (default 3) before Shift-Break, so timers, the OS clock and the keyboard buffer land differently. The bytes that differ between
-runs are machine state, not the game; they are listed in OUT_noise.txt (ranges, with how many runs differed) for the vote that builds the reference.
+runs are machine state, not the game; they are listed in OUT_noise.txt (ranges, with how many runs differed) for the vote that builds the reference; with three or more runs the most common value of each byte is written to dumps/handoff.bin as a 64 KB image (the RAM, then zeros where the ROMs and I/O are; the input of `just reference`; --no-vote skips it).
 Defaults come from project.config: HANDOFF_MEDIA, HANDOFF_PC (hex), BBC_MOS (an OS ROM file; without it Beebium uses its own default). Needs the Beebium client in the Python that runs this: `pip install beebium beebium-server` in a
 virtualenv and either run this file with that Python or set BEEBIUM_PYTHON to it (this script then re-runs itself with it). The OS ROM is the user's: it is never copied into a project. Exit 1 when a run did not reach the hand-off."""
 import json, os, shutil, sys, tempfile, time
@@ -60,7 +60,7 @@ def ranges(cells):
 def main():
     a = parser(__doc__.split('\n')[0], write=False)
     a.add_argument('--media'); a.add_argument('--handoff'); a.add_argument('--runs', type=int, default=3); a.add_argument('--out', default='dumps/at_dump'); a.add_argument('--timeout', type=int, default=240)
-    a.add_argument('--preset', default='model-b-8271-disc'); a.add_argument('--mos'); a.add_argument('--perturb', type=int, default=3)
+    a.add_argument('--no-vote', action='store_true', help='do not write dumps/handoff.bin from three or more runs'); a.add_argument('--preset', default='model-b-8271-disc'); a.add_argument('--mos'); a.add_argument('--perturb', type=int, default=3)
     args = a.parse_args(); cfg = config(args.root)
     media = args.media or cfg.get('HANDOFF_MEDIA'); hp = args.handoff or cfg.get('HANDOFF_PC'); mos = args.mos or cfg.get('BBC_MOS') or None
     if not media or not hp: sys.exit('need --media and --handoff (or HANDOFF_MEDIA and HANDOFF_PC in project.config)')
@@ -80,5 +80,14 @@ def main():
             f.write('# bytes of main RAM that differ between the %d runs at the hand-off $%04X (machine state, not the game): lo-hi count\n' % (len(rams), handoff))
             for lo, hi in rs: f.write('%04X-%04X %d\n' % (lo, hi, hi - lo + 1))
         print('%d run(s) agree on %d of %d bytes; %d byte(s) in %d range(s) differ (%s_noise.txt)' % (len(rams), len(rams[0]) - len(differ), len(rams[0]), len(differ), len(rs), os.path.relpath(out, args.root)))
+    if len(rams) >= 3 and not args.no_vote:
+        import collections
+        vote = bytearray(); tie = []
+        for i in range(len(rams[0])):
+            (v, c), *rest = collections.Counter(r[i] for r in rams).most_common()
+            if rest and rest[0][1] == c: tie.append(i)
+            vote.append(v)
+        hp_path = os.path.join(os.path.dirname(out), 'handoff.bin'); open(hp_path, 'wb').write(bytes(vote) + bytes(0x8000))      # a 64 KB image like the C64's: RAM, then zeros where the ROMs and I/O are (not dumped)
+        print('wrote %s: the most common value of each byte over %d runs (%d byte(s) with no majority%s)' % (os.path.relpath(hp_path, args.root), len(rams), len(tie), ': ' + ', '.join('%04X' % t for t in tie[:8]) if tie else ''))
     return 1 if bad else 0
 if __name__ == '__main__': sys.exit(main())
