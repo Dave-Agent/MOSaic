@@ -117,3 +117,7 @@ vice/vice_monitor.py	platform/c64	platform/c64/emulator/vice/vice_monitor.py	VIC
 vice/vice_symbols.py	platform/c64	platform/c64/emulator/vice/vice_symbols.py	VICE monitor labels
 zp_namespace.py	shared	zp_namespace.py	
 platform/nes/emulator/mapper_check.py	platform/nes	platform/nes/emulator/mapper_check.py	builds a test cartridge for a mapper file and compares it with what Mesen maps
+evidence.py	shared	evidence.py	
+refactor/drop_xrefs.py	shared	refactor/drop_xrefs.py	
+refactor/tidy_comments.py	shared	refactor/tidy_comments.py	
+refactor/zp_virtual.py	shared	refactor/zp_virtual.py	
