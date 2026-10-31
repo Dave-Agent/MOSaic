@@ -108,6 +108,7 @@ trace/report.py	shared	trace/report.py
 trace/rom_dir.py	platform/c64	platform/c64/trace/rom_dir.py	where VICE keeps the ROM images
 trace/sample_report.py	shared	trace/sample_report.py	
 trace/selftest.py	platform/c64	platform/c64/trace/selftest.py	the trust test of the 6510 core in c64trace.c
+trace/start_check.py	platform/c64	platform/c64/trace/start_check.py	boots the ROMs in the machine model and compares the start states
 unreferenced.py	shared	unreferenced.py	
 version_check.py	shared	version_check.py	
 vice/judge_screenshot.py	platform/c64	platform/c64/emulator/vice/judge_screenshot.py	judges a VICE screenshot
