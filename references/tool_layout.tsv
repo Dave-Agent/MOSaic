@@ -129,3 +129,4 @@ platform/bbc/emulator/stale_probe.py	platform/bbc	platform/bbc/emulator/stale_pr
 platform/bbc/emulator/coverage.py	platform/bbc	platform/bbc/emulator/coverage.py	counts which instructions ran, with recording breakpoints in Beebium
 ghidra/inline_data.py	shared	ghidra/inline_data.py	
 platform/bbc/text/vdu_text.py	platform/bbc	platform/bbc/text/vdu_text.py	turns the inline VDU streams of a BBC source into text (.byte VDU.TAB, 16, 3 / .text "..."), byte-identical
+region_profile.py	shared	region_profile.py	describes a region of the reference image: entropy, runs, valid-opcode share, printable share, a triage hint

@@ -769,6 +769,17 @@ open(os.path.join(_sd, 'tools', 'ghidra', 'inline_seeds.txt'), 'w').write('0830 
 r = subprocess.run([sys.executable, '-B', _ms, '--root', _sd, '--reference', 'r.bin', '--base', '0800', '--out', 'tools/ghidra/seeds.txt', '--lines', 'lines.txt'], capture_output=True, text=True); _st = open(os.path.join(_sd, 'tools', 'ghidra', 'seeds.txt')).read() if os.path.exists(os.path.join(_sd, 'tools', 'ghidra', 'seeds.txt')) else ''
 check('make_seeds: tools/ghidra/inline_seeds.txt is read without being named (a regeneration from other lines keeps the seeds after inline data)', r.returncode == 0 and '0830' in _st and '0810' in _st and 'including the inline-data seeds' in r.stdout, r.stdout + r.stderr + _st)
 
+# ---- region_profile.py: a triage hint for a region of the image ---------------------------------------------------------------------------------------------------
+_pd = tempfile.mkdtemp(prefix='c64rp_'); _rnd2 = _rnd.Random(9)
+_code = bytes([0xA9, 0x01, 0x85, 0x02, 0xA2, 0x00, 0xBD, 0x00, 0x20, 0x9D, 0x00, 0x30, 0xE8, 0xD0, 0xF7, 0x20, 0x10, 0x08, 0xA5, 0x03, 0x18, 0x69, 0x05, 0x85, 0x03, 0x4C, 0x00, 0x08] * 3)
+_text = (b'THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG ' * 3)[:96]; _fill = bytes(96); _dense = bytes(_rnd2.randrange(256) for _ in range(256)); _tbl = bytes([0, 1, 2, 3] * 24)
+_img = _code[:84] + _text + _fill + _dense + _tbl; open(os.path.join(_pd, 'r.bin'), 'wb').write(_img)
+open(os.path.join(_pd, 'project.config'), 'w').write('REFERENCE_PRG="r.bin"\nREFERENCE_IS_RAW="true"\nLOAD_ADDRESS="0x1000"\n')
+def _rp(lo, n): return subprocess.run([sys.executable, '-B', os.path.join(HERE, 'region_profile.py'), '--root', _pd, '--range', '%04X-%04X' % (0x1000 + lo, 0x1000 + lo + n - 1), '--block', '0'], capture_output=True, text=True).stdout
+check('region_profile: code is code-like, text text-like, zeros fill, random bytes dense, a four-value pattern table-like',
+      'code-like' in _rp(0, 84) and 'text-like' in _rp(84, 96) and 'fill ($00)' in _rp(180, 96) and 'dense' in _rp(276, 256) and 'table-like' in _rp(532, 96), _rp(0, 84) + _rp(84, 96) + _rp(180, 96) + _rp(276, 256) + _rp(532, 96))
+check('region_profile: a range outside the image is reported, not profiled', 'outside the image' in _rp(5000, 10))
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')

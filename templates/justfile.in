@@ -144,6 +144,10 @@ bbc-seeds:
     [ -f dumps/executed_all.txt ] || { [ -f dumps/executed.txt ] && lines+=(--lines dumps/executed.txt); } || true
     python3 -B {{skill}}/scripts/ghidra/make_seeds.py --root . --reference "$REFERENCE_PRG" --base "${LOAD_ADDRESS#0x}" --out tools/ghidra/seeds.txt --entry "$HANDOFF_PC:hand-off" --vectors dumps/handoff.bin "${lines[@]}"
 
+# What the regions nobody has classified look like (entropy, runs, valid-opcode share, printable share; a triage hint, never a classification): `just profile` for the STATUS: unknown banners, or `just profile --range 1000-10FF`.
+profile *args="--unknown":
+    python3 -B {{skill}}/scripts/region_profile.py --root . --phase 1 {{args}}
+
 # How far phase 1 is, per area: a bar of the clean share (raw operands, placeholder and provisional names left), about two seconds per area; saved for `just status`.
 gauge:
     python3 -B {{skill}}/scripts/gauge.py --root . --phase 1
