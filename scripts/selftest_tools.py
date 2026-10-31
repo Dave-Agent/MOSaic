@@ -664,6 +664,9 @@ if _has_b:
     r = subprocess.run([sys.executable, '-B', _sp, '--root', _sdir, '--media', 'g.ssd', '--handoff', '2000', '--ranges', '3000-300F,3100-310F', '--seconds', '3', '--every', '10', '--max-runs', '60', '--granule', '1'], capture_output=True, text=True, env=dict(os.environ))
     _st = open(os.path.join(_sdir, 'dumps', 'stale.txt')).read() if os.path.exists(os.path.join(_sdir, 'dumps', 'stale.txt')) else ''
     check('stale_probe: of two stretches a program reads one byte of, the unread stretch is reported dead and the byte that matters is named', r.returncode == 0 and 'dead 3100-310F' in _st and 'needed 3005-3005' in _st and 'dead 3000' not in _st.replace('3006-300F', '').replace('3000-3004', ''), r.stdout[-400:] + _st)
+    r = subprocess.run([sys.executable, '-B', _sp, '--root', _sdir, '--media', 'g.ssd', '--handoff', '2000', '--ranges', '3100-310F', '--seconds', '2', '--every', '10', '--max-runs', '3', '--out', 'dumps/stale_small.txt'], capture_output=True, text=True, env=dict(os.environ))
+    _st2 = open(os.path.join(_sdir, 'dumps', 'stale_small.txt')).read() if os.path.exists(os.path.join(_sdir, 'dumps', 'stale_small.txt')) else ''
+    check('stale_probe: a run budget too small to test a range leaves it undecided, never dead', r.returncode == 0 and 'undecided 3100-310F' in _st2 and 'dead 3100' not in _st2, r.stdout[-300:] + _st2)
 else: print('SKIP stale_probe: no Beebium client')
 
 # ---- progress shows as it happens: every tool imports _common (line-buffered output), and every recipe runs Python unbuffered ----------------------------------------------------
