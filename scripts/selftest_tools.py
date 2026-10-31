@@ -577,6 +577,13 @@ def evidence(*a): return subprocess.run([sys.executable, '-B', os.path.join(HERE
 r1 = evidence('climb_flag', 'down held in frames 250-289 gave 80'); r2 = evidence('climb_flag', 'owner said it is the climb', '--kind', 'user'); r3 = evidence('climb_flag', 'owner said it is the climb'); r4 = evidence('--show', 'climb_flag')
 check('evidence: one entry per name, one bullet per piece of evidence, the same text not twice, readable with --show', r1.returncode == r2.returncode == r3.returncode == r4.returncode == 0 and 'already recorded' in r3.stdout and r4.stdout.count('\n- ') == 2 and 'user (' in r4.stdout and 'observation (' in r4.stdout and text(d, 'docs/evidence.md').count('## climb_flag') == 1, r4.stdout + r3.stdout)
 check('evidence: a name with no entry says so', evidence('--show', 'nothing').returncode == 1)
+# ---- mapper_check.py: the mapper files agree with Mesen (needs Java, Kick Assembler and Mesen) ------------------------------------------------------------------------
+_mesen = os.environ.get('MESEN') or os.path.expanduser('~/tools/Mesen')
+if __import__('shutil').which('java') and os.path.exists(_jar) and os.path.exists(_mesen):
+    for _m in ('mmc3', 'uxrom'):
+        r = subprocess.run([sys.executable, '-B', os.path.join(HERE, 'platform', 'nes', 'emulator', 'mapper_check.py'), _m], capture_output=True, text=True)
+        check('mapper_check: the %s file agrees with Mesen on every configuration' % _m, r.returncode == 0 and ' 0 of ' in r.stdout, r.stdout + r.stderr)
+else: print('SKIP mapper_check: no Java / Kick Assembler / Mesen')
 
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)

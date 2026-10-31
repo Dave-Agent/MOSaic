@@ -211,5 +211,74 @@
   ],
   "irq": "a counter clocked by rises of PPU address line A12 (so by the sprite pattern fetch of each scanline), reloaded from the latch, raising the CPU IRQ when it reaches 0 and is enabled",
   "bus_conflicts": false,
-  "chr_note": "R0 and R1 select 2 KB banks (the low bit is ignored), so each takes two 1 KB windows; R2-R5 select 1 KB banks"
+  "chr_note": "R0 and R1 select 2 KB banks (the low bit is ignored), so each takes two 1 KB windows; R2-R5 select 1 KB banks",
+  "test": {
+    "prelude": [
+      [
+        "8000",
+        "00"
+      ],
+      [
+        "8001",
+        "00"
+      ],
+      [
+        "8000",
+        "01"
+      ],
+      [
+        "8001",
+        "00"
+      ],
+      [
+        "8000",
+        "02"
+      ],
+      [
+        "8001",
+        "00"
+      ],
+      [
+        "8000",
+        "03"
+      ],
+      [
+        "8001",
+        "00"
+      ],
+      [
+        "8000",
+        "04"
+      ],
+      [
+        "8001",
+        "00"
+      ],
+      [
+        "8000",
+        "05"
+      ],
+      [
+        "8001",
+        "00"
+      ],
+      [
+        "8000",
+        "06"
+      ],
+      [
+        "8001",
+        "00"
+      ],
+      [
+        "8000",
+        "07"
+      ],
+      [
+        "8001",
+        "00"
+      ]
+    ],
+    "doc": "writes that give every state value a defined value before the random writes of mapper_check.py (power-on values are undefined)"
+  }
 }

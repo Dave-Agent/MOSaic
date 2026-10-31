@@ -5,14 +5,47 @@
   "doc": "UNROM/UOROM style boards: one register selects the 16 KB PRG bank at $8000, the last bank stays at $C000; CHR is RAM. Written from the nesdev wiki's mapper description; not checked against a program yet.",
   "prg_unit": "4000",
   "chr_unit": "2000",
-  "state": {"prg_bank": 0},
+  "state": {
+    "prg_bank": 0
+  },
   "registers": [
-    {"name": "bank select", "mask": "8000", "value": "8000", "set": {"prg_bank": "d"}, "doc": "a write anywhere in $8000-$FFFF; many boards have bus conflicts (the ROM drives the bus while the CPU writes, so write a value the ROM holds at that address)"}
+    {
+      "name": "bank select",
+      "mask": "8000",
+      "value": "8000",
+      "set": {
+        "prg_bank": "d"
+      },
+      "doc": "a write anywhere in $8000-$FFFF; many boards have bus conflicts (the ROM drives the bus while the CPU writes, so write a value the ROM holds at that address)"
+    }
   ],
   "prg": [
-    {"cpu": "8000-BFFF", "bank": [{"bank": "prg_bank"}]},
-    {"cpu": "C000-FFFF", "bank": [{"bank": "-1"}]}
+    {
+      "cpu": "8000-BFFF",
+      "bank": [
+        {
+          "bank": "prg_bank"
+        }
+      ]
+    },
+    {
+      "cpu": "C000-FFFF",
+      "bank": [
+        {
+          "bank": "-1"
+        }
+      ]
+    }
   ],
   "chr": [],
-  "bus_conflicts": "board dependent"
+  "bus_conflicts": "board dependent",
+  "test": {
+    "prelude": [
+      [
+        "8000",
+        "00"
+      ]
+    ],
+    "doc": "writes that give every state value a defined value before the random writes of mapper_check.py (power-on values are undefined)"
+  }
 }

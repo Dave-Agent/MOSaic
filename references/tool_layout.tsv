@@ -1,5 +1,5 @@
 # Where every tool under scripts/ lives (issue #39). Columns: path (today, relative to scripts/), axis, target (relative to scripts/), why.
-# axis: shared = neither a CPU nor a platform (the process, the source text, the checks); cpu/6502 = parses instructions and addressing modes; platform/c64 = machine behaviour (scripts/platform/c64/<job>/): a model, an emulator, a chip's graphics, a medium's format; backend/ghidra = the disassembler backend.
+# axis: shared = neither a CPU nor a platform (the process, the source text, the checks); cpu/6502 = parses instructions and addressing modes; platform/c64 and platform/nes = machine behaviour (scripts/platform/<id>/<job>/): a model, an emulator, a chip's graphics, a medium's format; backend/ghidra = the disassembler backend.
 # The rule: a tool is placed by what it cannot do without. Parameters (a mirror step, a vector, a ROM name) come from the platform descriptor and keep a tool shared; BEHAVIOUR moves it.
 _common.py	shared	_common.py	
 add_label.py	shared	add_label.py	
@@ -116,3 +116,4 @@ vice/vice_handoff.py	platform/c64	platform/c64/emulator/vice/vice_handoff.py	VIC
 vice/vice_monitor.py	platform/c64	platform/c64/emulator/vice/vice_monitor.py	VICE monitor protocol
 vice/vice_symbols.py	platform/c64	platform/c64/emulator/vice/vice_symbols.py	VICE monitor labels
 zp_namespace.py	shared	zp_namespace.py	
+platform/nes/emulator/mapper_check.py	platform/nes	platform/nes/emulator/mapper_check.py	builds a test cartridge for a mapper file and compares it with what Mesen maps
