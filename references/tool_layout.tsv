@@ -130,3 +130,4 @@ platform/bbc/emulator/coverage.py	platform/bbc	platform/bbc/emulator/coverage.py
 ghidra/inline_data.py	shared	ghidra/inline_data.py	
 platform/bbc/text/vdu_text.py	platform/bbc	platform/bbc/text/vdu_text.py	turns the inline VDU streams of a BBC source into text (.byte VDU.TAB, 16, 3 / .text "..."), byte-identical
 region_profile.py	shared	region_profile.py	describes a region of the reference image: entropy, runs, valid-opcode share, printable share, a triage hint
+byte_search.py	shared	byte_search.py	searches the reference image for a byte pattern with wildcards and masks, naming the nearest routine of each hit

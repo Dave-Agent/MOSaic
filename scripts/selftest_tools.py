@@ -780,6 +780,14 @@ check('region_profile: code is code-like, text text-like, zeros fill, random byt
       'code-like' in _rp(0, 84) and 'text-like' in _rp(84, 96) and 'fill ($00)' in _rp(180, 96) and 'dense' in _rp(276, 256) and 'table-like' in _rp(532, 96), _rp(0, 84) + _rp(84, 96) + _rp(180, 96) + _rp(276, 256) + _rp(532, 96))
 check('region_profile: a range outside the image is reported, not profiled', 'outside the image' in _rp(5000, 10))
 
+# ---- byte_search.py: wildcards, masks, the routine of a hit, a pattern that constrains nothing ----------------------------------------------------------------------
+_bd = tempfile.mkdtemp(prefix='c64bs_'); open(os.path.join(_bd, 'r.bin'), 'wb').write(bytes([0xEA, 0xA9, 0x05, 0x8D, 0x20, 0xD0, 0xEA, 0xA9, 0x07, 0x8D, 0x21, 0xD0, 0xA4, 0xA7, 0x60]))
+open(os.path.join(_bd, 'project.config'), 'w').write('REFERENCE_PRG="r.bin"\nREFERENCE_IS_RAW="true"\nLOAD_ADDRESS="0x1000"\n'); open(os.path.join(_bd, 'x.sym'), 'w').write('.label Start=$1000\n.label Second=$1006\n')
+def _bs(pat): return subprocess.run([sys.executable, '-B', os.path.join(HERE, 'byte_search.py'), '--root', _bd, '--sym', 'x.sym', pat], capture_output=True, text=True)
+r = _bs('A9 ?? 8D ?? D0'); check('byte_search: a wildcard pattern finds both hits and names the routine and offset of each', r.returncode == 0 and '$1001' in r.stdout and 'in Start+1' in r.stdout and '$1007' in r.stdout and 'in Second+1' in r.stdout and '2 hit(s)' in r.stdout, r.stdout + r.stderr)
+r = _bs('A0/F0'); check('byte_search: a masked byte matches a whole class (A0/F0 is any byte A0-AF)', r.returncode == 0 and '$1001' in r.stdout and '$100C' in r.stdout and '$100D' in r.stdout, r.stdout + r.stderr)
+r = _bs('?? ??'); check('byte_search: a pattern that constrains no bit is refused', r.returncode != 0 and 'constrains no bit' in r.stdout + r.stderr, r.stdout + r.stderr)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')
