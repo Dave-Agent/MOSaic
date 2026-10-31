@@ -34,7 +34,9 @@
         "nmi": "0D00"
       }
     },
-    "used_by": []
+    "used_by": [
+      "scripts/apply_libs.py"
+    ]
   },
   "memory": {
     "size": 65536,
@@ -145,7 +147,9 @@
       "os": "acorn-mos_1_20.rom",
       "doc": "supplied by the user, never kept in a project or in the skill; the OS ROM and the sideways ROMs (BASIC, the disc filing system) are named by the emulator's own ROM directory"
     },
-    "used_by": []
+    "used_by": [
+      "scripts/apply_libs.py"
+    ]
   },
   "chips": [
     {
@@ -156,7 +160,8 @@
       "mirror_step": "2",
       "registers": "FE00-FE01",
       "role": "video timing and the screen start address; FE00 selects a register, FE01 is its data",
-      "unverified": true
+      "lib": "crtc.asm",
+      "verified": "Beebium: FE00 selects a register, FE01 writes it"
     },
     {
       "name": "6850 ACIA",
@@ -186,7 +191,8 @@
       "mirror_step": "2",
       "registers": "FE20-FE21",
       "role": "FE20 the video control register (mode, cursor, flash), FE21 the palette",
-      "unverified": true
+      "lib": "ula.asm",
+      "verified": "Beebium: FE20 sets the control register"
     },
     {
       "name": "ROM select",
@@ -195,7 +201,8 @@
       "hi": "FE3F",
       "mirror_step": "1",
       "registers": "FE30-FE30",
-      "role": "sideways bank select; write only"
+      "role": "sideways bank select; write only",
+      "lib": "ula.asm"
     },
     {
       "name": "system VIA 6522",
@@ -205,7 +212,8 @@
       "mirror_step": "10",
       "registers": "FE40-FE4F",
       "role": "keyboard, sound, the screen vsync (CA1), timers; its port B drives the addressable latch",
-      "unverified": true
+      "lib": "via.asm",
+      "verified": "Beebium: the registers at offsets 2, 6, 7, 11 and 14 of FE40 changed the VIA state as the datasheet says"
     },
     {
       "name": "user VIA 6522",
@@ -215,7 +223,8 @@
       "mirror_step": "10",
       "registers": "FE60-FE6F",
       "role": "the user port and printer port, timers",
-      "unverified": true
+      "lib": "via.asm",
+      "verified": "Beebium: the same offsets of FE60"
     },
     {
       "name": "8271 floppy controller",
@@ -256,8 +265,13 @@
       "unverified": true
     }
   ],
-  "libs": [],
-  "libs_doc": "No register libraries yet (a crtc.asm, ula.asm and via.asm in the style of vic.asm are to be written).",
+  "libs": [
+    "crtc.asm",
+    "via.asm",
+    "ula.asm",
+    "os.asm"
+  ],
+  "libs_doc": "Register libraries: crtc.asm (CRTC), via.asm (SYSVIA and USERVIA), ula.asm (the video ULA and the ROM select), os.asm (the OS call table). The addresses of the CRTC, both VIAs and the video ULA were checked on Beebium (a write to an address showed in the chip's state); the other chips have no lib yet.",
   "video": {
     "chip": "6845 CRTC with the video ULA (and the SAA5050 teletext chip in mode 7)",
     "standard": {
@@ -423,7 +437,11 @@
       "FE4D",
       "FE6D"
     ],
-    "used_by": []
+    "used_by": [],
+    "named_ranges": [
+      "FFB9-FFF7"
+    ],
+    "named_ranges_doc": "the OS call table: apply_libs.py may name an address here from a lib (os.asm); the C64 has none (its KERNAL calls are not named by a lib)"
   },
   "tracer": {
     "model": null,
@@ -443,6 +461,6 @@
     "video.sprites: none (software sprites); the C64 schema has a sprite block",
     "boot: no single load address or container: a disc catalogue gives load, exec and length per file, and a BASIC loader hands off to machine code",
     "media: a disc image is a DFS catalogue, not a file list; media.tools has no tool for it yet",
-    "chips: the registers of a chip are given by offset from memory, not checked (`unverified`)"
+    "chips: the register offsets of the ACIA, serial ULA, 8271, Econet, ADC and Tube are still from memory (`unverified`); the CRTC, VIAs and video ULA were checked on the emulator (`verified`)"
   ]
 }

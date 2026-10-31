@@ -676,6 +676,19 @@ check('output: the justfile template exports PYTHONUNBUFFERED and the tracer set
 _nb = [f for f in subprocess.run(['grep', '-rLE', 'from _common import|import _common|line_buffering|^import platforms|from platforms import|^import symbols|runpy', HERE, '--include=*.py'], capture_output=True, text=True).stdout.split() if os.path.getsize(f) > 2500 and 'if __name__' in open(f).read() and '__pycache__' not in f and 'ghidra' not in f and 'selftest' not in f]
 check('output: no tool of any size runs without line-buffered output (add `sys.stdout.reconfigure(line_buffering=True)` or import _common): %s' % ', '.join(os.path.relpath(f, HERE) for f in _nb), not _nb, _nb)
 
+# ---- apply_libs.py is driven by the platform descriptor: the C64's and the BBC's registers are named ------------------------------------------------------------------------
+def _libs_project(platform, src, syms):
+    d = project(src); open(os.path.join(d, 'symbols.asm'), 'w').write(syms)
+    open(os.path.join(d, 'project.config'), 'a').write('PLATFORM="%s"\n' % platform if platform != 'c64' else '')
+    return d
+_al = lambda d, libs, *a: subprocess.run([sys.executable, '-B', os.path.join(HERE, 'apply_libs.py'), '--root', d, '--main', 'main.asm', '--libs', os.path.join(HERE, '..', libs)] + list(a), capture_output=True, text=True)
+_d = _libs_project('c64', '#import "symbols.asm"\n.pc = $0800 "RAM"\n  lda DAT_d021\n  sta DAT_dc01\n  lda DAT_d041\n  lda DAT_fe4e\n  rts\n', '#importonce\n.label DAT_d021 = $D021\n.label DAT_dc01 = $DC01\n.label DAT_d041 = $D041\n.label DAT_fe4e = $FE4E\n')
+r = _al(_d, 'libs', '--write'); t = text(_d)
+check('apply_libs, c64: a VIC and a CIA register are named, a mirror of the VIC register is reported, an address that is not hardware here ($FE4E) is left alone', r.returncode == 0 and 'lda VIC.' in t and 'sta CIA.DATA_PORT_B_1' in t and 'DAT_d041' in t and 'DAT_fe4e' in t and '$D041 = VIC.' in r.stdout, t + r.stdout + r.stderr)
+_d = _libs_project('bbc', '#import "symbols.asm"\n.pc = $0200 "RAM"\n  lda DAT_fe4e\n  sta DAT_fe00\n  jsr SUB_fff4\n  lda DAT_d021\n  rts\n', '#importonce\n.label DAT_fe4e = $FE4E\n.label DAT_fe00 = $FE00\n.label SUB_fff4 = $FFF4\n.label DAT_d021 = $D021\n')
+r = _al(_d, os.path.join('platforms', 'bbc', 'libs'), '--write'); t = text(_d); _sy = open(os.path.join(_d, 'symbols.asm')).read()
+check('apply_libs, bbc: the system VIA register, the CRTC register and the OS call (a SUB_ label) are named from the BBC libs; $D021 is not hardware on this machine; the symbols file keeps their XREF lines as comments', r.returncode == 0 and 'sta CRTC.ADDRESS' in t and 'lda SYSVIA.IRQ_ENABLE' in t and 'jsr OS.OSBYTE' in t and 'DAT_d021' in t and 'exported as SUB_fff4' in _sy and '#import "libs/via.asm"' in t, t + _sy + r.stdout + r.stderr)
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')
