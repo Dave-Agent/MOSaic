@@ -8,6 +8,7 @@ Setup comes from project.config (see scripts/trace/c64env.py: TRACE_RAM, TRACE_P
   SIM_STUB     address of the stub that calls the routine (default 0200: free RAM in the base image; the stub is `jsr TARGET [; sta A_ADDR] [; stx X_ADDR]; jmp *`)
   SIM_SP       stack pointer at the call (hex, default f0)           SIM_P   status register (hex, default 34: interrupts masked, so a call is deterministic)
   SIM_PORT     processor port $01 (hex, default 35: ROMs out, I/O in)
+  SIM_FLAT_RAM 1: all 64K is plain RAM, no 6510 port at $00/$01 and no ROM or I/O banking (a BBC Micro or NES program; or Sim(flat=True))
   SIM_FRAMES   video frames the call may take at most (default 2; the run stops as soon as the routine returns to the stub's loop)
 Environment: C64_ROOT, C64_PHASE (1|2), C64_PRG, C64_SYM select the project and the build (scripts/sim/run_tests.py sets them from --root/--phase).
 
@@ -28,7 +29,7 @@ from c64env import Env, hexval
 import symbols
 
 class Sim:
-    def __init__(self, base=None, syms=None, env=None, trace_bin=None, rom_dir=None, stub=0x0200, sp=0xf0, p=0x34, port=0x35, frames=2):
+    def __init__(self, base=None, syms=None, env=None, trace_bin=None, rom_dir=None, stub=0x0200, sp=0xf0, p=0x34, port=0x35, frames=2, flat=False):
         """base: the initial 64K image (bytes); syms: {name: address}. Both default to the project of the environment (TRACE_RAM + build, the build's symbol file)."""
         self.env = env; c = env.cfg if env else {}
         self.base = base if base is not None else env.base_ram()
@@ -36,7 +37,7 @@ class Sim:
         self.trace = trace_bin or (env.build_tracer() if env else None)
         self.rom_dir = rom_dir if rom_dir is not None else (env.rom_dir if env else None)
         self.stub = hexval(c.get('SIM_STUB'), stub); self.sp = hexval(c.get('SIM_SP'), sp); self.p = hexval(c.get('SIM_P'), p)
-        self.port = hexval(c.get('SIM_PORT'), port); self.frames = int(c.get('SIM_FRAMES', frames))
+        self.port = hexval(c.get('SIM_PORT'), port); self.frames = int(c.get('SIM_FRAMES', frames)); self.flat = flat or c.get('SIM_FLAT_RAM') == '1'
         if not self.trace:                                       # standalone use (the example test): build the tracer into a temp dir
             self.trace = os.path.join(tempfile.gettempdir(), 'c64trace_sim'); src = os.path.join(os.path.dirname(HERE), 'trace', 'c64trace.c')
             if not os.path.exists(self.trace) or os.path.getmtime(self.trace) < os.path.getmtime(src): subprocess.check_call(['gcc', '-O2', '-o', self.trace, src])
@@ -64,7 +65,7 @@ class Sim:
             if keymat: cmd += ['--keymat', ','.join('%x' % b for b in keymat)]
             if init: cmd += ['--init', d + '/init.txt']
             if memlog: cmd += ['--memlog', d + '/mem.txt', '%04x' % memlog[0], '%04x' % memlog[1]]
-            r = subprocess.run(cmd + list(extra) + ['--out', d + '/o'], capture_output=True, text=True)
+            r = subprocess.run(cmd + (['--flat-ram'] if self.flat else []) + list(extra) + ['--out', d + '/o'], capture_output=True, text=True)
             assert 'dump-at' in r.stdout, 'the routine did not return within %d frame(s) (stdout %r, stderr %r)' % (self.frames, r.stdout, r.stderr)
             out = open(d + '/out.bin', 'rb').read()[:65536]
             if memlog: return out, [l for l in open(d + '/mem.txt').read().splitlines() if l and not l.startswith('#')]

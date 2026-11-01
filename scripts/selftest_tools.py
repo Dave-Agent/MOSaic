@@ -812,6 +812,14 @@ for _ in range(50):
 _run = _st('slow').get('state'); _pid = 'pid' in _st('slow'); _pp.send_signal(_sg.SIGTERM); _pp.wait(timeout=20)
 check('with_status: while it runs the file says running with a pid, and a SIGTERM is recorded as killed', _run == 'running' and _pid and _st('slow').get('state') == 'killed', str(_st('slow')))
 
+# ---- the simulator can run a flat 64K machine (no 6510 port at $00/$01) ------------------------------------------------------------------------------------------------------
+def _flat_test():
+    sys.path.insert(0, os.path.join(HERE, 'sim')); import c64sim
+    base = bytearray(65536); prog = bytes([0xA9, 0x42, 0x85, 0x00, 0x85, 0x01, 0xA5, 0x00, 0x85, 0xF0, 0xA5, 0x01, 0x85, 0xF1, 0x60]); base[0x1000:0x1000 + len(prog)] = prog
+    flat = c64sim.Sim(base=bytes(base), syms={'T': 0x1000}, flat=True).run(0x1000, {}); c64 = c64sim.Sim(base=bytes(base), syms={'T': 0x1000}).run(0x1000, {})
+    return flat[0xF0] == 0x42 and flat[0xF1] == 0x42 and c64[0xF0] != 0x42
+check('sim: a flat machine keeps what is written to $00 and $01 as plain RAM; the 6510 model reads the port registers there', _flat_test())
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')

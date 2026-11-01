@@ -15,7 +15,7 @@
  *
  * Build:  gcc -O2 -o c64trace c64trace.c
  *
- * Run:    c64trace --ram IMAGE [--rom-dir DIR] --out PREFIX --pc HEX [--a HEX --x HEX --y HEX --sp HEX --p HEX] [--port HEX (the processor port, $01: pass it when the dump's $01 is not the value you want, a dump taken mid-load may hold junk)]
+ * Run:    c64trace --ram IMAGE [--rom-dir DIR] --out PREFIX --pc HEX [--a HEX --x HEX --y HEX --sp HEX --p HEX] [--flat-ram] [--port HEX (the processor port, $01: pass it when the dump's $01 is not the value you want, a dump taken mid-load may hold junk)]
  *                  [--state FILE] [--overlay F FILE [ADDR]] [--jump F HEX] [--init FILE] [--frames N] [--seed S] [--chaos N] [--poke F[+P]:ADDR[-HI]=VAL ...] [--joy1 HEX] [--joy2 HEX]
  *                  [--keymat B0,..,B7 [--keymat-frames N]] [--joy1-at F=HEX ...] [--joy2-at F=HEX ...] [--keymat-at F=B0,..,B7 ...] [--skew CYCLES]
  *           IMAGE: 64K RAM (a 65538-byte file with a 2-byte load address is accepted); without --rom-dir the ROM areas read $02 (KIL: executing one stops the run); DIR holds kernal-901227-03.bin,
@@ -130,6 +130,7 @@ static u8 A, X, Y, SP;
 static u16 PC;
 static int fN, fV, fD, fI, fZ, fC;
 static u8 port_dir = 0x2F, port_val = 0x37;
+static int flat_ram;                  /* --flat-ram: all 64K is plain RAM (a 6502 machine without the 6510 port at $00/$01, ROM or I/O banking: the BBC Micro, the NES CPU) */
 static int dump_at = -1;
 static unsigned port_init = 0x34;      /* processor port at start of a normal run (--port HEX); a program with its ROMs banked out runs with $34/$35, a BASIC SYS starts with $37 */
 static u64 cycles;
@@ -313,6 +314,7 @@ static int adds_raster_at(u16 pc) {
 }
 
 static u8 mem_read(u16 a) {
+    if (flat_ram) return ram[a];
     if (a < 2) return a == 0 ? port_dir : (u8)((port_val & port_dir) | (~port_dir & 0x37));
     int b = bankbits();
     if (a >= 0xA000 && a < 0xC000 && (b & 3) == 3) return basic[a - 0xA000];
@@ -325,6 +327,7 @@ static u8 mem_read(u16 a) {
 }
 
 static void mem_write(u16 a, u8 v) {
+    if (flat_ram) { ram[a] = v; return; }
     /* The data direction register is held at $2F: a program never means to change it (a wild write to $00 in the
        stubbed-hardware runs would otherwise bank the I/O area in and hide RAM reads). */
     if (a < 2) { if (a == 1) port_val = v; return; }
@@ -914,6 +917,7 @@ int main(int argc, char **argv) {
             noverlays++;
         }
         else if (!strcmp(argv[i], "--jump") && i + 2 < argc && njumps < 8) { jumps[njumps].frame = atol(argv[++i]); jumps[njumps].pc = (unsigned)strtoul(argv[++i], 0, 16); njumps++; }
+        else if (!strcmp(argv[i], "--flat-ram")) flat_ram = 1;
         else if (!strcmp(argv[i], "--port") && i + 1 < argc) port_init = (unsigned)strtoul(argv[++i], 0, 16);
         else if (!strcmp(argv[i], "--dump-at") && i + 1 < argc) dump_at = (int)strtoul(argv[++i], 0, 16);
         else if (!strcmp(argv[i], "--chaos") && i + 1 < argc) chaos = (u32)atol(argv[++i]);
