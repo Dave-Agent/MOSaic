@@ -91,3 +91,8 @@ INKEY: {
 OSZP: {
     .label ROW_TABLE                 = $E0     // pointer to the row multiplication table: the screen address offset of each character row, high bytes first
 }
+
+// OS workspace in page 3.
+OSWS: {
+    .label SCREEN_START              = $0350   // top-left screen address as the OS believes the CRTC has it (the text output is drawn relative to it); keep it in step with a hardware scroll
+}
