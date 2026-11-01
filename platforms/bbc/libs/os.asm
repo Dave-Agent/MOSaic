@@ -86,3 +86,8 @@ INKEY: {
     .label Y                         = $BB
     .label Z                         = $9E
 }
+
+// Zero page the OS drivers use, as the Model B and Electron have it (the Master uses these bytes for other things).
+OSZP: {
+    .label ROW_TABLE                 = $E0     // pointer to the row multiplication table: the screen address offset of each character row, high bytes first
+}
