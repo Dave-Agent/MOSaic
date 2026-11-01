@@ -248,6 +248,12 @@ golden phase=active_phase: (build phase)
     #!/usr/bin/env bash
     set -euo pipefail
     . ./project.config
+    if [ "${GOLDEN_RUNNER:-}" = "bbc" ]; then
+        # BBC Micro: named state per video field under scripted keys in Beebium; phase 1 must agree exactly, phase 2 with the early fields (GOLDEN_TOLERANCE, default 200)
+        if [ "{{phase}}" = "1" ]; then sym="${TRACE_SYM_P1:-build/game.sym}"; prg="${TRACE_PRG_P1:-$OUTPUT_PRG}"; tol=0; else sym="${TRACE_SYM:-build/p2/game.sym}"; prg="${TRACE_PRG:-build/p2/game.prg}"; tol="${GOLDEN_TOLERANCE:-200}"; fi
+        python3 -B {{skill}}/scripts/platform/bbc/emulator/golden.py check --root . --sym "$sym" --prg "$prg" --out tools/golden/p1 --tolerance "$tol" --from "${GOLDEN_FROM:-0}"
+        exit 0
+    fi
     only=(); [ -n "${GOLDEN_T_SET:-}" ] && only=(--only "$GOLDEN_T_SET")
     g="python3 -B {{skill}}/scripts/golden/golden.py"
     if [ "{{phase}}" = "1" ]; then $g check --root . --phase 1; fi
@@ -256,6 +262,10 @@ golden-record: (build "1")
     #!/usr/bin/env bash
     set -euo pipefail
     . ./project.config
+    if [ "${GOLDEN_RUNNER:-}" = "bbc" ]; then
+        python3 -B {{skill}}/scripts/platform/bbc/emulator/golden.py record --root . --sym "${TRACE_SYM_P1:-build/game.sym}" --prg "${TRACE_PRG_P1:-$OUTPUT_PRG}" --out tools/golden/p1
+        exit 0
+    fi
     only=(); [ -n "${GOLDEN_T_SET:-}" ] && only=(--only "$GOLDEN_T_SET")
     python3 -B {{skill}}/scripts/golden/golden.py record --root . --phase 1
     python3 -B {{skill}}/scripts/golden/golden.py record-t --root . --phase 1 ${only[@]+"${only[@]}"}

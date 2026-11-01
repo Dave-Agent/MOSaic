@@ -820,6 +820,25 @@ def _flat_test():
     return flat[0xF0] == 0x42 and flat[0xF1] == 0x42 and c64[0xF0] != 0x42
 check('sim: a flat machine keeps what is written to $00 and $01 as plain RAM; the 6510 model reads the port registers there', _flat_test())
 
+# ---- golden.py (BBC): the parts that need no emulator ------------------------------------------------------------------------------------------------------------------------
+def _golden_test():
+    import importlib.util, tempfile
+    sys.modules.setdefault('beebium', None)
+    spec = importlib.util.spec_from_file_location('bbc_golden', os.path.join(HERE, 'platform', 'bbc', 'emulator', 'golden.py')); g = importlib.util.module_from_spec(spec); spec.loader.exec_module(g)
+    ref = bytes(range(16)); build = bytearray(ref); build[3] = 0xEE; build[4] = 0xEF; build[12] = 0x77
+    prg = (0x1000).to_bytes(2, 'little') + bytes(build)
+    ok = g.overlay(prg, ref, 0x1000, gap=2) == [(0x1003, bytes([0xEE, 0xEF])), (0x100C, bytes([0x77]))] and g.overlay(prg, ref, 0x1000, gap=8) == [(0x1003, bytes(build[3:13]))]
+    ok = ok and g.overlay(prg, bytes(build), 0x1000) == [] and g.overlay(prg, ref[:8], 0x1000)[-1][0] + len(g.overlay(prg, ref[:8], 0x1000)[-1][1]) == 0x1010      # beyond the reference counts as different
+    a = [(0, 'aa'), (5, 'bb'), (9, 'cc')]; b = [(0, 'aa'), (5, 'bb'), (9, 'cd')]; c = [(0, 'zz'), (5, 'bb'), (9, 'cc')]
+    ok = ok and g.first_difference(a, a) is None and g.first_difference(a, b) == 9 and g.first_difference(a, c) == 0 and g.first_difference(a, c, 3) == 3 and g.first_difference(a, [(0, 'zz'), (3, 'aa'), (5, 'bb'), (9, 'cc')], 4) is None and g.first_difference(a, [(0, 'aa'), (7, 'bb'), (9, 'cc')]) == 5
+    d = tempfile.mkdtemp(); open(d + '/sc.txt', 'w').write('# c\nwalk\t300\t60,RET,down;70,RET,up;100,=var+2,7\n')
+    import symbols
+    sc = g.read_scenarios(d + '/sc.txt', {'var': 0x40})
+    ok = ok and sc == [('walk', 300, {60: [('\r', 'down')], 70: [('\r', 'up')], 100: [('=', (0x42, 7))]})]
+    open(d + '/st.txt', 'w').write('a*3  # three\nb+1\n'); st = g.read_state(d + '/st.txt', {'a': 0x10, 'b': 0x20})
+    return ok and st == [('a', 0x10, 3), ('b+1', 0x21, 1)]
+check('golden (BBC): overlay writes only the bytes that differ from the reference (merging close ones), first_difference honours --from, scenarios parse key and poke events, state names resolve with offsets and counts', _golden_test())
+
 if __name__ == '__main__':
     if fails: print('\n%d FAILED: %s' % (len(fails), ', '.join(fails))); sys.exit(1)
     print('\nall tool self-tests passed')
